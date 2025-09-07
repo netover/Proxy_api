@@ -6,10 +6,16 @@ providers:
     models:
       - "gpt-4"
       - "gpt-3.5-turbo"
+      - "text-davinci-003"
+      - "text-embedding-ada-002"
     enabled: true
     priority: 1
     timeout: 30
     rate_limit: 1000
+    retry_attempts: 3
+    retry_delay: 1.0
+    headers:
+      "Authorization": "Bearer ${OPENAI_API_KEY}"
 
   - name: "anthropic"
     type: "anthropic"
@@ -22,3 +28,8 @@ providers:
     priority: 2
     timeout: 30
     rate_limit: 1000
+    retry_attempts: 3
+    retry_delay: 1.0
+    headers:
+      "x-api-key": "${ANTHROPIC_API_KEY}"
+      "anthropic-version": "2023-06-01"

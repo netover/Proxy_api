@@ -18,8 +18,6 @@
 - [x] Create config.yaml file
 - [x] Create README.md documentation
 - [x] Create LICENSE file
-
-## In Progress
 - [x] Test all components together
 - [x] Verify API endpoints work correctly
 - [x] Test provider health checks
@@ -27,14 +25,23 @@
 - [x] Test rate limiting
 - [x] Test Docker build
 - [x] Test executable build
+- [x] Enhance configuration validation with Pydantic schemas
+- [x] Implement additional OpenAI-compatible endpoints (/v1/completions, /v1/embeddings, etc.)
+- [x] Introduce connection pooling to reuse httpx clients
+- [x] Add consistent timeouts and error normalization
+- [x] Create comprehensive unit and integration tests
+- [x] Add complete type hints throughout the codebase
+- [x] Create PyInstaller build scripts for Windows executables with embedded configs
+
+## In Progress
+- [ ] Develop protected admin GUI for CRUD operations on providers/routes
+- [x] Update TODO.md to reflect new tasks and progress tracking
 
 ## Pending
 - [ ] Add more provider implementations (Azure OpenAI, Cohere, etc.)
 - [ ] Implement authentication middleware
 - [ ] Add request/response caching
 - [ ] Implement request queuing for rate limiting
-- [ ] Add comprehensive unit tests
-- [ ] Add integration tests
 - [ ] Implement CI/CD pipeline
 - [ ] Add API documentation with Swagger
 - [ ] Create example client applications
@@ -43,7 +50,6 @@
 - [ ] Add request tracing
 - [ ] Implement advanced error handling
 - [ ] Add configuration hot reloading
-- [ ] Create admin dashboard
 - [ ] Add provider-specific settings validation
 - [ ] Implement request/response transformation middleware
 - [ ] Add support for streaming responses
