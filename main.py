@@ -121,52 +121,52 @@ async def chat_completions(
     completion_request: Dict[str, Any]
 ):
     """OpenAI-compatible chat completions endpoint with intelligent routing"""
-    
+
     if not config:
         raise HTTPException(status_code=500, detail="Configuration not loaded")
-    
+
     model = completion_request.get("model")
     if not model:
         raise HTTPException(status_code=400, detail="Model is required")
-    
+
     # Find providers that support this model
     providers = [
-        provider for provider in config.providers 
+        provider for provider in config.providers
         if provider.enabled and model in provider.models
     ]
-    
+
     if not providers:
         raise HTTPException(
             status_code=400,
             detail=f"Model '{model}' is not supported by any provider"
         )
-    
+
     # Sort providers by priority (lower number = higher priority)
     providers.sort(key=lambda p: p.priority)
-    
+
     # Try providers in order
     last_exception = None
-    
+
     for provider_config in providers:
         try:
             logger.info(f"Attempting request with provider: {provider_config.name}")
-            
+
             # Get provider instance
             provider = get_provider(provider_config)
-            
+
             # Make the request
             response = await provider.create_completion(completion_request)
-            
-            logger.info("Request completed successfully", 
+
+            logger.info("Request completed successfully",
                        provider=provider_config.name)
-            
+
             return response
-            
+
         except Exception as e:
             last_exception = e
             logger.error(f"Provider {provider_config.name} failed: {e}")
             continue
-    
+
     # All providers failed
     logger.error("All providers failed", error=str(last_exception))
     raise HTTPException(
@@ -174,6 +174,126 @@ async def chat_completions(
         detail="All providers are currently unavailable"
     )
 
+@app.post("/v1/completions")
+@limiter.limit(f"{settings.rate_limit_requests}/{settings.rate_limit_window}second")
+async def completions(
+    request: Request,
+    completion_request: Dict[str, Any]
+):
+    """OpenAI-compatible completions endpoint with intelligent routing"""
+
+    if not config:
+        raise HTTPException(status_code=500, detail="Configuration not loaded")
+
+    model = completion_request.get("model")
+    if not model:
+        raise HTTPException(status_code=400, detail="Model is required")
+
+    # Find providers that support this model
+    providers = [
+        provider for provider in config.providers
+        if provider.enabled and model in provider.models
+    ]
+
+    if not providers:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Model '{model}' is not supported by any provider"
+        )
+
+    # Sort providers by priority (lower number = higher priority)
+    providers.sort(key=lambda p: p.priority)
+
+    # Try providers in order
+    last_exception = None
+
+    for provider_config in providers:
+        try:
+            logger.info(f"Attempting completions request with provider: {provider_config.name}")
+
+            # Get provider instance
+            provider = get_provider(provider_config)
+
+            # Make the request
+            response = await provider.create_text_completion(completion_request)
+
+            logger.info("Completions request completed successfully",
+                       provider=provider_config.name)
+
+            return response
+
+        except Exception as e:
+            last_exception = e
+            logger.error(f"Provider {provider_config.name} failed: {e}")
+            continue
+
+    # All providers failed
+    logger.error("All providers failed for completions", error=str(last_exception))
+    raise HTTPException(
+        status_code=503,
+        detail="All providers are currently unavailable"
+    )
+
+@app.post("/v1/embeddings")
+@limiter.limit(f"{settings.rate_limit_requests}/{settings.rate_limit_window}second")
+async def embeddings(
+    request: Request,
+    embedding_request: Dict[str, Any]
+):
+    """OpenAI-compatible embeddings endpoint with intelligent routing"""
+
+    if not config:
+        raise HTTPException(status_code=500, detail="Configuration not loaded")
+
+    model = embedding_request.get("model")
+    if not model:
+        raise HTTPException(status_code=400, detail="Model is required")
+
+    # Find providers that support this model
+    providers = [
+        provider for provider in config.providers
+        if provider.enabled and model in provider.models
+    ]
+
+    if not providers:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Model '{model}' is not supported by any provider"
+        )
+
+    # Sort providers by priority (lower number = higher priority)
+    providers.sort(key=lambda p: p.priority)
+
+    # Try providers in order
+    last_exception = None
+
+    for provider_config in providers:
+        try:
+            logger.info(f"Attempting embeddings request with provider: {provider_config.name}")
+
+            # Get provider instance
+            provider = get_provider(provider_config)
+
+            # Make the request
+            response = await provider.create_embeddings(embedding_request)
+
+            logger.info("Embeddings request completed successfully",
+                       provider=provider_config.name)
+
+            return response
+
+        except Exception as e:
+            last_exception = e
+            logger.error(f"Provider {provider_config.name} failed: {e}")
+            continue
+
+    # All providers failed
+    logger.error("All providers failed for embeddings", error=str(last_exception))
+    raise HTTPException(
+        status_code=503,
+        detail="All providers are currently unavailable"
+    )
+        
 # Error handlers
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):

@@ -8,87 +8,161 @@ import time
 
 class AnthropicProvider(Provider):
     """Anthropic provider implementation"""
-    
+
     def __init__(self, config: ProviderConfig):
         super().__init__(config)
         self.logger = ContextualLogger(f"provider.{config.name}")
-        
+
     async def _health_check(self) -> Dict[str, Any]:
         """Check Anthropic health"""
         try:
-            response = await self.client.get(
+            response = await self.make_request_with_retry(
+                "GET",
                 f"{self.config.base_url}/v1/models",
                 headers={"x-api-key": self.api_key}
             )
-            response.raise_for_status()
             return response.json()
         except Exception as e:
             self.logger.error(f"Health check failed: {e}")
             raise
-    
+
     async def create_completion(self, request: Dict[str, Any]) -> Dict[str, Any]:
-        """Create a completion using Anthropic's API"""
+        """Create a chat completion using Anthropic's API"""
         start_time = time.time()
-        
+
         try:
-            # Prepare request
-            headers = {
-                "x-api-key": self.api_key,
-                "Content-Type": "application/json",
-                "anthropic-version": "2023-06-01"
-            }
-            
-            # Make request
-            response = await self.client.post(
+            # Make request with retry logic
+            response = await self.make_request_with_retry(
+                "POST",
                 f"{self.config.base_url}/v1/messages",
-                headers=headers,
+                headers={
+                    "x-api-key": self.api_key,
+                    "Content-Type": "application/json",
+                    "anthropic-version": "2023-06-01"
+                },
                 json=request
             )
-            
-            response.raise_for_status()
-            
+
+            result = response.json()
+
             # Record metrics
             response_time = time.time() - start_time
-            # Anthropic doesn't return token count in the same way as OpenAI
-            # We'll estimate based on input/output
-            input_tokens = response.json().get("usage", {}).get("input_tokens", 0)
-            output_tokens = response.json().get("usage", {}).get("output_tokens", 0)
+            input_tokens = result.get("usage", {}).get("input_tokens", 0)
+            output_tokens = result.get("usage", {}).get("output_tokens", 0)
             tokens = input_tokens + output_tokens
-            
+
             metrics_collector.record_request(
                 self.config.name,
                 success=True,
                 response_time=response_time,
                 tokens=tokens
             )
-            
-            self.logger.info(f"Completion successful", 
-                           response_time=response_time, 
+
+            self.logger.info("Chat completion successful",
+                           response_time=response_time,
                            tokens=tokens)
-            
-            return response.json()
-            
-        except httpx.HTTPStatusError as e:
-            response_time = time.time() - start_time
-            
-            metrics_collector.record_request(
-                self.config.name,
-                success=False,
-                response_time=response_time,
-                error_type=f"http_{e.response.status_code}"
-            )
-            
-            self.logger.error(f"HTTP error: {e.response.status_code}")
-            raise
+
+            return result
+
         except Exception as e:
             response_time = time.time() - start_time
-            
+
             metrics_collector.record_request(
                 self.config.name,
                 success=False,
                 response_time=response_time,
                 error_type=type(e).__name__
             )
-            
-            self.logger.error(f"Request failed: {e}")
+
+            self.logger.error(f"Chat completion failed: {e}")
             raise
+
+    async def create_text_completion(self, request: Dict[str, Any]) -> Dict[str, Any]:
+        """Create a text completion using Anthropic's API"""
+        # Anthropic doesn't have a separate text completion endpoint like OpenAI
+        # We'll use the messages endpoint with a system prompt
+        start_time = time.time()
+
+        try:
+            # Convert OpenAI-style request to Anthropic format
+            anthropic_request = {
+                "model": request.get("model", "claude-3-sonnet-20240229"),
+                "max_tokens": request.get("max_tokens", 1000),
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": request.get("prompt", "")
+                    }
+                ]
+            }
+
+            # Make request with retry logic
+            response = await self.make_request_with_retry(
+                "POST",
+                f"{self.config.base_url}/v1/messages",
+                headers={
+                    "x-api-key": self.api_key,
+                    "Content-Type": "application/json",
+                    "anthropic-version": "2023-06-01"
+                },
+                json=anthropic_request
+            )
+
+            result = response.json()
+
+            # Record metrics
+            response_time = time.time() - start_time
+            input_tokens = result.get("usage", {}).get("input_tokens", 0)
+            output_tokens = result.get("usage", {}).get("output_tokens", 0)
+            tokens = input_tokens + output_tokens
+
+            metrics_collector.record_request(
+                self.config.name,
+                success=True,
+                response_time=response_time,
+                tokens=tokens
+            )
+
+            self.logger.info("Text completion successful",
+                           response_time=response_time,
+                           tokens=tokens)
+
+            # Convert back to OpenAI-style response format
+            return {
+                "id": result.get("id", ""),
+                "object": "text_completion",
+                "created": int(time.time()),
+                "model": result.get("model", ""),
+                "choices": [
+                    {
+                        "text": result.get("content", [{}])[0].get("text", ""),
+                        "index": 0,
+                        "logprobs": None,
+                        "finish_reason": result.get("stop_reason", "stop")
+                    }
+                ],
+                "usage": {
+                    "prompt_tokens": input_tokens,
+                    "completion_tokens": output_tokens,
+                    "total_tokens": tokens
+                }
+            }
+
+        except Exception as e:
+            response_time = time.time() - start_time
+
+            metrics_collector.record_request(
+                self.config.name,
+                success=False,
+                response_time=response_time,
+                error_type=type(e).__name__
+            )
+
+            self.logger.error(f"Text completion failed: {e}")
+            raise
+
+    async def create_embeddings(self, request: Dict[str, Any]) -> Dict[str, Any]:
+        """Create embeddings using Anthropic's API"""
+        # Anthropic doesn't have a native embeddings endpoint
+        # This is a placeholder - would need to use a different service
+        raise NotImplementedError("Anthropic does not provide embeddings API")

@@ -1,0 +1,12 @@
+app_name: "LLM Proxy API"
+version: "1.0.0"
+company: "Your Company"
+description: "High-performance LLM proxy with intelligent routing and fallback"
+icon: "icon.ico"
+console: true
+onefile: true
+include_files:
+  - ["config.yaml", "config.yaml"]
+  - ["logs", "logs"]
+  - ["README.md", "README.md"]
+  - ["LICENSE", "LICENSE"]
