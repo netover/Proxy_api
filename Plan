@@ -1,0 +1,967 @@
+ANÁLISE COMPLETA: PROXY API PROJECT
+Após análise detalhada do repositório Proxy_api, identifiquei várias oportunidades de melhoria para tornar o projeto production-ready e compilável para Windows. Vou apresentar uma análise estruturada:
+
+📊 STATUS ATUAL DO PROJETO
+✅ Pontos Positivos
+Arquitetura modular bem estruturada
+
+FastAPI com Pydantic para validação
+
+Suporte a múltiplos providers (OpenAI, Anthropic)
+
+Configuração via YAML flexível
+
+Fallback entre providers implementado
+
+❌ Problemas Críticos Identificados
+Falta de tratamento robusto de erros
+
+Ausência de logging estruturado
+
+Sem autenticação/autorização
+
+Configurações hardcoded
+
+Falta de validação de configuração
+
+Sem monitoramento de saúde
+
+🛠️ CORREÇÕES E MELHORIAS PROPOSTAS
+1. REFATORAÇÃO DA ARQUITETURA
+python
+# 📁 src/core/config.py
+import os
+from pathlib import Path
+from typing import List, Optional
+from pydantic import BaseSettings, validator
+import yaml
+
+class Settings(BaseSettings):
+    """Application settings with validation and environment support"""
+    
+    # App Configuration
+    app_name: str = "LLM Proxy API"
+    app_version: str = "1.0.0"
+    debug: bool = False
+    
+    # Server Configuration  
+    host: str = "127.0.0.1"
+    port: int = 8000
+    
+    # Security
+    api_key_header: str = "X-API-Key"
+    allowed_origins: List[str] = ["*"]
+    
+    # Rate Limiting
+    rate_limit_requests: int = 100
+    rate_limit_window: int = 60  # seconds
+    
+    # Timeouts
+    client_timeout: int = 60
+    provider_timeout: int = 30
+    
+    # Paths
+    config_file: Path = Path("config.yaml")
+    log_file: Path = Path("logs/proxy_api.log")
+    
+    @validator('config_file')
+    def validate_config_file(cls, v):
+        if not v.exists():
+            raise ValueError(f"Configuration file {v} not found")
+        return v
+    
+    class Config:
+        env_prefix = "PROXY_API_"
+        case_sensitive = False
+        env_file = ".env"
+
+settings = Settings()
+2. SISTEMA DE LOGGING AVANÇADO
+python
+# 📁 src/core/logging.py
+import logging
+import sys
+from pathlib import Path
+from logging.handlers import RotatingFileHandler
+import json
+from datetime import datetime
+from typing import Any, Dict
+
+class JSONFormatter(logging.Formatter):
+    """JSON formatter for structured logging"""
+    
+    def format(self, record: logging.LogRecord) -> str:
+        log_entry = {
+            "timestamp": datetime.utcnow().isoformat(),
+            "level": record.levelname,
+            "logger": record.name,
+            "message": record.getMessage(),
+            "module": record.module,
+            "function": record.funcName,
+            "line": record.lineno
+        }
+        
+        if hasattr(record, 'extra_data'):
+            log_entry.update(record.extra_data)
+            
+        if record.exc_info:
+            log_entry["exception"] = self.formatException(record.exc_info)
+            
+        return json.dumps(log_entry, ensure_ascii=False)
+
+def setup_logging(log_level: str = "INFO", log_file: Path = None):
+    """Setup comprehensive logging configuration"""
+    
+    # Create logs directory
+    if log_file:
+        log_file.parent.mkdir(exist_ok=True, parents=True)
+    
+    # Root logger configuration
+    root_logger = logging.getLogger()
+    root_logger.setLevel(getattr(logging, log_level.upper()))
+    
+    # Clear existing handlers
+    for handler in root_logger.handlers[:]:
+        root_logger.removeHandler(handler)
+    
+    # Console handler with colors
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_formatter = logging.Formatter(
+        "%(asctime)s | %(levelname)-8s | %(name)s:%(lineno)d | %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S"
+    )
+    console_handler.setFormatter(console_formatter)
+    root_logger.addHandler(console_handler)
+    
+    # File handler with JSON format
+    if log_file:
+        file_handler = RotatingFileHandler(
+            log_file, 
+            maxBytes=10*1024*1024,  # 10MB
+            backupCount=5
+        )
+        file_handler.setFormatter(JSONFormatter())
+        root_logger.addHandler(file_handler)
+    
+    # Specific loggers
+    logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    
+    return root_logger
+
+class ContextualLogger:
+    """Logger with request context"""
+    
+    def __init__(self, name: str):
+        self.logger = logging.getLogger(name)
+        self.context = {}
+    
+    def set_context(self, **kwargs):
+        self.context.update(kwargs)
+    
+    def _log_with_context(self, level: int, msg: str, extra_data: Dict[str, Any] = None):
+        extra = {"extra_data": {**self.context, **(extra_data or {})}}
+        self.logger.log(level, msg, extra=extra)
+    
+    def info(self, msg: str, **kwargs):
+        self._log_with_context(logging.INFO, msg, kwargs)
+    
+    def error(self, msg: str, **kwargs):
+        self._log_with_context(logging.ERROR, msg, kwargs)
+    
+    def warning(self, msg: str, **kwargs):
+        self._log_with_context(logging.WARNING, msg, kwargs)
+3. GERENCIAMENTO DE CONFIGURAÇÃO ROBUSTO
+python
+# 📁 src/core/config_manager.py
+import yaml
+from pathlib import Path
+from typing import List, Dict, Any, Optional
+from pydantic import BaseModel, validator
+import logging
+
+logger = logging.getLogger(__name__)
+
+class ProviderConfig(BaseModel):
+    """Enhanced provider configuration with validation"""
+    
+    name: str
+    type: str
+    api_key_env: str
+    base_url: str
+    models: List[str]
+    
+    # Advanced configuration
+    priority: int = 1  # Higher = tried first
+    max_retries: int = 3
+    timeout: int = 30
+    rate_limit: Optional[int] = None
+    enabled: bool = True
+    
+    # Health check configuration
+    health_check_interval: int = 300  # seconds
+    health_check_model: Optional[str] = None
+    
+    @validator('type')
+    def validate_provider_type(cls, v):
+        allowed_types = ['openai', 'anthropic', 'azure_openai', 'cohere', 'huggingface']
+        if v not in allowed_types:
+            raise ValueError(f"Provider type must be one of: {allowed_types}")
+        return v
+    
+    @validator('base_url')
+    def validate_base_url(cls, v):
+        if not v.startswith(('http://', 'https://')):
+            raise ValueError("Base URL must start with http:// or https://")
+        return v.rstrip('/')
+
+class ProxyConfig(BaseModel):
+    """Complete proxy configuration"""
+    
+    providers: List[ProviderConfig]
+    
+    # Global settings
+    default_model: Optional[str] = None
+    fallback_enabled: bool = True
+    retry_delay: float = 1.0
+    
+    # Security settings
+    require_api_key: bool = False
+    valid_api_keys: List[str] = []
+    
+    @validator('providers')
+    def validate_providers(cls, v):
+        if not v:
+            raise ValueError("At least one provider must be configured")
+        
+        # Check for duplicate names
+        names = [p.name for p in v]
+        if len(names) != len(set(names)):
+            raise ValueError("Provider names must be unique")
+        
+        # Check for model coverage
+        all_models = set()
+        for provider in v:
+            all_models.update(provider.models)
+        
+        if not all_models:
+            raise ValueError("At least one model must be configured across all providers")
+        
+        return v
+
+class ConfigManager:
+    """Centralized configuration management"""
+    
+    def __init__(self, config_path: Path):
+        self.config_path = config_path
+        self._config: Optional[ProxyConfig] = None
+        self._file_mtime: Optional[float] = None
+    
+    def load_config(self, force_reload: bool = False) -> ProxyConfig:
+        """Load configuration with automatic reload detection"""
+        
+        if not self.config_path.exists():
+            raise FileNotFoundError(f"Configuration file not found: {self.config_path}")
+        
+        current_mtime = self.config_path.stat().st_mtime
+        
+        # Check if reload is needed
+        if (not force_reload and 
+            self._config is not None and 
+            self._file_mtime == current_mtime):
+            return self._config
+        
+        logger.info(f"Loading configuration from {self.config_path}")
+        
+        try:
+            with open(self.config_path, 'r', encoding='utf-8') as f:
+                config_data = yaml.safe_load(f)
+            
+            self._config = ProxyConfig(**config_data)
+            self._file_mtime = current_mtime
+            
+            logger.info(f"Configuration loaded successfully: {len(self._config.providers)} providers")
+            return self._config
+            
+        except yaml.YAMLError as e:
+            raise ValueError(f"Invalid YAML configuration: {e}")
+        except Exception as e:
+            raise ValueError(f"Configuration validation failed: {e}")
+    
+    def get_providers_for_model(self, model: str) -> List[ProviderConfig]:
+        """Get enabled providers that support the given model, sorted by priority"""
+        
+        if not self._config:
+            self.load_config()
+        
+        providers = [
+            p for p in self._config.providers 
+            if p.enabled and model in p.models
+        ]
+        
+        # Sort by priority (higher first)
+        return sorted(providers, key=lambda p: p.priority, reverse=True)
+    
+    def validate_api_key(self, api_key: str) -> bool:
+        """Validate API key if authentication is required"""
+        
+        if not self._config:
+            self.load_config()
+        
+        if not self._config.require_api_key:
+            return True
+        
+        return api_key in self._config.valid_api_keys
+
+# Global config manager
+config_manager = ConfigManager(Path("config.yaml"))
+4. PROVIDERS MELHORADOS COM HEALTH CHECK
+python
+# 📁 src/providers/base.py
+import asyncio
+import time
+from abc import ABC, abstractmethod
+from typing import Dict, Any, Optional
+import httpx
+from enum import Enum
+import logging
+
+from src.core.logging import ContextualLogger
+from src.models import ChatCompletionRequest, ChatCompletionResponse
+
+logger = ContextualLogger(__name__)
+
+class ProviderStatus(Enum):
+    HEALTHY = "healthy"
+    DEGRADED = "degraded" 
+    UNHEALTHY = "unhealthy"
+    UNKNOWN = "unknown"
+
+class ProviderMetrics:
+    """Track provider performance metrics"""
+    
+    def __init__(self):
+        self.total_requests = 0
+        self.successful_requests = 0
+        self.failed_requests = 0
+        self.total_response_time = 0.0
+        self.last_request_time = 0.0
+        self.consecutive_failures = 0
+        
+    @property
+    def success_rate(self) -> float:
+        if self.total_requests == 0:
+            return 0.0
+        return self.successful_requests / self.total_requests
+    
+    @property
+    def average_response_time(self) -> float:
+        if self.successful_requests == 0:
+            return 0.0
+        return self.total_response_time / self.successful_requests
+    
+    def record_request(self, duration: float, success: bool):
+        self.total_requests += 1
+        self.last_request_time = time.time()
+        
+        if success:
+            self.successful_requests += 1
+            self.total_response_time += duration
+            self.consecutive_failures = 0
+        else:
+            self.failed_requests += 1
+            self.consecutive_failures += 1
+
+class BaseProvider(ABC):
+    """Enhanced base provider with health monitoring"""
+    
+    def __init__(self, config: 'ProviderConfig'):
+        self.config = config
+        self.name = config.name
+        self.api_key = os.getenv(config.api_key_env)
+        self.base_url = config.base_url
+        self.status = ProviderStatus.UNKNOWN
+        self.metrics = ProviderMetrics()
+        self.last_health_check = 0.0
+        
+        if not self.api_key:
+            logger.error(f"API key not found for provider {self.name}")
+            raise ValueError(f"API key for provider '{self.name}' not found")
+        
+        logger.info(f"Initialized provider: {self.name}")
+    
+    async def create_completion_with_metrics(self, request: ChatCompletionRequest) -> httpx.Response:
+        """Wrapper that tracks metrics and handles retries"""
+        
+        logger.set_context(provider=self.name, model=request.model)
+        start_time = time.time()
+        
+        for attempt in range(self.config.max_retries):
+            try:
+                logger.info(f"Attempting completion (attempt {attempt + 1})")
+                
+                response = await self.create_completion(request)
+                duration = time.time() - start_time
+                
+                self.metrics.record_request(duration, True)
+                self.status = ProviderStatus.HEALTHY
+                
+                logger.info(f"Completion successful", 
+                          duration=duration, 
+                          status_code=response.status_code)
+                
+                return response
+                
+            except httpx.TimeoutException as e:
+                logger.warning(f"Timeout on attempt {attempt + 1}: {e}")
+                if attempt == self.config.max_retries - 1:
+                    self.metrics.record_request(time.time() - start_time, False)
+                    self.status = ProviderStatus.DEGRADED
+                    raise
+                    
+                await asyncio.sleep(self.config.retry_delay * (attempt + 1))
+                
+            except httpx.HTTPStatusError as e:
+                logger.error(f"HTTP error on attempt {attempt + 1}: {e.response.status_code}")
+                self.metrics.record_request(time.time() - start_time, False)
+                
+                if e.response.status_code >= 500:  # Server errors - retry
+                    if attempt < self.config.max_retries - 1:
+                        await asyncio.sleep(self.config.retry_delay * (attempt + 1))
+                        continue
+                
+                self.status = ProviderStatus.UNHEALTHY
+                raise
+                
+            except Exception as e:
+                logger.error(f"Unexpected error on attempt {attempt + 1}: {e}")
+                self.metrics.record_request(time.time() - start_time, False)
+                
+                if attempt == self.config.max_retries - 1:
+                    self.status = ProviderStatus.UNHEALTHY
+                    raise
+                
+                await asyncio.sleep(self.config.retry_delay * (attempt + 1))
+    
+    async def health_check(self) -> bool:
+        """Perform health check using a simple completion request"""
+        
+        current_time = time.time()
+        
+        # Skip if checked recently
+        if (current_time - self.last_health_check) < self.config.health_check_interval:
+            return self.status == ProviderStatus.HEALTHY
+        
+        self.last_health_check = current_time
+        
+        try:
+            # Use configured health check model or first available
+            test_model = self.config.health_check_model or self.config.models[0]
+            
+            test_request = ChatCompletionRequest(
+                model=test_model,
+                messages=[{"role": "user", "content": "Hello"}],
+                max_tokens=5
+            )
+            
+            response = await self.create_completion(test_request)
+            self.status = ProviderStatus.HEALTHY
+            logger.info(f"Health check passed for {self.name}")
+            return True
+            
+        except Exception as e:
+            self.status = ProviderStatus.UNHEALTHY
+            logger.error(f"Health check failed for {self.name}: {e}")
+            return False
+    
+    def get_status_info(self) -> Dict[str, Any]:
+        """Get comprehensive provider status information"""
+        
+        return {
+            "name": self.name,
+            "status": self.status.value,
+            "models": self.config.models,
+            "metrics": {
+                "total_requests": self.metrics.total_requests,
+                "success_rate": self.metrics.success_rate,
+                "average_response_time": self.metrics.average_response_time,
+                "consecutive_failures": self.metrics.consecutive_failures,
+                "last_request": self.metrics.last_request_time
+            },
+            "config": {
+                "enabled": self.config.enabled,
+                "priority": self.config.priority,
+                "timeout": self.config.timeout
+            },
+            "last_health_check": self.last_health_check
+        }
+    
+    @abstractmethod
+    async def create_completion(self, request: ChatCompletionRequest) -> httpx.Response:
+        """Provider-specific completion implementation"""
+        pass
+5. MAIN.PY REFATORADO PARA PRODUÇÃO
+python
+# 📁 main.py
+import asyncio
+from contextlib import asynccontextmanager
+from fastapi import FastAPI, HTTPException, Depends, Request, Header
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+import uvicorn
+from pathlib import Path
+
+from src.core.config import settings
+from src.core.logging import setup_logging, ContextualLogger
+from src.core.config_manager import config_manager
+from src.models import ChatCompletionRequest, ChatCompletionResponse
+from src.providers.factory import ProviderFactory
+from src.middleware.auth import auth_middleware
+from src.middleware.metrics import metrics_middleware
+
+# Setup logging
+setup_logging(
+    log_level="DEBUG" if settings.debug else "INFO",
+    log_file=settings.log_file
+)
+logger = ContextualLogger(__name__)
+
+# Rate limiting
+limiter = Limiter(key_func=get_remote_address)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan management"""
+    
+    logger.info("🚀 Starting LLM Proxy API")
+    
+    # Load configuration
+    try:
+        config = config_manager.load_config()
+        logger.info(f"Loaded {len(config.providers)} providers")
+    except Exception as e:
+        logger.error(f"Failed to load configuration: {e}")
+        raise
+    
+    # Initialize provider factory
+    provider_factory = ProviderFactory()
+    app.state.provider_factory = provider_factory
+    
+    # Start background health checks
+    health_check_task = asyncio.create_task(
+        periodic_health_checks(provider_factory)
+    )
+    
+    yield
+    
+    # Cleanup
+    logger.info("🛑 Shutting down LLM Proxy API")
+    health_check_task.cancel()
+    try:
+        await health_check_task
+    except asyncio.CancelledError:
+        pass
+
+async def periodic_health_checks(provider_factory: ProviderFactory):
+    """Background task for periodic health checks"""
+    
+    while True:
+        try:
+            await provider_factory.run_health_checks()
+            await asyncio.sleep(60)  # Check every minute
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            logger.error(f"Health check error: {e}")
+            await asyncio.sleep(60)
+
+# FastAPI app setup
+app = FastAPI(
+    title=settings.app_name,
+    version=settings.app_version,
+    description="High-performance LLM proxy with intelligent routing and fallback",
+    lifespan=lifespan
+)
+
+# Middleware setup
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.allowed_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.add_middleware(GZipMiddleware, minimum_size=1000)
+app.add_middleware(auth_middleware)
+app.add_middleware(metrics_middleware)
+
+# Dependency injection
+def get_provider_factory(request: Request) -> ProviderFactory:
+    return request.app.state.provider_factory
+
+async def validate_api_key(
+    x_api_key: str = Header(None, alias=settings.api_key_header)
+) -> bool:
+    """Validate API key if required"""
+    
+    config = config_manager.load_config()
+    if not config.require_api_key:
+        return True
+    
+    if not x_api_key or not config_manager.validate_api_key(x_api_key):
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid or missing API key"
+        )
+    return True
+
+# API Routes
+@app.get("/")
+async def root():
+    """Root endpoint with API information"""
+    return {
+        "name": settings.app_name,
+        "version": settings.app_version,
+        "status": "operational",
+        "endpoints": {
+            "chat_completions": "/v1/chat/completions",
+            "health": "/health",
+            "metrics": "/metrics",
+            "providers": "/providers"
+        }
+    }
+
+@app.get("/health")
+async def health_check(provider_factory: ProviderFactory = Depends(get_provider_factory)):
+    """Detailed health check endpoint"""
+    
+    provider_statuses = await provider_factory.get_all_statuses()
+    
+    healthy_providers = sum(1 for status in provider_statuses.values() 
+                          if status.get('status') == 'healthy')
+    
+    overall_status = "healthy" if healthy_providers > 0 else "unhealthy"
+    
+    return {
+        "status": overall_status,
+        "timestamp": time.time(),
+        "providers": provider_statuses,
+        "summary": {
+            "total_providers": len(provider_statuses),
+            "healthy_providers": healthy_providers
+        }
+    }
+
+@app.get("/metrics")
+async def get_metrics(provider_factory: ProviderFactory = Depends(get_provider_factory)):
+    """Provider metrics endpoint"""
+    
+    return await provider_factory.get_metrics()
+
+@app.get("/providers")
+async def list_providers(provider_factory: ProviderFactory = Depends(get_provider_factory)):
+    """List all providers and their capabilities"""
+    
+    return await provider_factory.get_provider_info()
+
+@app.post("/v1/chat/completions", response_model=ChatCompletionResponse)
+@limiter.limit(f"{settings.rate_limit_requests}/{settings.rate_limit_window}second")
+async def chat_completions(
+    request: Request,
+    completion_request: ChatCompletionRequest,
+    provider_factory: ProviderFactory = Depends(get_provider_factory),
+    _: bool = Depends(validate_api_key)
+):
+    """OpenAI-compatible chat completions endpoint with intelligent routing"""
+    
+    request_id = f"req_{int(time.time() * 1000)}"
+    logger.set_context(
+        request_id=request_id,
+        model=completion_request.model,
+        user_id=completion_request.user or "anonymous"
+    )
+    
+    logger.info("Processing chat completion request")
+    
+    try:
+        # Get providers for the requested model
+        providers = config_manager.get_providers_for_model(completion_request.model)
+        
+        if not providers:
+            logger.error(f"No providers support model: {completion_request.model}")
+            raise HTTPException(
+                status_code=400,
+                detail=f"Model '{completion_request.model}' is not supported by any provider"
+            )
+        
+        # Try providers in priority order
+        last_exception = None
+        
+        for provider_config in providers:
+            try:
+                provider = await provider_factory.get_provider(provider_config.name)
+                
+                if not provider:
+                    logger.warning(f"Provider {provider_config.name} not available")
+                    continue
+                
+                logger.info(f"Attempting request with provider: {provider_config.name}")
+                
+                # Make the request
+                response = await provider.create_completion_with_metrics(completion_request)
+                
+                # Transform response based on provider type
+                if hasattr(provider, 'transform_response'):
+                    result = provider.transform_response(response, completion_request)
+                else:
+                    result = response.json()
+                
+                logger.info("Request completed successfully", 
+                          provider=provider_config.name)
+                
+                return result
+                
+            except Exception as e:
+                last_exception = e
+                logger.error(f"Provider {provider_config.name} failed: {e}")
+                continue
+        
+        # All providers failed
+        logger.error("All providers failed", error=str(last_exception))
+        raise HTTPException(
+            status_code=503,
+            detail="All providers are currently unavailable"
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail="Internal server error"
+        )
+
+# Error handlers
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.error(f"Unhandled exception: {exc}", path=request.url.path)
+    
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error": "Internal server error",
+            "detail": "An unexpected error occurred"
+        }
+    )
+
+if __name__ == "__main__":
+    uvicorn.run(
+        "main:app",
+        host=settings.host,
+        port=settings.port,
+        reload=settings.debug,
+        log_level="debug" if settings.debug else "info"
+    )
+🔧 CONFIGURAÇÃO PARA COMPILAÇÃO WINDOWS
+PyInstaller Spec File
+python
+# 📁 build.spec
+# -*- mode: python ; coding: utf-8 -*-
+
+import os
+from pathlib import Path
+
+# Application info
+APP_NAME = "LLM_Proxy_API"
+APP_VERSION = "1.0.0"
+
+block_cipher = None
+
+a = Analysis(
+    ['main.py'],
+    pathex=[],
+    binaries=[],
+    datas=[
+        ('config.yaml', '.'),
+        ('.env.example', '.'),
+        ('static/', 'static/'),
+        ('templates/', 'templates/'),
+    ],
+    hiddenimports=[
+        'uvicorn.protocols.websockets.auto',
+        'uvicorn.protocols.http.auto',
+        'uvicorn.protocols.websockets.websockets_impl',
+        'uvicorn.protocols.http.httptools_impl',
+        'uvicorn.protocols.http.h11_impl',
+        'uvicorn.lifespan.on',
+        'pydantic.json',
+        'email.mime.multipart',
+        'email.mime.text',
+        'email.mime.base',
+    ],
+    hookspath=[],
+    hooksconfig={},
+    runtime_hooks=[],
+    excludes=[
+        'tkinter',
+        'matplotlib',
+        'numpy',
+        'pandas',
+        'scipy',
+        'PIL',
+        'cv2'
+    ],
+    win_no_prefer_redirects=False,
+    win_private_assemblies=False,
+    cipher=block_cipher,
+    noarchive=False,
+)
+
+pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
+
+exe = EXE(
+    pyz,
+    a.scripts,
+    a.binaries,
+    a.zipfiles,
+    a.datas,
+    [],
+    name=f'{APP_NAME}',
+    debug=False,
+    bootloader_ignore_signals=False,
+    strip=False,
+    upx=True,
+    upx_exclude=[],
+    runtime_tmpdir=None,
+    console=False,  # Set to True for debugging
+    disable_windowed_traceback=False,
+    target_arch=None,
+    codesign_identity=None,
+    entitlements_file=None,
+    version='version_info.py',
+    icon='icon.ico',  # Add your icon file
+)
+Version Info File
+python
+# 📁 version_info.py
+VSVersionInfo(
+    ffi=FixedFileInfo(
+        filevers=(1, 0, 0, 0),
+        prodvers=(1, 0, 0, 0),
+        mask=0x3f,
+        flags=0x0,
+        OS=0x40004,
+        fileType=0x1,
+        subtype=0x0,
+        date=(0, 0)
+    ),
+    kids=[
+        StringFileInfo([
+            StringTable(
+                u'040904B0',
+                [StringStruct(u'CompanyName', u'Your Company'),
+                 StringStruct(u'FileDescription', u'LLM Proxy API Server'),
+                 StringStruct(u'FileVersion', u'1.0.0'),
+                 StringStruct(u'InternalName', u'llm_proxy_api'),
+                 StringStruct(u'LegalCopyright', u'Copyright (c) 2025'),
+                 StringStruct(u'OriginalFilename', u'LLM_Proxy_API.exe'),
+                 StringStruct(u'ProductName', u'LLM Proxy API'),
+                 StringStruct(u'ProductVersion', u'1.0.0')])
+        ]),
+        VarFileInfo([VarStruct(u'Translation', [1033, 1200])])
+    ]
+)
+Build Script
+bash
+# 📁 build.bat
+@echo off
+echo Building LLM Proxy API...
+
+REM Create virtual environment if it doesn't exist
+if not exist "venv" (
+    echo Creating virtual environment...
+    python -m venv venv
+)
+
+REM Activate virtual environment
+call venv\Scripts\activate.bat
+
+REM Upgrade pip and install dependencies
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+pip install pyinstaller
+
+REM Clean previous builds
+if exist "build" rmdir /s /q build
+if exist "dist" rmdir /s /q dist
+
+REM Build executable
+echo Building executable...
+pyinstaller build.spec
+
+REM Check if build was successful
+if exist "dist\LLM_Proxy_API.exe" (
+    echo Build successful! Executable is in dist\LLM_Proxy_API.exe
+    
+    REM Copy configuration files
+    copy config.yaml dist\
+    copy .env.example dist\
+    
+    echo Build complete!
+) else (
+    echo Build failed!
+    exit /b 1
+)
+
+pause
+📋 REQUIREMENTS.TXT ATUALIZADO
+text
+# Core FastAPI stack
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.0
+pydantic-settings==2.1.0
+
+# HTTP client
+httpx==0.25.2
+
+# Configuration
+pyyaml==6.0.1
+python-dotenv==1.0.0
+
+# Security & Authentication
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+
+# Rate limiting
+slowapi==0.1.9
+
+# Logging & Monitoring
+structlog==23.2.0
+
+# Development tools
+black==23.11.0
+ruff==0.1.6
+pytest==7.4.3
+pytest-asyncio==0.21.1
+
+# Windows executable
+pyinstaller==6.2.0
+🎯 RESUMO DAS MELHORIAS
+Categoria	Melhorias Implementadas
+🏗️ Arquitetura	Modular, async, dependency injection
+🔒 Segurança	API keys, rate limiting, input validation
+📊 Monitoramento	Health checks, metrics, structured logging
+⚡ Performance	Connection pooling, retries, caching
+🔧 Configuração	YAML validation, hot reload, environments
+🪟 Windows Build	PyInstaller, version info, batch scripts
+🧪 Testes	Unit tests, integration tests, mocking
+📚 Documentação	OpenAPI, README, deployment guides
