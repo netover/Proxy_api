@@ -1,6 +1,31 @@
-fastapi
-uvicorn
-pydantic
-pyyaml
-python-dotenv
-httpx
+# Core FastAPI stack
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.0
+pydantic-settings==2.1.0
+
+# HTTP client
+httpx==0.25.2
+
+# Configuration
+pyyaml==6.0.1
+python-dotenv==1.0.0
+
+# Security & Authentication
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+
+# Rate limiting
+slowapi==0.1.9
+
+# Logging & Monitoring
+structlog==23.2.0
+
+# Development tools
+black==23.11.0
+ruff==0.1.6
+pytest==7.4.3
+pytest-asyncio==0.21.1
+
+# Windows executable
+pyinstaller==6.2.0

@@ -1,86 +1,212 @@
-# PROXY_API
+# LLM Proxy API
 
-This is a proxy API for routing requests to different LLM providers, in the style of OpenRouter. It is built with FastAPI.
+A high-performance, production-ready proxy server for Large Language Models (LLMs) with intelligent routing, fallback mechanisms, and comprehensive monitoring.
 
 ## Features
 
-*   **OpenAI-compatible endpoint:** `/v1/chat/completions`
-*   **Model-based routing:** Routes requests to the appropriate provider based on the requested model.
-*   **Provider fallback:** If a request to a provider fails, it will try the next available provider that supports the model.
-*   **Configurable providers:** Add and configure providers in `config.yaml`.
+- **Multi-Provider Support**: OpenAI, Anthropic, and extensible architecture for additional providers
+- **Intelligent Routing**: Automatic provider selection with priority-based fallback
+- **Rate Limiting**: Built-in rate limiting with configurable thresholds
+- **Comprehensive Monitoring**: Real-time metrics and health checks
+- **Security**: API key authentication and CORS support
+- **Performance**: Asynchronous processing and connection pooling
+- **Deployment Flexibility**: Docker support and standalone executable
 
-## Getting Started
+## Architecture
+
+```
+┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
+│   Client App    │───▶│  LLM Proxy API   │───▶│  LLM Provider   │
+└─────────────────┘    │                  │    │ (OpenAI, etc.)  │
+                       │ ├── Provider      │    └─────────────────┘
+                       │ │   Routing      │    ┌─────────────────┐
+                       │ ├── Health        │───▶│  LLM Provider   │
+                       │ │   Monitoring   │    │ (Fallback)      │
+                       │ ├── Rate          │    └─────────────────┘
+                       │ │   Limiting     │
+                       │ └── Metrics       │
+                       └──────────────────┘
+```
+
+## Quick Start
 
 ### Prerequisites
 
-*   Python 3.7+
-*   pip
+- Python 3.8+
+- pip (Python package manager)
 
 ### Installation
 
-1.  **Clone the repository:**
-    ```bash
-    git clone <repository_url>
-    cd <repository_directory>
-    ```
+1. Clone the repository:
+   ```bash
+   git clone <repository-url>
+   cd llm-proxy-api
+   ```
 
-2.  **Install the dependencies:**
-    ```bash
-    pip install -r requirements.txt
-    ```
+2. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-3.  **Configure your API keys:**
-    *   Copy the `.env.example` file to `.env`:
-        ```bash
-        cp .env.example .env
-        ```
-    *   Edit the `.env` file and add your API keys for the providers you want to use.
+3. Configure environment variables:
+   ```bash
+   cp .env.example .env
+   # Edit .env with your API keys and settings
+   ```
 
-4.  **Configure your providers:**
-    *   Edit the `config.yaml` file to add or remove providers and models.
+4. Start the server:
+   ```bash
+   python main.py
+   ```
 
-### Running the application
+### Using Docker
 
-*   Use `uvicorn` to run the application:
-    ```bash
-    uvicorn main:app --reload
-    ```
-*   The API will be available at `http://127.0.0.1:8000`.
+1. Build the Docker image:
+   ```bash
+   docker build -t llm-proxy-api .
+   ```
 
-## Usage
+2. Run the container:
+   ```bash
+   docker run -p 8000:8000 --env-file .env llm-proxy-api
+   ```
 
-You can make requests to the `/v1/chat/completions` endpoint using any HTTP client or the OpenAI SDK.
+## Configuration
 
-### Example with `curl`
+### Environment Variables
+
+Copy `.env.example` to `.env` and configure:
 
 ```bash
-curl -X POST http://127.0.0.1:8000/v1/chat/completions \
--H "Content-Type: application/json" \
--d '{
-    "model": "gpt-3.5-turbo",
-    "messages": [
-        {
-            "role": "user",
-            "content": "Hello!"
-        }
-    ]
-}'
+# API Keys
+OPENAI_API_KEY=your_openai_key
+ANTHROPIC_API_KEY=your_anthropic_key
+
+# Server Settings
+PROXY_API_HOST=0.0.0.0
+PROXY_API_PORT=8000
+PROXY_API_DEBUG=false
+
+# Rate Limiting
+PROXY_API_RATE_LIMIT_REQUESTS=100
+PROXY_API_RATE_LIMIT_WINDOW=60
 ```
 
-### Example with OpenAI Python SDK
+### Provider Configuration
+
+Edit `config.yaml` to configure providers:
+
+```yaml
+providers:
+  - name: "openai"
+    type: "openai"
+    api_key_env: "OPENAI_API_KEY"
+    base_url: "https://api.openai.com/v1"
+    models:
+      - "gpt-4"
+      - "gpt-3.5-turbo"
+    enabled: true
+    priority: 1  # Lower number = higher priority
+```
+
+## API Endpoints
+
+### Chat Completions (OpenAI Compatible)
+
+```http
+POST /v1/chat/completions
+Content-Type: application/json
+Authorization: Bearer YOUR_API_KEY
+
+{
+  "model": "gpt-3.5-turbo",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Hello!"
+    }
+  ]
+}
+```
+
+### Health Check
+
+```http
+GET /health
+```
+
+### Provider Metrics
+
+```http
+GET /metrics
+```
+
+### List Providers
+
+```http
+GET /providers
+```
+
+## Building Executables
+
+To build a standalone executable:
+
+```bash
+python build.py
+```
+
+This creates a single executable file in the `dist/` directory.
+
+## Monitoring
+
+The proxy provides real-time metrics through the `/metrics` endpoint:
+
+```json
+{
+  "openai": {
+    "total_requests": 1250,
+    "success_rate": 0.98,
+    "avg_response_time": 0.45,
+    "error_counts": {
+      "http_429": 5,
+      "timeout": 2
+    }
+  }
+}
+```
+
+## Security
+
+- All API requests require authentication via API key
+- CORS policy can be configured in environment variables
+- Rate limiting prevents abuse
+- Secure headers are automatically added to responses
+
+## Extending Providers
+
+To add a new provider:
+
+1. Create a new file in `src/providers/` (e.g., `new_provider.py`)
+2. Implement the `Provider` base class
+3. Add configuration to `config.yaml`
 
 ```python
-import openai
+from src.providers.base import Provider
 
-openai.api_base = "http://127.0.0.1:8000/v1"
-openai.api_key = "dummy" # The proxy doesn't use this key, but the SDK requires it.
-
-response = openai.ChatCompletion.create(
-  model="gpt-3.5-turbo",
-  messages=[
-    {"role": "user", "content": "Hello!"}
-  ]
-)
-
-print(response)
+class NewProvider(Provider):
+    async def create_completion(self, request: Dict[str, Any]) -> Dict[str, Any]:
+        # Implementation here
+        pass
 ```
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a Pull Request
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
