@@ -3,6 +3,12 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# Virtual Environments
+.venv
+venv
+env
+agno-env-312/
+
 # Environment variables
 .env
 
