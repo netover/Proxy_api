@@ -76,3 +76,4 @@ def init_config():
     """Initialize global config instance"""
     global config
     config = load_config()
+    return config

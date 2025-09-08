@@ -118,15 +118,39 @@ def build_executable():
         "--hidden-import=uvicorn.logging",
         "--hidden-import=uvicorn.loops.auto",
         "--hidden-import=uvicorn.protocols.http.auto",
+        "--hidden-import=uvicorn.protocols.http.h11_impl",
+        "--hidden-import=uvicorn.protocols.http.httptools_impl",
+        "--hidden-import=uvicorn.protocols.websockets.auto",
+        "--hidden-import=uvicorn.lifespan.on",
+        "--hidden-import=uvicorn.lifespan.off",
         "--hidden-import=fastapi",
+        "--hidden-import=fastapi.routing",
+        "--hidden-import=fastapi.applications",
+        "--hidden-import=fastapi.middleware",
+        "--hidden-import=fastapi.middleware.cors",
+        "--hidden-import=fastapi.middleware.gzip",
         "--hidden-import=pydantic",
+        "--hidden-import=pydantic.fields",
+        "--hidden-import=pydantic.main",
+        "--hidden-import=pydantic.types",
         "--hidden-import=httpx",
+        "--hidden-import=httpx._main",
         "--hidden-import=pyyaml",
         "--hidden-import=structlog",
         "--hidden-import=slowapi",
+        "--hidden-import=src.core.config",
+        "--hidden-import=src.core.logging",
+        "--hidden-import=src.core.app_config",
+        "--hidden-import=src.core.metrics",
+        "--hidden-import=src.core.auth",
+        "--hidden-import=src.core.circuit_breaker",
+        "--hidden-import=src.providers.base",
+        "--hidden-import=src.providers.openai",
+        "--hidden-import=src.providers.anthropic",
         "--collect-all=fastapi",
         "--collect-all=pydantic",
-        "--collect-all=httpx"
+        "--collect-all=httpx",
+        "--collect-all=uvicorn"
     ]
 
     # Add console mode
@@ -172,14 +196,15 @@ def build_executable():
             return False
 
         build_time = time.time() - start_time
-        print(".2f"
+        print(f"✅ Build completed in {build_time:.2f} seconds")
         # Check if executable was created
         exe_name = f"{config['app_name'].replace(' ', '_')}.exe"
         exe_path = dist_dir / exe_name
 
         if exe_path.exists():
             exe_size = exe_path.stat().st_size / (1024 * 1024)  # Size in MB
-            print(".2f"            print(f"📁 Executable location: {exe_path.absolute()}")
+            print(f"📦 Executable size: {exe_size:.2f} MB")
+            print(f"📁 Executable location: {exe_path.absolute()}")
             return True
         else:
             print("❌ Executable not found after build!")

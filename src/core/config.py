@@ -29,6 +29,10 @@ class Settings(BaseSettings):
     client_timeout: int = 60
     provider_timeout: int = 30
     
+    # API Keys (not required in settings, loaded by auth module)
+    openai_api_key: Optional[str] = None
+    anthropic_api_key: Optional[str] = None
+    
     # Paths
     config_file: Path = Path("config.yaml")
     log_file: Path = Path("logs/proxy_api.log")

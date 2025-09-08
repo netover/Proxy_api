@@ -12,7 +12,7 @@ import time
 
 from src.core.config import settings
 from src.core.logging import setup_logging, ContextualLogger
-from src.core.app_config import init_config, config
+from src.core.app_config import init_config
 from src.core.metrics import metrics_collector
 from src.core.auth import verify_api_key, check_rate_limit
 from src.providers.base import get_provider
@@ -36,8 +36,8 @@ async def lifespan(app: FastAPI):
     
     # Initialize configuration
     try:
-        init_config()
-        logger.info(f"Loaded {len(config.providers)} providers")
+        app.state.config = init_config()
+        logger.info(f"Loaded {len(app.state.config.providers)} providers")
     except Exception as e:
         logger.error(f"Failed to load configuration: {e}")
         raise
@@ -46,6 +46,7 @@ async def lifespan(app: FastAPI):
     
     # Cleanup
     logger.info("🛑 Shutting down LLM Proxy API")
+
 
 # FastAPI app setup
 app = FastAPI(
@@ -79,6 +80,9 @@ async def root():
         "status": "operational",
         "endpoints": {
             "chat_completions": "/v1/chat/completions",
+            "completions": "/v1/completions",
+            "embeddings": "/v1/embeddings",
+            "models": "/v1/models",
             "health": "/health",
             "metrics": "/metrics",
             "providers": "/providers"
@@ -91,7 +95,7 @@ async def health_check():
     return {
         "status": "healthy",
         "timestamp": time.time(),
-        "providers": len(config.providers) if config else 0
+        "providers": len(app.state.config.providers) if hasattr(app.state, 'config') else 0
     }
 
 @app.get("/metrics")
@@ -102,7 +106,7 @@ async def get_metrics():
 @app.get("/providers")
 async def list_providers():
     """List all providers and their capabilities"""
-    if not config:
+    if not hasattr(app.state, 'config'):
         return []
     
     return [
@@ -113,7 +117,7 @@ async def list_providers():
             "enabled": provider.enabled,
             "priority": provider.priority
         }
-        for provider in config.providers
+        for provider in app.state.config.providers
     ]
 
 @app.post("/v1/chat/completions")
@@ -126,7 +130,7 @@ async def chat_completions(
 
     """OpenAI-compatible chat completions endpoint with intelligent routing"""
 
-    if not config:
+    if not hasattr(app.state, 'config'):
         raise HTTPException(status_code=500, detail="Configuration not loaded")
 
     model = completion_request.get("model")
@@ -135,7 +139,7 @@ async def chat_completions(
 
     # Find providers that support this model
     providers = [
-        provider for provider in config.providers
+        provider for provider in app.state.config.providers
         if provider.enabled and model in provider.models
     ]
 
@@ -188,7 +192,7 @@ async def completions(
 
     """OpenAI-compatible completions endpoint with intelligent routing"""
 
-    if not config:
+    if not hasattr(app.state, 'config'):
         raise HTTPException(status_code=500, detail="Configuration not loaded")
 
     model = completion_request.get("model")
@@ -197,7 +201,7 @@ async def completions(
 
     # Find providers that support this model
     providers = [
-        provider for provider in config.providers
+        provider for provider in app.state.config.providers
         if provider.enabled and model in provider.models
     ]
 
@@ -250,7 +254,7 @@ async def embeddings(
 
     """OpenAI-compatible embeddings endpoint with intelligent routing"""
 
-    if not config:
+    if not hasattr(app.state, 'config'):
         raise HTTPException(status_code=500, detail="Configuration not loaded")
 
     model = embedding_request.get("model")
@@ -259,7 +263,7 @@ async def embeddings(
 
     # Find providers that support this model
     providers = [
-        provider for provider in config.providers
+        provider for provider in app.state.config.providers
         if provider.enabled and model in provider.models
     ]
 
@@ -301,7 +305,28 @@ async def embeddings(
         status_code=503,
         detail="All providers are currently unavailable"
     )
-        
+
+@app.get("/v1/models")
+async def list_models():
+    """OpenAI-compatible models endpoint"""
+    if not hasattr(app.state, 'config'):
+        return {"object": "list", "data": []}
+
+    models = []
+    for provider in app.state.config.providers:
+        if provider.enabled:
+            for model in provider.models:
+                models.append({
+                    "id": model,
+                    "object": "model",
+                    "created": 1677610602,  # Default timestamp
+                    "owned_by": provider.name
+                })
+            
+    return {
+        "object": "list",
+        "data": models
+    }
 # Error handlers
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
@@ -314,7 +339,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 if __name__ == "__main__":
     uvicorn.run(
-        "main:app",
+        app,
         host=settings.host,
         port=settings.port,
         reload=settings.debug,

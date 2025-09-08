@@ -5,12 +5,13 @@ A high-performance, production-ready proxy server for Large Language Models (LLM
 ## Features
 
 - **Multi-Provider Support**: OpenAI, Anthropic, and extensible architecture for additional providers
-- **Intelligent Routing**: Automatic provider selection with priority-based fallback
-- **Rate Limiting**: Built-in rate limiting with configurable thresholds
-- **Comprehensive Monitoring**: Real-time metrics and health checks
-- **Security**: API key authentication and CORS support
-- **Performance**: Asynchronous processing and connection pooling
-- **Deployment Flexibility**: Docker support and standalone executable
+- **Intelligent Routing**: Automatic provider selection with priority-based fallback and circuit breaker protection
+- **Rate Limiting**: Built-in rate limiting with configurable thresholds using slowapi
+- **Comprehensive Monitoring**: Real-time metrics collection, health checks, and provider statistics
+- **Circuit Breaker**: Prevents cascading failures with configurable failure thresholds and recovery
+- **Security**: API key authentication, CORS support, and input validation
+- **Performance**: Asynchronous processing with HTTP connection pooling and retry logic
+- **Deployment Flexibility**: Standalone executable build for Windows and cross-platform support
 
 ## Architecture
 
@@ -157,6 +158,12 @@ GET /health
 
 ```http
 GET /metrics
+```
+
+### List Models
+
+```http
+GET /v1/models
 ```
 
 ### List Providers
