@@ -65,6 +65,15 @@
 - [x] Update httpx from 0.25.2 to 0.28.1
 - [x] Update pyinstaller from 6.2.0 to 6.15.0
 - [x] Update other outdated dependencies
+- [ ] Address security vulnerabilities identified in dependency audit
+- [ ] Resolve dependency conflicts identified by pip check
+- [ ] Update python-jose from 3.3.0 to 3.4.0 (security fix)
+- [ ] Update structlog from 23.2.0 to 25.4.0
+- [ ] Update python-dotenv from 1.0.0 to 1.1.1
+- [ ] Update ruff from 0.1.6 to 0.12.12
+- [ ] Update pytest from 7.4.3 to 8.4.2
+- [ ] Update pytest-asyncio from 0.21.1 to 1.1.0
+- [ ] Update black from 23.11.0 to 25.1.0 (security fix)
 
 
 ## Priority 3: Reliability Enhancements (High)

@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 from typing import List, Optional
 from pydantic_settings import BaseSettings
-from pydantic import validator
+from pydantic import field_validator
 import yaml
 
 class Settings(BaseSettings):
@@ -33,7 +33,8 @@ class Settings(BaseSettings):
     config_file: Path = Path("config.yaml")
     log_file: Path = Path("logs/proxy_api.log")
     
-    @validator('config_file')
+    @field_validator('config_file')
+    @classmethod
     def validate_config_file(cls, v):
         if not v.exists():
             raise ValueError(f"Configuration file {v} not found")

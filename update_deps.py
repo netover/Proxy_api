@@ -2,6 +2,7 @@
 """
 Dependency update script for LLM Proxy API
 Updates dependencies and runs tests to verify compatibility
+Also addresses security vulnerabilities and dependency conflicts
 """
 
 import subprocess
@@ -25,16 +26,51 @@ def run_command(cmd, cwd=None):
         print(f"Command failed with exception: {e}")
         return False
 
+def upgrade_pip():
+    """Upgrade pip to latest version"""
+    print("⬆️  Upgrading pip...")
+    return run_command([sys.executable, "-m", "pip", "install", "--upgrade", "pip"])
+
+def install_requirements():
+    """Install dependencies from requirements.txt"""
+    print("📦 Installing requirements...")
+    return run_command([sys.executable, "-m", "pip", "install", "-r", "requirements.txt"])
+
+def check_dependencies():
+    """Check for dependency conflicts"""
+    print("🔍 Checking for dependency conflicts...")
+    return run_command([sys.executable, "-m", "pip", "check"])
+
+def audit_vulnerabilities():
+    """Audit for security vulnerabilities"""
+    print("🛡️  Auditing for security vulnerabilities...")
+    # Try to use pip-audit if available
+    try:
+        result = subprocess.run([sys.executable, "-m", "pip_audit"], 
+                              capture_output=True, text=True)
+        if result.returncode == 0:
+            print("✅ Security audit completed")
+            return True
+        else:
+            print("⚠️  pip-audit not available or found vulnerabilities")
+            print(result.stdout)
+            print(result.stderr)
+            return False
+    except FileNotFoundError:
+        print("ℹ️  pip-audit not installed, skipping security audit")
+        print("💡 Run 'pip install pip-audit' to enable security auditing")
+        return True
+
 def update_dependencies():
     """Update project dependencies"""
     print("🔄 Updating dependencies...")
     
     # Upgrade pip first
-    if not run_command([sys.executable, "-m", "pip", "install", "--upgrade", "pip"]):
+    if not upgrade_pip():
         return False
     
     # Install updated requirements
-    if not run_command([sys.executable, "-m", "pip", "install", "-r", "requirements.txt"]):
+    if not install_requirements():
         return False
     
     print("✅ Dependencies updated successfully")
@@ -65,12 +101,23 @@ def main():
         print("❌ Dependency update failed")
         sys.exit(1)
     
+    # Check for conflicts
+    if not check_dependencies():
+        print("❌ Dependency conflicts detected")
+        print("💡 Run 'pip check' to see details")
+        sys.exit(1)
+    
+    # Audit for vulnerabilities
+    if not audit_vulnerabilities():
+        print("❌ Security vulnerabilities detected")
+        sys.exit(1)
+    
     # Run tests
     if not run_tests():
         print("❌ Tests failed")
         sys.exit(1)
     
-    print("\n✅ Dependency update and testing completed successfully!")
+    print("\n✅ Dependency update, security audit, and testing completed successfully!")
     print("\n📋 Next steps:")
     print("1. Review the updated requirements.txt")
     print("2. Test the application manually")

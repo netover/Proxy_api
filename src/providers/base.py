@@ -54,20 +54,44 @@ class Provider(ABC):
                 "response_time": response_time,
                 "details": result
             }
-        except Exception as e:
+        except httpx.HTTPStatusError as e:
             response_time = time.time() - start_time
-
             metrics_collector.record_request(
                 self.config.name,
                 success=False,
                 response_time=response_time,
                 error_type=type(e).__name__
             )
-
             return {
                 "status": "unhealthy",
                 "response_time": response_time,
-                "error": str(e)
+                "error": f"HTTP {e.response.status_code}: {e.response.text}"
+            }
+        except (httpx.ConnectError, httpx.TimeoutException) as e:
+            response_time = time.time() - start_time
+            metrics_collector.record_request(
+                self.config.name,
+                success=False,
+                response_time=response_time,
+                error_type=type(e).__name__
+            )
+            return {
+                "status": "unhealthy",
+                "response_time": response_time,
+                "error": f"Connection error: {str(e)}"
+            }
+        except Exception as e:
+            response_time = time.time() - start_time
+            metrics_collector.record_request(
+                self.config.name,
+                success=False,
+                response_time=response_time,
+                error_type=type(e).__name__
+            )
+            return {
+                "status": "unhealthy",
+                "response_time": response_time,
+                "error": f"Unexpected error: {str(e)}"
             }
 
     @abstractmethod
@@ -118,16 +142,25 @@ class Provider(ABC):
                     response.raise_for_status()
                     return response
 
-                except (httpx.HTTPStatusError, httpx.ConnectError, httpx.TimeoutException) as e:
+                except httpx.HTTPStatusError as e:
                     last_exception = e
                     # Check if we should retry (attempt < retry_attempts)
                     if attempt < self.config.retry_attempts:
                         self.logger.warning(
-                            f"Request attempt {attempt + 1} failed: {e}, retrying..."
+                            f"Request attempt {attempt + 1} failed with HTTP {e.response.status_code}: {e.response.text}, retrying..."
+                        )
+                    continue
+                except (httpx.ConnectError, httpx.TimeoutException) as e:
+                    last_exception = e
+                    # Check if we should retry (attempt < retry_attempts)
+                    if attempt < self.config.retry_attempts:
+                        self.logger.warning(
+                            f"Request attempt {attempt + 1} failed with connection error: {e}, retrying..."
                         )
                     continue
                 except Exception as e:
                     last_exception = e
+                    self.logger.error(f"Unexpected error during request: {e}")
                     break
 
             raise last_exception
@@ -137,6 +170,9 @@ class Provider(ABC):
             return await circuit_breaker.execute(_make_request)
         except CircuitBreakerOpenException:
             self.logger.error(f"Circuit breaker is open for provider {self.config.name}")
+            raise httpx.RequestError(f"Circuit breaker is open for provider {self.config.name}", request=None)
+        except Exception as e:
+            self.logger.error(f"Request failed after all retries: {e}")
             raise
 
             

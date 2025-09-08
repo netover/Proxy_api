@@ -10,7 +10,7 @@ class ProviderConfig(BaseModel):
     type: str = Field(..., description="Provider type (openai, anthropic, etc.)")
     base_url: HttpUrl = Field(..., description="Base URL for the provider API")
     api_key_env: str = Field(..., description="Environment variable name for API key")
-    models: List[str] = Field(..., min_items=1, description="List of supported models")
+    models: List[str] = Field(..., min_length=1, description="List of supported models")
     enabled: bool = Field(True, description="Whether this provider is enabled")
     priority: int = Field(100, ge=1, le=1000, description="Provider priority (lower = higher priority)")
     timeout: int = Field(30, ge=1, le=300, description="Request timeout in seconds")
@@ -36,7 +36,7 @@ class ProviderConfig(BaseModel):
 
 class AppConfig(BaseModel):
     """Main application configuration"""
-    providers: List[ProviderConfig] = Field(..., min_items=1)
+    providers: List[ProviderConfig] = Field(..., min_length=1)
 
     @field_validator('providers')
     @classmethod
