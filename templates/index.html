@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LLM Proxy Config</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>LLM Proxy Configuration</h1>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flash-messages">
+                {% for category, message in messages %}
+                    <div class="flash {{ category }}">{{ message }}</div>
+                {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        <form action="{{ url_for('save') }}" method="post">
+
+            <fieldset class="neumorphic-card">
+                <legend>Server Settings</legend>
+                <div class="form-group">
+                    <label for="port">Server Port</label>
+                    <input type="number" id="port" name="port" value="{{ env_vars.get('PROXY_API_PORT', 8000) }}" class="neumorphic-input">
+                </div>
+                <div class="form-group">
+                    <label for="api_key_header">API Key Header</label>
+                    <input type="text" id="api_key_header" name="api_key_header" value="{{ env_vars.get('PROXY_API_API_KEY_HEADER', 'X-API-Key') }}" class="neumorphic-input">
+                </div>
+            </fieldset>
+
+            <fieldset class="neumorphic-card">
+                <legend>Providers</legend>
+                <div id="provider-list">
+                    {% for provider in config.get('providers', []) %}
+                    <div class="provider-card neumorphic-card-inset">
+                        <div class="form-group">
+                            <label>Name</label>
+                            <input type="text" name="provider_name_{{ loop.index0 }}" value="{{ provider.name }}" class="neumorphic-input">
+                        </div>
+                        <div class="form-group">
+                            <label>API Key</label>
+                            <input type="password" name="api_key_value_{{ loop.index0 }}" value="{{ provider.api_key_value }}" class="neumorphic-input" placeholder="Enter API Key">
+                            <input type="hidden" name="api_key_env_{{ loop.index0 }}" value="{{ provider.api_key_env }}">
+                        </div>
+                        <div class="form-group">
+                            <label>Models (comma-separated)</label>
+                            <textarea name="models_{{ loop.index0 }}" class="neumorphic-textarea" rows="3">{{ provider.models | join(', ') }}</textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Priority</label>
+                            <input type="number" name="priority_{{ loop.index0 }}" value="{{ provider.priority }}" class="neumorphic-input">
+                        </div>
+                        <!-- Hidden fields to preserve data -->
+                        <input type="hidden" name="module_{{ loop.index0 }}" value="{{ provider.module }}">
+                        <input type="hidden" name="class_{{ loop.index0 }}" value="{{ provider.class }}">
+                        <input type="hidden" name="type_{{ loop.index0 }}" value="{{ provider.type }}">
+                        <input type="hidden" name="base_url_{{ loop.index0 }}" value="{{ provider.base_url }}">
+                    </div>
+                    {% endfor %}
+                </div>
+            </fieldset>
+
+            <div class="form-actions">
+                <button type="submit" class="neumorphic-btn">Save Changes</button>
+            </div>
+        </form>
+    </div>
+</body>
+</html>
