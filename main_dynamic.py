@@ -2,18 +2,19 @@ import asyncio
 import uvicorn
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Depends, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Callable, Awaitable
 import time
 
-from src.core.config import settings
+from src.core.config import settings, load_providers_cfg
 from src.core.logging import setup_logging, ContextualLogger
 from src.core.metrics import metrics_collector
-from src.core.auth import verify_api_key, check_rate_limit
+from src.core.auth import verify_api_key, APIKeyAuth
 from src.services.provider_loader import instantiate_providers
 
 
@@ -31,10 +32,17 @@ limiter = Limiter(key_func=get_remote_address)
 async def lifespan(app: FastAPI):
     """Application lifespan management"""
     logger.info("Starting LLM Proxy API")
+    app.state.start_time = int(time.time())
     
+    # Initialize authentication
+    if not settings.proxy_api_keys:
+        logger.warning("No API keys configured. The proxy will not require authentication.")
+    app.state.api_key_auth = APIKeyAuth(settings.proxy_api_keys)
+
     # Initialize providers dynamically
     try:
-        app.state.providers = instantiate_providers()
+        provider_cfgs = load_providers_cfg(settings.config_file)
+        app.state.providers = instantiate_providers(provider_cfgs)
         logger.info(f"Loaded {len(app.state.providers)} providers dynamically")
     except Exception as e:
         logger.error(f"Failed to load providers: {e}")
@@ -43,7 +51,14 @@ async def lifespan(app: FastAPI):
     yield
     
     # Cleanup
-    logger.info("Shutting down LLM Proxy API")
+    logger.info("Shutting down LLM Proxy API, closing provider clients...")
+    if hasattr(app.state, "providers"):
+        for provider in app.state.providers:
+            try:
+                await provider.client.aclose()
+                logger.info(f"Closed client for provider: {provider.name}")
+            except Exception as e:
+                logger.error(f"Error closing client for provider {provider.name}: {e}")
 
 
 
@@ -72,6 +87,64 @@ app.add_middleware(GZipMiddleware, minimum_size=1000)
 # Helper function to find providers that support a model
 def find_providers_for_model(providers, model: str):
     return [provider for provider in providers if model in provider.models]
+
+async def _route_request(
+    request_data: Dict[str, Any],
+    providers: List[Any],
+    provider_method_name: str,
+    request_type: str
+):
+    """
+    Generic request router for different completion types.
+    """
+    if not providers:
+        raise HTTPException(status_code=500, detail="Providers not loaded")
+
+    model = request_data.get("model")
+    if not model:
+        raise HTTPException(status_code=400, detail="Model is required")
+
+    # Find providers that support this model
+    supported_providers = find_providers_for_model(providers, model)
+
+    if not supported_providers:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Model '{model}' is not supported by any provider"
+        )
+
+    # Sort providers by priority (lower number = higher priority)
+    supported_providers.sort(key=lambda p: p.priority)
+
+    # Try providers in order
+    last_exception = None
+
+    for provider in supported_providers:
+        try:
+            logger.info(f"Attempting {request_type} request with provider: {provider.name}")
+
+            # Get the actual method from the provider instance
+            provider_method: Callable[[Dict[str, Any]], Awaitable[Any]] = getattr(provider, provider_method_name)
+
+            # Make the request
+            response = await provider_method(request_data)
+
+            logger.info(f"{request_type.capitalize()} request completed successfully",
+                       provider=provider.name)
+
+            return response
+
+        except Exception as e:
+            last_exception = e
+            logger.error(f"Provider {provider.name} failed for {request_type}: {e}")
+            continue
+
+    # All providers failed
+    logger.error(f"All providers failed for {request_type}", error=str(last_exception))
+    raise HTTPException(
+        status_code=503,
+        detail="All providers are currently unavailable"
+    )
 
 # API Routes
 @app.get("/")
@@ -128,53 +201,12 @@ async def chat_completions(
     completion_request: Dict[str, Any],
     _: bool = Depends(verify_api_key)
 ):
-
     """OpenAI-compatible chat completions endpoint with intelligent routing"""
-
-    if not hasattr(app.state, 'providers'):
-        raise HTTPException(status_code=500, detail="Providers not loaded")
-
-    model = completion_request.get("model")
-    if not model:
-        raise HTTPException(status_code=400, detail="Model is required")
-
-    # Find providers that support this model
-    providers = find_providers_for_model(app.state.providers, model)
-
-    if not providers:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Model '{model}' is not supported by any provider"
-        )
-
-    # Sort providers by priority (lower number = higher priority)
-    providers.sort(key=lambda p: p.priority)
-
-    # Try providers in order
-    last_exception = None
-
-    for provider in providers:
-        try:
-            logger.info(f"Attempting request with provider: {provider.name}")
-
-            # Make the request
-            response = await provider.create_completion(completion_request)
-
-            logger.info("Request completed successfully",
-                       provider=provider.name)
-
-            return response
-
-        except Exception as e:
-            last_exception = e
-            logger.error(f"Provider {provider.name} failed: {e}")
-            continue
-
-    # All providers failed
-    logger.error("All providers failed", error=str(last_exception))
-    raise HTTPException(
-        status_code=503,
-        detail="All providers are currently unavailable"
+    return await _route_request(
+        request_data=completion_request,
+        providers=app.state.providers,
+        provider_method_name="create_completion",
+        request_type="chat completions"
     )
 
 @app.post("/v1/completions")
@@ -184,53 +216,12 @@ async def completions(
     completion_request: Dict[str, Any],
     _: bool = Depends(verify_api_key)
 ):
-
     """OpenAI-compatible completions endpoint with intelligent routing"""
-
-    if not hasattr(app.state, 'providers'):
-        raise HTTPException(status_code=500, detail="Providers not loaded")
-
-    model = completion_request.get("model")
-    if not model:
-        raise HTTPException(status_code=400, detail="Model is required")
-
-    # Find providers that support this model
-    providers = find_providers_for_model(app.state.providers, model)
-
-    if not providers:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Model '{model}' is not supported by any provider"
-        )
-
-    # Sort providers by priority (lower number = higher priority)
-    providers.sort(key=lambda p: p.priority)
-
-    # Try providers in order
-    last_exception = None
-
-    for provider in providers:
-        try:
-            logger.info(f"Attempting completions request with provider: {provider.name}")
-
-            # Make the request
-            response = await provider.create_text_completion(completion_request)
-
-            logger.info("Completions request completed successfully",
-                       provider=provider.name)
-
-            return response
-
-        except Exception as e:
-            last_exception = e
-            logger.error(f"Provider {provider.name} failed: {e}")
-            continue
-
-    # All providers failed
-    logger.error("All providers failed for completions", error=str(last_exception))
-    raise HTTPException(
-        status_code=503,
-        detail="All providers are currently unavailable"
+    return await _route_request(
+        request_data=completion_request,
+        providers=app.state.providers,
+        provider_method_name="create_text_completion",
+        request_type="completions"
     )
 
 @app.post("/v1/embeddings")
@@ -240,68 +231,27 @@ async def embeddings(
     embedding_request: Dict[str, Any],
     _: bool = Depends(verify_api_key)
 ):
-
     """OpenAI-compatible embeddings endpoint with intelligent routing"""
-
-    if not hasattr(app.state, 'providers'):
-        raise HTTPException(status_code=500, detail="Providers not loaded")
-
-    model = embedding_request.get("model")
-    if not model:
-        raise HTTPException(status_code=400, detail="Model is required")
-
-    # Find providers that support this model
-    providers = find_providers_for_model(app.state.providers, model)
-
-    if not providers:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Model '{model}' is not supported by any provider"
-        )
-
-    # Sort providers by priority (lower number = higher priority)
-    providers.sort(key=lambda p: p.priority)
-
-    # Try providers in order
-    last_exception = None
-
-    for provider in providers:
-        try:
-            logger.info(f"Attempting embeddings request with provider: {provider.name}")
-
-            # Make the request
-            response = await provider.create_embeddings(embedding_request)
-
-            logger.info("Embeddings request completed successfully",
-                       provider=provider.name)
-
-            return response
-
-        except Exception as e:
-            last_exception = e
-            logger.error(f"Provider {provider.name} failed: {e}")
-            continue
-
-    # All providers failed
-    logger.error("All providers failed for embeddings", error=str(last_exception))
-    raise HTTPException(
-        status_code=503,
-        detail="All providers are currently unavailable"
+    return await _route_request(
+        request_data=embedding_request,
+        providers=app.state.providers,
+        provider_method_name="create_embeddings",
+        request_type="embeddings"
     )
 
 @app.get("/v1/models")
-async def list_models():
+async def list_models(request: Request):
     """OpenAI-compatible models endpoint"""
-    if not hasattr(app.state, 'providers'):
+    if not hasattr(request.app.state, 'providers'):
         return {"object": "list", "data": []}
 
     models = []
-    for provider in app.state.providers:
+    for provider in request.app.state.providers:
         for model in provider.models:
             models.append({
                 "id": model,
                 "object": "model",
-                "created": 1677610602,  # Default timestamp
+                "created": request.app.state.start_time,
                 "owned_by": provider.name
             })
             
@@ -313,12 +263,18 @@ async def list_models():
 # Error handlers
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    logger.error(f"Unhandled exception: {exc}", path=request.url.path)
+    logger.error(f"Unhandled exception: {exc}", path=request.url.path, exc_info=True)
     
-    return {
-        "error": "Internal server error",
-        "detail": "An unexpected error occurred"
-    }
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error": {
+                "message": "Internal server error",
+                "type": "server_error",
+                "detail": "An unexpected error occurred. Please check the logs for more information."
+            }
+        },
+    )
 
 if __name__ == "__main__":
     uvicorn.run(

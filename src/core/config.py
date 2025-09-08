@@ -5,6 +5,9 @@ from typing import List, Optional
 from pydantic_settings import BaseSettings
 import yaml
 
+# Define the project's base directory (the parent of the 'src' directory)
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
+
 class Settings(BaseSettings):
     """Application settings with validation and environment support"""
 
@@ -20,6 +23,7 @@ class Settings(BaseSettings):
     # Security
     api_key_header: str = "X-API-Key"
     allowed_origins: List[str] = ["*"]
+    proxy_api_keys: List[str] = []
 
     # Rate Limiting
     rate_limit_requests: int = 100
@@ -34,13 +38,20 @@ class Settings(BaseSettings):
     anthropic_api_key: Optional[str] = None
 
     # Paths
-    config_file: Path = Path("config.yaml")  # Default path, will be overridden by app_config.py
-    log_file: Path = Path("logs/proxy_api.log")
+    config_file: Path = BASE_DIR / "config.yaml"
+    log_file: Path = BASE_DIR / "logs/proxy_api.log"
 
     class Config:
         env_prefix = "PROXY_API_"
         case_sensitive = False
         env_file = ".env"
 
+from src.config.models import ProviderConfig
+
 # Initialize settings
 settings = Settings()
+
+def load_providers_cfg(path: str) -> List[ProviderConfig]:
+    with open(path, 'r') as f:
+        raw = yaml.safe_load(f)
+    return [ProviderConfig.model_validate(p) for p in raw["providers"]]

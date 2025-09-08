@@ -1,12 +1,12 @@
 import os
 import importlib
 from typing import List
-from src.config import get_settings, load_providers_cfg
 from src.config.models import ProviderConfig
+from src.core.logging import ContextualLogger
 
-def instantiate_providers() -> List:
-    settings = get_settings()
-    cfgs = load_providers_cfg(settings.config_file)
+logger = ContextualLogger(__name__)
+
+def instantiate_providers(cfgs: List[ProviderConfig]) -> List:
     providers = []
     for cfg in sorted(cfgs, key=lambda c: c.priority):
         try:
@@ -21,6 +21,6 @@ def instantiate_providers() -> List:
                 priority=cfg.priority
             ))
         except Exception as e:
-            print(f"Failed to load provider {cfg.name}: {e}")
+            logger.error(f"Failed to load provider {cfg.name}: {e}")
             continue
     return providers

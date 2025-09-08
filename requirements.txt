@@ -1,12 +1,21 @@
-fastapi>=0.104.1,<0.116.0
-uvicorn>=0.24.0,<0.32.0
-pydantic>=2.5.0,<2.11.0
-pydantic-settings>=2.1.0,<2.5.0
-PyYAML>=6.0.1
-httpx>=0.25.2,<0.28.0
-slowapi>=0.1.9
-anyio>=4.7.0,<4.8.0
-pyasn1>=0.6.1,<0.7.0
-PyJWT>=2.8.0
-pytest>=8.4.2
-pytest-asyncio>=0.21.0
+# Core Framework
+fastapi~=0.104.1      # The main web framework for building the API.
+uvicorn~=0.24.0       # ASGI server to run the FastAPI application.
+
+# Data Validation and Settings
+pydantic~=2.5.0         # For data validation and settings management.
+pydantic-settings~=2.1.0 # For managing application settings from environment variables.
+
+# Configuration and HTTP
+PyYAML~=6.0.1         # To parse the YAML configuration files.
+httpx~=0.25.2         # The HTTP client used to make requests to provider APIs.
+
+# API Features
+slowapi~=0.1.9        # For rate limiting API requests.
+anyio~=3.7.1          # Asynchronous networking library, a dependency of FastAPI/HTTPX.
+PyJWT~=2.8.0          # For handling JSON Web Tokens, used in authentication.
+pyasn1~=0.6.1         # A dependency of PyJWT.
+
+# Testing
+pytest~=8.4.2         # The framework for running tests.
+pytest-asyncio~=0.21.0 # Plugin for running asyncio tests with pytest.

@@ -146,10 +146,15 @@ class DynamicProvider(ABC):
 
                 except httpx.HTTPStatusError as e:
                     last_exception = e
+                    # Do not retry on 4xx client errors, except for 429 Too Many Requests
+                    if 400 <= e.response.status_code < 500 and e.response.status_code != 429:
+                        self.logger.error(f"Request failed with non-retriable status code {e.response.status_code}: {e.response.text}")
+                        break # Exit retry loop for client errors
+
                     # Check if we should retry (attempt < 3)
                     if attempt < 3:
                         self.logger.warning(
-                            f"Request attempt {attempt + 1} failed with HTTP {e.response.status_code}: {e.response.text}, retrying..."
+                            f"Request attempt {attempt + 1} failed with HTTP {e.response.status_code}, retrying..."
                         )
                     continue
                 except (httpx.ConnectError, httpx.TimeoutException) as e:
