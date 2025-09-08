@@ -38,10 +38,6 @@ class Settings(BaseSettings):
     circuit_breaker_threshold: int = 5
     circuit_breaker_timeout: int = 60  # seconds
 
-    # API Keys (not required in settings, loaded by auth module)
-    openai_api_key: Optional[str] = None
-    anthropic_api_key: Optional[str] = None
-
     # Paths
     config_file: Path = BASE_DIR / "config.yaml"
     log_file: Path = BASE_DIR / "logs/proxy_api.log"
