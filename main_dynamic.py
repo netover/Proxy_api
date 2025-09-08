@@ -36,7 +36,7 @@ async def lifespan(app: FastAPI):
     
     # Initialize authentication
     if not settings.proxy_api_keys:
-        logger.warning("No API keys configured. The proxy will not require authentication.")
+        logger.warning("No API keys configured. All authenticated requests will be rejected.")
     app.state.api_key_auth = APIKeyAuth(settings.proxy_api_keys)
 
     # Initialize providers dynamically
@@ -134,6 +134,12 @@ async def _route_request(
 
             return response
 
+        except NotImplementedError:
+            # This provider does not support the requested operation.
+            # This is not a failure, so we log it as info and continue to the next provider.
+            logger.info(f"Provider {provider.name} does not implement {provider_method_name}. Trying next provider.")
+            last_exception = NotImplementedError(f"The {request_type} operation is not implemented by any of the attempted providers.")
+            continue
         except Exception as e:
             last_exception = e
             logger.error(f"Provider {provider.name} failed for {request_type}: {e}")
@@ -141,6 +147,14 @@ async def _route_request(
 
     # All providers failed
     logger.error(f"All providers failed for {request_type}", error=str(last_exception))
+
+    # If the last exception was because the method is not implemented, return 501
+    if isinstance(last_exception, NotImplementedError):
+        raise HTTPException(
+            status_code=501,
+            detail=f"The requested operation '{request_type}' is not supported by any provider for the model '{model}'."
+        )
+
     raise HTTPException(
         status_code=503,
         detail="All providers are currently unavailable"
@@ -197,14 +211,14 @@ async def list_providers():
 @app.post("/v1/chat/completions")
 @limiter.limit(f"{settings.rate_limit_requests}/{settings.rate_limit_window}second")
 async def chat_completions(
-    request: Request,
     completion_request: Dict[str, Any],
+    request: Request,
     _: bool = Depends(verify_api_key)
 ):
     """OpenAI-compatible chat completions endpoint with intelligent routing"""
     return await _route_request(
         request_data=completion_request,
-        providers=app.state.providers,
+        providers=request.app.state.providers,
         provider_method_name="create_completion",
         request_type="chat completions"
     )
@@ -212,14 +226,14 @@ async def chat_completions(
 @app.post("/v1/completions")
 @limiter.limit(f"{settings.rate_limit_requests}/{settings.rate_limit_window}second")
 async def completions(
-    request: Request,
     completion_request: Dict[str, Any],
+    request: Request,
     _: bool = Depends(verify_api_key)
 ):
     """OpenAI-compatible completions endpoint with intelligent routing"""
     return await _route_request(
         request_data=completion_request,
-        providers=app.state.providers,
+        providers=request.app.state.providers,
         provider_method_name="create_text_completion",
         request_type="completions"
     )
@@ -227,14 +241,14 @@ async def completions(
 @app.post("/v1/embeddings")
 @limiter.limit(f"{settings.rate_limit_requests}/{settings.rate_limit_window}second")
 async def embeddings(
-    request: Request,
     embedding_request: Dict[str, Any],
+    request: Request,
     _: bool = Depends(verify_api_key)
 ):
     """OpenAI-compatible embeddings endpoint with intelligent routing"""
     return await _route_request(
         request_data=embedding_request,
-        providers=app.state.providers,
+        providers=request.app.state.providers,
         provider_method_name="create_embeddings",
         request_type="embeddings"
     )

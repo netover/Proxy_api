@@ -33,6 +33,11 @@ class Settings(BaseSettings):
     client_timeout: int = 60
     provider_timeout: int = 30
 
+    # Resilience
+    provider_retries: int = 3
+    circuit_breaker_threshold: int = 5
+    circuit_breaker_timeout: int = 60  # seconds
+
     # API Keys (not required in settings, loaded by auth module)
     openai_api_key: Optional[str] = None
     anthropic_api_key: Optional[str] = None

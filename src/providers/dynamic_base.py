@@ -6,7 +6,7 @@ import time
 from src.core.metrics import metrics_collector
 from src.core.logging import ContextualLogger
 from src.core.circuit_breaker import get_circuit_breaker, CircuitBreakerOpenException
-import os
+from src.core.config import settings
 
 
 class DynamicProvider(ABC):
@@ -126,8 +126,8 @@ class DynamicProvider(ABC):
         # Get circuit breaker for this provider
         circuit_breaker = get_circuit_breaker(
             f"provider_{self.name}",
-            failure_threshold=4,
-            recovery_timeout=60  # 1 minute
+            failure_threshold=settings.circuit_breaker_threshold,
+            recovery_timeout=settings.circuit_breaker_timeout
         )
         
         async def _make_request() -> httpx.Response:
@@ -135,7 +135,7 @@ class DynamicProvider(ABC):
             last_exception = None
 
             # Include the initial attempt in the loop
-            for attempt in range(3 + 1):  # 3 retry attempts
+            for attempt in range(settings.provider_retries + 1):
                 try:
                     if attempt > 0:
                         await asyncio.sleep(1.0 * (2 ** (attempt - 1)))
@@ -151,16 +151,16 @@ class DynamicProvider(ABC):
                         self.logger.error(f"Request failed with non-retriable status code {e.response.status_code}: {e.response.text}")
                         break # Exit retry loop for client errors
 
-                    # Check if we should retry (attempt < 3)
-                    if attempt < 3:
+                    # Check if we should retry
+                    if attempt < settings.provider_retries:
                         self.logger.warning(
                             f"Request attempt {attempt + 1} failed with HTTP {e.response.status_code}, retrying..."
                         )
                     continue
                 except (httpx.ConnectError, httpx.TimeoutException) as e:
                     last_exception = e
-                    # Check if we should retry (attempt < 3)
-                    if attempt < 3:
+                    # Check if we should retry
+                    if attempt < settings.provider_retries:
                         self.logger.warning(
                             f"Request attempt {attempt + 1} failed with connection error: {e}, retrying..."
                         )

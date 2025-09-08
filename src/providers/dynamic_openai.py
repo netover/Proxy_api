@@ -1,8 +1,7 @@
 from typing import Dict, Any
-import httpx
+import time
 from src.providers.dynamic_base import DynamicProvider
 from src.core.metrics import metrics_collector
-import time
 
 class DynamicOpenAIProvider(DynamicProvider):
     """Dynamic OpenAI provider implementation"""
