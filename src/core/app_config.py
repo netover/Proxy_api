@@ -1,8 +1,55 @@
 import yaml
+import shutil
+import sys
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 from pydantic import BaseModel, field_validator, Field, HttpUrl
-from src.core.config import settings
+
+def get_config_paths() -> Tuple[Path, Path]:
+    """Returns paths for bundled and external config files"""
+    if getattr(sys, 'frozen', False):
+        # Executable: config bundled (read-only) + config external (writable)
+        bundle_path = Path(sys._MEIPASS) / "config.yaml"
+        external_path = Path(sys.executable).parent / "config.yaml"
+    else:
+        # Development: both point to the same file
+        bundle_path = external_path = Path(__file__).parent.parent.parent / "config.yaml"
+    
+    return bundle_path, external_path
+
+def create_default_config(config_path: Path) -> Dict[str, Any]:
+    """Create and return default configuration"""
+    default_config = {
+        "providers": [
+            {
+                "name": "openai",
+                "type": "openai",
+                "base_url": "https://api.openai.com/v1",
+                "api_key_env": "OPENAI_API_KEY",
+                "models": ["gpt-3.5-turbo", "gpt-4"],
+                "enabled": True,
+                "priority": 1,
+                "timeout": 30,
+                "rate_limit": 1000,
+                "retry_attempts": 3,
+                "retry_delay": 1.0
+            }
+        ]
+    }
+
+    try:
+        # Ensure parent directory exists
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Write the config file
+        with open(config_path, 'w', encoding='utf-8') as f:
+            yaml.safe_dump(default_config, f, default_flow_style=False, sort_keys=False)
+        
+        print(f"✅ Created default config file: {config_path}")
+    except Exception as e:
+        print(f"❌ Failed to create default config file: {e}")
+    
+    return default_config
 
 class ProviderConfig(BaseModel):
     """Configuration for a single provider"""
@@ -22,11 +69,11 @@ class ProviderConfig(BaseModel):
     @field_validator('type')
     @classmethod
     def validate_provider_type(cls, v):
-        supported_types = ['openai', 'anthropic', 'azure_openai', 'cohere']
+        supported_types = ['openai', 'anthropic', 'azure_openai', 'cohere', 'perplexity', 'grok', 'blackbox', 'openrouter']
         if v.lower() not in supported_types:
             raise ValueError(f'Provider type must be one of: {supported_types}')
         return v.lower()
-        
+
     @field_validator('models')
     @classmethod
     def validate_models(cls, v):
@@ -55,18 +102,42 @@ class AppConfig(BaseModel):
             raise ValueError('Provider priorities must be unique')
 
         return v
+
+def load_config() -> AppConfig:
+    """Load config with fallback: external -> bundled -> default"""
+    bundle_path, external_path = get_config_paths()
+    
+    # 1st: Try external config (editable by user)
+    if external_path.exists():
+        try:
+            with open(external_path, 'r', encoding='utf-8') as f:
+                config_data = yaml.safe_load(f)
+            print(f"✅ Loaded config from: {external_path}")
+            return AppConfig(**config_data)
+        except Exception as e:
+            print(f"⚠️  Error reading external config: {e}")
+    
+    # 2nd: Try bundled config (read-only)
+    if bundle_path.exists():
+        try:
+            with open(bundle_path, 'r', encoding='utf-8') as f:
+                config_data = yaml.safe_load(f)
+            print(f"✅ Loaded bundled config from: {bundle_path}")
             
-def load_config(config_path: Path = None) -> AppConfig:
-    """Load and validate configuration from YAML file"""
-    if config_path is None:
-        config_path = settings.config_file
+            # Copy to external for future editing
+            try:
+                shutil.copy2(bundle_path, external_path)
+                print(f"✅ Copied bundled config to: {external_path}")
+            except Exception as e:
+                print(f"⚠️  Failed to copy config to external location: {e}")
+                
+            return AppConfig(**config_data)
+        except Exception as e:
+            print(f"⚠️  Error reading bundled config: {e}")
     
-    if not config_path.exists():
-        raise FileNotFoundError(f"Configuration file {config_path} not found")
-    
-    with open(config_path, 'r', encoding='utf-8') as f:
-        config_data = yaml.safe_load(f)
-    
+    # 3rd: Create default config
+    print("ℹ️  Creating default config...")
+    config_data = create_default_config(external_path)
     return AppConfig(**config_data)
 
 # Global config instance

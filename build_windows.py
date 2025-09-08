@@ -8,6 +8,7 @@ import os
 import sys
 import shutil
 import subprocess
+import stat
 from pathlib import Path
 import yaml
 import time
@@ -86,6 +87,39 @@ VSVersionInfo(
 )
 '''
     return version_info
+
+def copy_config_with_permissions():
+    """Copy config.yaml to dist directory with proper permissions"""
+    print("📋 Copying config.yaml to dist directory with proper permissions...")
+
+    source_config = Path("config.yaml")
+    dist_dir = Path("dist")
+    target_config = dist_dir / "config.yaml"
+
+    if not source_config.exists():
+        print("❌ Source config.yaml not found!")
+        return False
+
+    if not dist_dir.exists():
+        dist_dir.mkdir(parents=True, exist_ok=True)
+
+    try:
+        # Copy the file
+        shutil.copy2(source_config, target_config)
+
+        # Set proper permissions (readable by all users)
+        current_permissions = target_config.stat().st_mode
+        # Add read permissions for user, group, and others
+        new_permissions = current_permissions | stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH
+        target_config.chmod(new_permissions)
+
+        print(f"✅ Config file copied to: {target_config.absolute()}")
+        print(f"   Permissions set to: {oct(target_config.stat().st_mode)}")
+
+        return True
+    except Exception as e:
+        print(f"❌ Failed to copy config file: {e}")
+        return False
 
 def build_executable():
     """Build Windows executable using PyInstaller"""
@@ -205,7 +239,13 @@ def build_executable():
             exe_size = exe_path.stat().st_size / (1024 * 1024)  # Size in MB
             print(f"📦 Executable size: {exe_size:.2f} MB")
             print(f"📁 Executable location: {exe_path.absolute()}")
-            return True
+
+            # Copy config file with proper permissions
+            if copy_config_with_permissions():
+                return True
+            else:
+                print("⚠️  Executable built but config file copy failed")
+                return False
         else:
             print("❌ Executable not found after build!")
             return False
@@ -282,8 +322,9 @@ InstallDirRegKey HKCU "Software\\{config['company']}\\{config['app_name']}" ""
 Section "MainSection" SEC01
     SetOutPath "$INSTDIR"
     File "dist\\{config['app_name'].replace(' ', '_')}.exe"
-    File "config.yaml"
+    File "dist\\config.yaml"
     File "README.md"
+    File "LICENSE"
 
     CreateShortCut "$SMPROGRAMS\\{config['app_name']}.lnk" "$INSTDIR\\{config['app_name'].replace(' ', '_')}.exe"
 
@@ -295,6 +336,7 @@ Section "Uninstall"
     Delete "$INSTDIR\\{config['app_name'].replace(' ', '_')}.exe"
     Delete "$INSTDIR\\config.yaml"
     Delete "$INSTDIR\\README.md"
+    Delete "$INSTDIR\\LICENSE"
     Delete "$INSTDIR\\Uninstall.exe"
 
     Delete "$SMPROGRAMS\\{config['app_name']}.lnk"
