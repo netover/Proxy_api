@@ -14,8 +14,10 @@ from src.core.config import settings
 from src.core.logging import setup_logging, ContextualLogger
 from src.core.app_config import init_config, config
 from src.core.metrics import metrics_collector
+from src.core.auth import verify_api_key, check_rate_limit
 from src.providers.base import get_provider
 from src.providers.base import ProviderConfig
+
 
 # Setup logging
 setup_logging(
@@ -118,8 +120,10 @@ async def list_providers():
 @limiter.limit(f"{settings.rate_limit_requests}/{settings.rate_limit_window}second")
 async def chat_completions(
     request: Request,
-    completion_request: Dict[str, Any]
+    completion_request: Dict[str, Any],
+    _: bool = Depends(verify_api_key)
 ):
+
     """OpenAI-compatible chat completions endpoint with intelligent routing"""
 
     if not config:
@@ -178,8 +182,10 @@ async def chat_completions(
 @limiter.limit(f"{settings.rate_limit_requests}/{settings.rate_limit_window}second")
 async def completions(
     request: Request,
-    completion_request: Dict[str, Any]
+    completion_request: Dict[str, Any],
+    _: bool = Depends(verify_api_key)
 ):
+
     """OpenAI-compatible completions endpoint with intelligent routing"""
 
     if not config:
@@ -238,8 +244,10 @@ async def completions(
 @limiter.limit(f"{settings.rate_limit_requests}/{settings.rate_limit_window}second")
 async def embeddings(
     request: Request,
-    embedding_request: Dict[str, Any]
+    embedding_request: Dict[str, Any],
+    _: bool = Depends(verify_api_key)
 ):
+
     """OpenAI-compatible embeddings endpoint with intelligent routing"""
 
     if not config:

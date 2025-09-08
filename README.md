@@ -116,7 +116,25 @@ providers:
 ```http
 POST /v1/chat/completions
 Content-Type: application/json
-Authorization: Bearer YOUR_API_KEY
+X-API-Key: YOUR_API_KEY
+
+{
+  "model": "gpt-3.5-turbo",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Hello!"
+    }
+  ]
+}
+```
+
+Or using Bearer token authentication:
+
+```http
+POST /v1/chat/completions
+Content-Type: application/json
+Authorization: Bearer YOUR_JWT_TOKEN
 
 {
   "model": "gpt-3.5-turbo",
@@ -177,10 +195,12 @@ The proxy provides real-time metrics through the `/metrics` endpoint:
 
 ## Security
 
-- All API requests require authentication via API key
+- All API requests require authentication via API key or JWT token
 - CORS policy can be configured in environment variables
 - Rate limiting prevents abuse
 - Secure headers are automatically added to responses
+- Input validation and sanitization protect against malicious payloads
+
 
 ## Extending Providers
 

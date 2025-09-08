@@ -6,7 +6,9 @@ import time
 from src.core.app_config import ProviderConfig
 from src.core.metrics import metrics_collector
 from src.core.logging import ContextualLogger
+from src.core.circuit_breaker import get_circuit_breaker, CircuitBreakerOpenException
 import os
+
 
 class Provider(ABC):
     """Abstract base class for AI providers"""
@@ -94,32 +96,49 @@ class Provider(ABC):
         url: str,
         **kwargs
     ) -> httpx.Response:
-        """Make HTTP request with retry logic"""
-        last_exception = None
+        """Make HTTP request with retry logic and circuit breaker"""
+        # Get circuit breaker for this provider
+        circuit_breaker = get_circuit_breaker(
+            f"provider_{self.config.name}",
+            failure_threshold=self.config.retry_attempts + 1,
+            recovery_timeout=60  # 1 minute
+        )
+        
+        async def _make_request() -> httpx.Response:
+            """Internal request function"""
+            last_exception = None
 
-        # Include the initial attempt in the loop
-        for attempt in range(self.config.retry_attempts + 1):
-            try:
-                if attempt > 0:
-                    await asyncio.sleep(self.config.retry_delay * (2 ** (attempt - 1)))
+            # Include the initial attempt in the loop
+            for attempt in range(self.config.retry_attempts + 1):
+                try:
+                    if attempt > 0:
+                        await asyncio.sleep(self.config.retry_delay * (2 ** (attempt - 1)))
 
-                response = await self.client.request(method, url, **kwargs)
-                response.raise_for_status()
-                return response
+                    response = await self.client.request(method, url, **kwargs)
+                    response.raise_for_status()
+                    return response
 
-            except (httpx.HTTPStatusError, httpx.ConnectError, httpx.TimeoutException) as e:
-                last_exception = e
-                # Check if we should retry (attempt < retry_attempts)
-                if attempt < self.config.retry_attempts:
-                    self.logger.warning(
-                        f"Request attempt {attempt + 1} failed: {e}, retrying..."
-                    )
-                continue
-            except Exception as e:
-                last_exception = e
-                break
+                except (httpx.HTTPStatusError, httpx.ConnectError, httpx.TimeoutException) as e:
+                    last_exception = e
+                    # Check if we should retry (attempt < retry_attempts)
+                    if attempt < self.config.retry_attempts:
+                        self.logger.warning(
+                            f"Request attempt {attempt + 1} failed: {e}, retrying..."
+                        )
+                    continue
+                except Exception as e:
+                    last_exception = e
+                    break
 
-        raise last_exception
+            raise last_exception
+        
+        # Execute with circuit breaker
+        try:
+            return await circuit_breaker.execute(_make_request)
+        except CircuitBreakerOpenException:
+            self.logger.error(f"Circuit breaker is open for provider {self.config.name}")
+            raise
+
             
     async def __aenter__(self):
         return self
