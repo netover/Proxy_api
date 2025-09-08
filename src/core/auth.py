@@ -4,11 +4,7 @@ Provides API key and JWT token-based authentication
 """
 
 from fastapi import Request, HTTPException, Depends
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from typing import Optional, Dict, Any
-import os
-import jwt
-from datetime import datetime, timedelta
+from typing import Any
 import hashlib
 import secrets
 from src.core.config import settings
@@ -80,5 +76,5 @@ async def verify_api_key(
             detail="Invalid or unauthorized API key"
         )
     
-    logger.debug("API key verified successfully", path=request.url.path)
+    logger.info("API key verified successfully", path=request.url.path)
     return True

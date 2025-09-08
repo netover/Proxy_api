@@ -99,3 +99,44 @@ def test_chat_completions_provider_failure(client, mock_provider):
     response = client.post("/v1/chat/completions", json=request_data)
     assert response.status_code == 503
     assert "All providers are currently unavailable" in response.json()["detail"]
+
+# --- Embeddings and Completions Tests ---
+
+def test_embeddings_not_implemented(client, mock_provider):
+    """Test that a 501 is returned if a provider doesn't support a method."""
+    # Configure the mock to raise NotImplementedError for this specific method
+    mock_provider.create_embeddings.side_effect = NotImplementedError
+
+    request_data = {
+        "model": "test-model",
+        "input": "This is a test."
+    }
+
+    response = client.post("/v1/embeddings", json=request_data)
+
+    assert response.status_code == 501
+    assert "not supported by any provider" in response.json()["detail"]
+
+def test_text_completions_success(client, mock_provider):
+    """Test a successful text completion call."""
+    # Configure the mock provider for a text completion response
+    mock_provider.create_text_completion.return_value = {
+        "id": "cmpl-mock-id",
+        "object": "text_completion",
+        "created": int(time.time()),
+        "model": "test-model",
+        "choices": [{"text": "Mocked text completion.", "index": 0, "logprobs": None, "finish_reason": "length"}]
+    }
+
+    request_data = {
+        "model": "test-model",
+        "prompt": "Once upon a time",
+        "max_tokens": 50
+    }
+
+    response = client.post("/v1/completions", json=request_data)
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["id"] == "cmpl-mock-id"
+    mock_provider.create_text_completion.assert_called_once_with(request_data)
