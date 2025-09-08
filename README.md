@@ -1,275 +1,112 @@
-# LLM Proxy API
+# LLM Proxy API with Dynamic Provider Loading
 
-A high-performance, production-ready proxy server for Large Language Models (LLMs) with intelligent routing, fallback mechanisms, and comprehensive monitoring.
+A high-performance LLM proxy with intelligent routing and fallback capabilities that supports dynamic provider loading through configuration.
 
 ## Features
 
-- **Multi-Provider Support**: OpenAI, Anthropic, Perplexity.ai, Grok (xAI), Blackbox.ai, OpenRouter, and extensible architecture
-- **Intelligent Routing**: Automatic provider selection with priority-based fallback and circuit breaker protection
-- **Rate Limiting**: Built-in rate limiting with configurable thresholds using slowapi
-- **Comprehensive Monitoring**: Real-time metrics collection, health checks, and provider statistics
-- **Circuit Breaker**: Prevents cascading failures with configurable failure thresholds and recovery
-- **Security**: API key authentication, CORS support, and input validation
-- **Performance**: Asynchronous processing with HTTP connection pooling and retry logic
-- **Advanced Capabilities**: Real-time search, tool calling, image/video generation, unified model access
-- **Deployment Flexibility**: Standalone executable build for Windows and cross-platform support
-
-## Architecture
-
-```
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   Client App    │───▶│  LLM Proxy API   │───▶│  LLM Provider   │
-└─────────────────┘    │                  │    │ (OpenAI, etc.)  │
-                       │ ├── Provider      │    └─────────────────┘
-                       │ │   Routing      │    ┌─────────────────┐
-                       │ ├── Health        │───▶│  LLM Provider   │
-                       │ │   Monitoring   │    │ (Fallback)      │
-                       │ ├── Rate          │    └─────────────────┘
-                       │ │   Limiting     │
-                       │ └── Metrics       │
-                       └──────────────────┘
-```
+- **Dynamic Provider Loading**: Add, remove, or reorder providers by simply editing the `config.yaml` file
+- **Intelligent Routing**: Automatic failover between providers
+- **Rate Limiting**: Built-in rate limiting protection
+- **Metrics Collection**: Performance monitoring and statistics
+- **OpenAI Compatible**: Drop-in replacement for OpenAI API endpoints
+- **Extensible Architecture**: Easy to add new provider implementations
 
 ## Quick Start
 
-### Prerequisites
-
-- Python 3.8+
-- pip (Python package manager)
-
-### Installation
-
-1. Clone the repository:
-   ```bash
-   git clone <repository-url>
-   cd llm-proxy-api
-   ```
-
-2. Install dependencies:
+1. Install dependencies:
    ```bash
    pip install -r requirements.txt
    ```
 
-3. Configure environment variables:
+2. Configure your API keys in environment variables:
    ```bash
-   cp .env.example .env
-   # Edit .env with your API keys and settings
+   export OPENAI_API_KEY="your-openai-key"
+   export ANTHROPIC_API_KEY="your-anthropic-key"
+   # ... other provider keys
    ```
 
-4. Start the server:
+3. Run the server:
    ```bash
-   python main.py
+   python main_dynamic.py
    ```
 
-### Using Docker
+## Dynamic Provider Configuration
 
-1. Build the Docker image:
-   ```bash
-   docker build -t llm-proxy-api .
-   ```
-
-2. Run the container:
-   ```bash
-   docker run -p 8000:8000 --env-file .env llm-proxy-api
-   ```
-
-## Configuration
-
-### Environment Variables
-
-Copy `.env.example` to `.env` and configure:
-
-```bash
-# API Keys
-OPENAI_API_KEY=your_openai_key
-ANTHROPIC_API_KEY=your_anthropic_key
-
-# Server Settings
-PROXY_API_HOST=0.0.0.0
-PROXY_API_PORT=8000
-PROXY_API_DEBUG=false
-
-# Rate Limiting
-PROXY_API_RATE_LIMIT_REQUESTS=100
-PROXY_API_RATE_LIMIT_WINDOW=60
-```
-
-### Provider Configuration
-
-Edit `config.yaml` to configure providers:
+Providers are configured in `config.yaml` with the following structure:
 
 ```yaml
 providers:
   - name: "openai"
-    type: "openai"
+    module: "src.providers.dynamic_openai"
+    class: "DynamicOpenAIProvider"
     api_key_env: "OPENAI_API_KEY"
     base_url: "https://api.openai.com/v1"
     models:
       - "gpt-4"
       - "gpt-3.5-turbo"
-    enabled: true
-    priority: 1  # Lower number = higher priority
+    priority: 1
 ```
+
+To add a new provider:
+1. Create a new provider implementation that inherits from `DynamicProvider`
+2. Add the provider configuration to `config.yaml`
+3. Set the required environment variable for the API key
+4. Restart the server (no code changes needed)
 
 ## API Endpoints
 
-### Chat Completions (OpenAI Compatible)
+- `POST /v1/chat/completions` - Chat completions
+- `POST /v1/completions` - Text completions
+- `POST /v1/embeddings` - Embeddings generation
+- `GET /v1/models` - List available models
+- `GET /providers` - List configured providers
+- `GET /metrics` - View performance metrics
+- `GET /health` - Health check
 
-```http
-POST /v1/chat/completions
-Content-Type: application/json
-X-API-Key: YOUR_API_KEY
-
-{
-  "model": "gpt-3.5-turbo",
-  "messages": [
-    {
-      "role": "user",
-      "content": "Hello!"
-    }
-  ]
-}
-```
-
-Or using Bearer token authentication:
-
-```http
-POST /v1/chat/completions
-Content-Type: application/json
-Authorization: Bearer YOUR_JWT_TOKEN
-
-{
-  "model": "gpt-3.5-turbo",
-  "messages": [
-    {
-      "role": "user",
-      "content": "Hello!"
-    }
-  ]
-}
-```
-
-### Health Check
-
-```http
-GET /health
-```
-
-### Provider Metrics
-
-```http
-GET /metrics
-```
-
-### List Models
-
-```http
-GET /v1/models
-```
-
-### List Providers
-
-```http
-GET /providers
-```
-
-## Building Executables
-
-To build a standalone executable:
-
-```bash
-python build.py
-```
-
-This creates a single executable file in the `dist/` directory.
-
-## Monitoring
-
-The proxy provides real-time metrics through the `/metrics` endpoint:
-
-```json
-{
-  "openai": {
-    "total_requests": 1250,
-    "success_rate": 0.98,
-    "avg_response_time": 0.45,
-    "error_counts": {
-      "http_429": 5,
-      "timeout": 2
-    }
-  }
-}
-```
-
-## Security
-
-- All API requests require authentication via API key or JWT token
-- CORS policy can be configured in environment variables
-- Rate limiting prevents abuse
-- Secure headers are automatically added to responses
-- Input validation and sanitization protect against malicious payloads
-
-
-## Supported Providers
-
-The proxy supports multiple LLM providers with OpenAI-compatible APIs:
-
-### OpenAI
-- **Models**: GPT-4, GPT-3.5-turbo, text-davinci-003, text-embedding-ada-002
-- **Features**: Chat completions, text completions, embeddings
-- **Authentication**: Bearer token
-
-### Anthropic
-- **Models**: Claude-3 Opus, Claude-3 Sonnet
-- **Features**: Chat completions, text completions
-- **Authentication**: x-api-key header
-
-### Perplexity.ai
-- **Models**: sonar-pro, sonar-small-online, sonar-medium-online, mistral-7b, codellama-34b, llama-2-70b
-- **Features**: Chat completions with real-time search, text completions
-- **Authentication**: Bearer token
-
-### Grok (xAI)
-- **Models**: grok-4
-- **Features**: Chat completions with optional real-time search
-- **Authentication**: Bearer token
-- **Note**: Requires xAI SDK for full functionality
-
-### Blackbox.ai
-- **Models**: blackbox-chat, blackbox-image, blackbox-video
-- **Features**: Chat completions, tool calling, image generation, video generation
-- **Authentication**: Bearer token
-
-### OpenRouter
-- **Models**: 280+ models from multiple providers (OpenAI, Anthropic, Meta, Google, etc.)
-- **Features**: Unified access to all supported models
-- **Authentication**: Bearer token
-
-## Extending Providers
+## Adding New Providers
 
 To add a new provider:
 
-1. Create a new file in `src/providers/` (e.g., `new_provider.py`)
-2. Implement the `Provider` base class
-3. Add configuration to `config.yaml`
+1. Create a new provider class in `src/providers/` that inherits from `DynamicProvider`
+2. Implement the required methods:
+   - `_health_check()`
+   - `create_completion()`
+   - `create_text_completion()`
+   - `create_embeddings()`
+3. Add the provider configuration to `config.yaml`
+4. Set the appropriate environment variable for the API key
+
+Example provider implementation:
 
 ```python
-from src.providers.base import Provider
+from src.providers.dynamic_base import DynamicProvider
 
-class NewProvider(Provider):
-    async def create_completion(self, request: Dict[str, Any]) -> Dict[str, Any]:
+class MyNewProvider(DynamicProvider):
+    async def _health_check(self):
+        # Implementation here
+        pass
+        
+    async def create_completion(self, request):
+        # Implementation here
+        pass
+        
+    async def create_text_completion(self, request):
+        # Implementation here
+        pass
+        
+    async def create_embeddings(self, request):
         # Implementation here
         pass
 ```
 
-## Contributing
+## Testing
 
-1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
+Run the dynamic loading test:
+
+```bash
+python test_dynamic_loading.py
+```
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+MIT

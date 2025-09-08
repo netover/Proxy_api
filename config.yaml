@@ -1,6 +1,7 @@
 providers:
   - name: "openai"
-    type: "openai"
+    module: "src.providers.dynamic_openai"
+    class: "DynamicOpenAIProvider"
     api_key_env: "OPENAI_API_KEY"
     base_url: "https://api.openai.com/v1"
     models:
@@ -8,34 +9,21 @@ providers:
       - "gpt-3.5-turbo"
       - "text-davinci-003"
       - "text-embedding-ada-002"
-    enabled: true
     priority: 1
-    timeout: 30
-    rate_limit: 1000
-    retry_attempts: 3
-    retry_delay: 1.0
-    headers:
-      "Authorization": "Bearer ${OPENAI_API_KEY}"
 
   - name: "anthropic"
-    type: "anthropic"
+    module: "src.providers.dynamic_anthropic"
+    class: "DynamicAnthropicProvider"
     api_key_env: "ANTHROPIC_API_KEY"
     base_url: "https://api.anthropic.com"
     models:
       - "claude-3-sonnet-20240229"
       - "claude-3-opus-20240229"
-    enabled: true
     priority: 2
-    timeout: 30
-    rate_limit: 1000
-    retry_attempts: 3
-    retry_delay: 1.0
-    headers:
-      "x-api-key": "${ANTHROPIC_API_KEY}"
-      "anthropic-version": "2023-06-01"
 
   - name: "perplexity"
-    type: "perplexity"
+    module: "src.providers.dynamic_perplexity"
+    class: "DynamicPerplexityProvider"
     api_key_env: "PERPLEXITY_API_KEY"
     base_url: "https://api.perplexity.ai"
     models:
@@ -47,63 +35,4 @@ providers:
       - "mistral-7b"
       - "codellama-34b"
       - "llama-2-70b"
-    enabled: true
     priority: 3
-    timeout: 30
-    rate_limit: 1000
-    retry_attempts: 3
-    retry_delay: 1.0
-    headers:
-      "Authorization": "Bearer ${PERPLEXITY_API_KEY}"
-
-  - name: "grok"
-    type: "grok"
-    api_key_env: "XAI_API_KEY"
-    base_url: "https://api.x.ai/v1"
-    models:
-      - "grok-4"
-    enabled: true
-    priority: 4
-    timeout: 30
-    rate_limit: 1000
-    retry_attempts: 3
-    retry_delay: 1.0
-    headers:
-      "Authorization": "Bearer ${XAI_API_KEY}"
-
-  - name: "blackbox"
-    type: "blackbox"
-    api_key_env: "BLACKBOX_API_KEY"
-    base_url: "https://api.blackbox.ai"
-    models:
-      - "blackbox-chat"
-      - "blackbox-image"
-      - "blackbox-video"
-    enabled: true
-    priority: 5
-    timeout: 30
-    rate_limit: 1000
-    retry_attempts: 3
-    retry_delay: 1.0
-    headers:
-      "Authorization": "Bearer ${BLACKBOX_API_KEY}"
-
-  - name: "openrouter"
-    type: "openrouter"
-    api_key_env: "OPENROUTER_API_KEY"
-    base_url: "https://openrouter.ai/api"
-    models:
-      - "openai/gpt-4"
-      - "openai/gpt-3.5-turbo"
-      - "anthropic/claude-3-sonnet"
-      - "anthropic/claude-3-opus"
-      - "meta-llama/llama-2-70b-chat"
-      - "google/gemini-pro"
-    enabled: true
-    priority: 6
-    timeout: 30
-    rate_limit: 1000
-    retry_attempts: 3
-    retry_delay: 1.0
-    headers:
-      "Authorization": "Bearer ${OPENROUTER_API_KEY}"
