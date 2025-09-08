@@ -33,3 +33,77 @@ providers:
     headers:
       "x-api-key": "${ANTHROPIC_API_KEY}"
       "anthropic-version": "2023-06-01"
+
+  - name: "perplexity"
+    type: "perplexity"
+    api_key_env: "PERPLEXITY_API_KEY"
+    base_url: "https://api.perplexity.ai"
+    models:
+      - "sonar-pro"
+      - "sonar-small-online"
+      - "sonar-medium-online"
+      - "sonar-small-chat"
+      - "sonar-medium-chat"
+      - "mistral-7b"
+      - "codellama-34b"
+      - "llama-2-70b"
+    enabled: true
+    priority: 3
+    timeout: 30
+    rate_limit: 1000
+    retry_attempts: 3
+    retry_delay: 1.0
+    headers:
+      "Authorization": "Bearer ${PERPLEXITY_API_KEY}"
+
+  - name: "grok"
+    type: "grok"
+    api_key_env: "XAI_API_KEY"
+    base_url: "https://api.x.ai/v1"
+    models:
+      - "grok-4"
+    enabled: true
+    priority: 4
+    timeout: 30
+    rate_limit: 1000
+    retry_attempts: 3
+    retry_delay: 1.0
+    headers:
+      "Authorization": "Bearer ${XAI_API_KEY}"
+
+  - name: "blackbox"
+    type: "blackbox"
+    api_key_env: "BLACKBOX_API_KEY"
+    base_url: "https://api.blackbox.ai"
+    models:
+      - "blackbox-chat"
+      - "blackbox-image"
+      - "blackbox-video"
+    enabled: true
+    priority: 5
+    timeout: 30
+    rate_limit: 1000
+    retry_attempts: 3
+    retry_delay: 1.0
+    headers:
+      "Authorization": "Bearer ${BLACKBOX_API_KEY}"
+
+  - name: "openrouter"
+    type: "openrouter"
+    api_key_env: "OPENROUTER_API_KEY"
+    base_url: "https://openrouter.ai/api"
+    models:
+      - "openai/gpt-4"
+      - "openai/gpt-3.5-turbo"
+      - "anthropic/claude-3-sonnet"
+      - "anthropic/claude-3-opus"
+      - "meta-llama/llama-2-70b-chat"
+      - "google/gemini-pro"
+    enabled: true
+    priority: 6
+    timeout: 30
+    rate_limit: 1000
+    retry_attempts: 3
+    retry_delay: 1.0
+    headers:
+      "Authorization": "Bearer ${OPENROUTER_API_KEY}"

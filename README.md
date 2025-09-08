@@ -4,13 +4,14 @@ A high-performance, production-ready proxy server for Large Language Models (LLM
 
 ## Features
 
-- **Multi-Provider Support**: OpenAI, Anthropic, and extensible architecture for additional providers
+- **Multi-Provider Support**: OpenAI, Anthropic, Perplexity.ai, Grok (xAI), Blackbox.ai, OpenRouter, and extensible architecture
 - **Intelligent Routing**: Automatic provider selection with priority-based fallback and circuit breaker protection
 - **Rate Limiting**: Built-in rate limiting with configurable thresholds using slowapi
 - **Comprehensive Monitoring**: Real-time metrics collection, health checks, and provider statistics
 - **Circuit Breaker**: Prevents cascading failures with configurable failure thresholds and recovery
 - **Security**: API key authentication, CORS support, and input validation
 - **Performance**: Asynchronous processing with HTTP connection pooling and retry logic
+- **Advanced Capabilities**: Real-time search, tool calling, image/video generation, unified model access
 - **Deployment Flexibility**: Standalone executable build for Windows and cross-platform support
 
 ## Architecture
@@ -208,6 +209,41 @@ The proxy provides real-time metrics through the `/metrics` endpoint:
 - Secure headers are automatically added to responses
 - Input validation and sanitization protect against malicious payloads
 
+
+## Supported Providers
+
+The proxy supports multiple LLM providers with OpenAI-compatible APIs:
+
+### OpenAI
+- **Models**: GPT-4, GPT-3.5-turbo, text-davinci-003, text-embedding-ada-002
+- **Features**: Chat completions, text completions, embeddings
+- **Authentication**: Bearer token
+
+### Anthropic
+- **Models**: Claude-3 Opus, Claude-3 Sonnet
+- **Features**: Chat completions, text completions
+- **Authentication**: x-api-key header
+
+### Perplexity.ai
+- **Models**: sonar-pro, sonar-small-online, sonar-medium-online, mistral-7b, codellama-34b, llama-2-70b
+- **Features**: Chat completions with real-time search, text completions
+- **Authentication**: Bearer token
+
+### Grok (xAI)
+- **Models**: grok-4
+- **Features**: Chat completions with optional real-time search
+- **Authentication**: Bearer token
+- **Note**: Requires xAI SDK for full functionality
+
+### Blackbox.ai
+- **Models**: blackbox-chat, blackbox-image, blackbox-video
+- **Features**: Chat completions, tool calling, image generation, video generation
+- **Authentication**: Bearer token
+
+### OpenRouter
+- **Models**: 280+ models from multiple providers (OpenAI, Anthropic, Meta, Google, etc.)
+- **Features**: Unified access to all supported models
+- **Authentication**: Bearer token
 
 ## Extending Providers
 

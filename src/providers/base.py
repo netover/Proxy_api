@@ -185,11 +185,19 @@ class Provider(ABC):
 # Import implementations after base class
 from src.providers.openai import OpenAIProvider
 from src.providers.anthropic import AnthropicProvider
+from src.providers.perplexity import PerplexityProvider
+from src.providers.grok import GrokProvider
+from src.providers.blackbox import BlackboxProvider
+from src.providers.openrouter import OpenRouterProvider
 
 # Provider factory
 PROVIDER_CLASSES = {
     "openai": OpenAIProvider,
-    "anthropic": AnthropicProvider
+    "anthropic": AnthropicProvider,
+    "perplexity": PerplexityProvider,
+    "grok": GrokProvider,
+    "blackbox": BlackboxProvider,
+    "openrouter": OpenRouterProvider
 }
 
 def get_provider(config: ProviderConfig) -> Provider:
