@@ -30,7 +30,7 @@ limiter = Limiter(key_func=get_remote_address)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan management"""
-    logger.info("🚀 Starting LLM Proxy API")
+    logger.info("Starting LLM Proxy API")
     
     # Initialize providers dynamically
     try:
@@ -43,7 +43,8 @@ async def lifespan(app: FastAPI):
     yield
     
     # Cleanup
-    logger.info("🛑 Shutting down LLM Proxy API")
+    logger.info("Shutting down LLM Proxy API")
+
 
 
 # FastAPI app setup

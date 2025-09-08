@@ -36,6 +36,7 @@ class DynamicProvider(ABC):
         if not self.api_key:
             self.logger.warning(f"API key for {name} not found in environment")
 
+
     async def health_check(self) -> Dict[str, Any]:
         """Check provider health"""
         start_time = time.time()

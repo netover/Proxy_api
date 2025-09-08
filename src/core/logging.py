@@ -52,6 +52,15 @@ def setup_logging(log_level: str = "INFO", log_file: Path = None):
     console_handler.setFormatter(console_formatter)
     root_logger.addHandler(console_handler)
     
+    # Handle encoding issues on Windows
+    if sys.platform == "win32":
+        import io
+        console_handler.stream = io.TextIOWrapper(
+            sys.stdout.buffer, 
+            encoding='utf-8', 
+            errors='replace'
+        )
+    
     # File handler with JSON format
     if log_file:
         file_handler = RotatingFileHandler(
