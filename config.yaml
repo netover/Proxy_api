@@ -39,3 +39,25 @@ providers:
       - "codellama-34b"
       - "llama-2-70b"
     priority: 3
+
+  - name: "openrouter"
+    type: "openrouter"
+    module: "src.providers.dynamic_openrouter"
+    class: "DynamicOpenRouterProvider"
+    api_key_env: "OPENROUTER_API_KEY"
+    base_url: "https://openrouter.ai/api"
+    models:
+      - "google/gemini-flash-1.5"
+      - "mistralai/mistral-7b-instruct"
+      - "openai/gpt-4o"
+    priority: 4
+
+  - name: "blackbox"
+    type: "blackbox"
+    module: "src.providers.dynamic_blackbox"
+    class: "DynamicBlackboxProvider"
+    api_key_env: "BLACKBOX_API_KEY"
+    base_url: "https://api.blackbox.ai"
+    models:
+      - "blackbox-chat"
+    priority: 5
