@@ -3,9 +3,11 @@ Grok (xAI) provider implementation
 Uses xAI SDK with OpenAI-compatible interface
 """
 
-from typing import Dict, Any
+from typing import Dict, Any, Union, AsyncGenerator
 from src.core.provider_factory import BaseProvider
 from src.core.unified_config import ProviderConfig
+import json
+import json
 from src.core.metrics import metrics_collector
 from src.core.logging import ContextualLogger
 import time
@@ -34,10 +36,10 @@ class GrokProvider(BaseProvider):
                 "error": str(e)
             }
 
-    async def create_completion(self, request: Dict[str, Any]) -> Dict[str, Any]:
-        """Create chat completion with Grok API"""
+    async def create_completion(self, request: Dict[str, Any]) -> Union[Dict[str, Any], AsyncGenerator]:
+        """Create chat completion with Grok API with streaming support"""
         start_time = time.time()
-
+ 
         try:
             # Extract parameters
             model = request.get("model", "grok-beta")
@@ -46,7 +48,7 @@ class GrokProvider(BaseProvider):
             temperature = request.get("temperature", 0.7)
             top_p = request.get("top_p", 1.0)
             stream = request.get("stream", False)
-
+ 
             # Prepare request body (OpenAI compatible)
             body = {
                 "model": model,
@@ -56,32 +58,63 @@ class GrokProvider(BaseProvider):
                 "top_p": top_p,
                 "stream": stream
             }
-
-            # Make request using self.make_request
-            response = await self.make_request(
-                "POST",
-                f"{self.config.base_url}/chat/completions",
-                json=body
-            )
-            result = response.json()
-            response_time = time.time() - start_time
-
-            # Record metrics
-            usage = result.get("usage", {})
-            total_tokens = usage.get("total_tokens", 0)
-            metrics_collector.record_request(
-                self.name,
-                success=True,
-                response_time=response_time,
-                tokens=total_tokens
-            )
-
-            self.logger.info("Chat completion successful",
-                             response_time=response_time,
-                             tokens=total_tokens)
-
-            return result
-
+ 
+            if stream:
+                # Streaming response
+                async def stream_generator():
+                    async with self.make_request(
+                        "POST",
+                        f"{self.config.base_url}/chat/completions",
+                        json=body,
+                        stream=True
+                    ) as response:
+                        response.raise_for_status()
+                        async for line in response.aiter_lines():
+                            if line.startswith('data: '):
+                                data = line[6:]
+                                if data == '[DONE]':
+                                    break
+                                try:
+                                    chunk = json.loads(data)
+                                    yield f"data: {json.dumps(chunk)}\n\n"
+                                except json.JSONDecodeError:
+                                    continue
+                
+                response_time = time.time() - start_time
+                metrics_collector.record_request(
+                    self.name,
+                    success=True,
+                    response_time=response_time,
+                    tokens=0  # Tokens not available in streaming
+                )
+                self.logger.info("Chat completion streaming successful", response_time=response_time)
+                return stream_generator()
+            else:
+                # Non-streaming
+                response = await self.make_request(
+                    "POST",
+                    f"{self.config.base_url}/chat/completions",
+                    json=body
+                )
+                result = response.json()
+                response_time = time.time() - start_time
+ 
+                # Record metrics
+                usage = result.get("usage", {})
+                total_tokens = usage.get("total_tokens", 0)
+                metrics_collector.record_request(
+                    self.name,
+                    success=True,
+                    response_time=response_time,
+                    tokens=total_tokens
+                )
+ 
+                self.logger.info("Chat completion successful",
+                                 response_time=response_time,
+                                 tokens=total_tokens)
+ 
+                return result
+ 
         except Exception as e:
             response_time = time.time() - start_time
             metrics_collector.record_request(

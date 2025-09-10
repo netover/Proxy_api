@@ -330,7 +330,10 @@ async def health_check(request: Request):
     }
 
 @router.get("/metrics")
-async def get_metrics(request: Request):
+async def get_metrics(
+    request: Request,
+    _: bool = Depends(verify_api_key)
+):
     """Comprehensive metrics endpoint"""
     app_state = request.app.state.app_state
     metrics = metrics_collector.get_all_stats()
@@ -359,7 +362,10 @@ async def get_metrics(request: Request):
     }
 
 @router.get("/providers")
-async def list_providers(request: Request):
+async def list_providers(
+    request: Request,
+    _: bool = Depends(verify_api_key)
+):
     """List all configured providers with detailed information"""
     app_state = request.app.state.app_state
     provider_info = await app_state.provider_factory.get_all_provider_info()

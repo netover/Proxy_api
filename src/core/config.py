@@ -22,7 +22,7 @@ class Settings(BaseSettings):
 
     # Security
     api_key_header: str = "X-API-Key"
-    allowed_origins: List[str] = ["*"]
+    allowed_origins: List[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
     proxy_api_keys: List[str] = []
     
     from pydantic import field_validator

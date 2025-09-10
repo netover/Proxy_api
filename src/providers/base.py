@@ -1,4 +1,6 @@
 from src.core.provider_factory import BaseProvider as CoreBaseProvider, provider_factory
+import asyncio
+import asyncio
 
 # Legacy base for backward compatibility - individual providers should inherit from core.BaseProvider
 class Provider(CoreBaseProvider):
@@ -8,14 +10,14 @@ class Provider(CoreBaseProvider):
     """
     pass
 
-def get_provider(config: ProviderConfig) -> Provider:
+async def get_provider(config: ProviderConfig) -> Provider:
     """Updated factory function using the centralized ProviderFactory"""
     from src.core.unified_config import ProviderConfig  # Ensure import
     import importlib  # Now included
     
     # Use the centralized factory
     try:
-        provider = asyncio.run(provider_factory.create_provider(config))
+        provider = await provider_factory.create_provider(config)
         return provider  # Returns BaseProvider instance, which is compatible
     except Exception as e:
         raise ValueError(f"Failed to load provider class for {config.type}: {e}")
