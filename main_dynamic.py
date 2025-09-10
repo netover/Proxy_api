@@ -101,6 +101,35 @@ async def root():
     }
 
 # Error handlers
+from src.core.exceptions import ProviderError, InvalidRequestError, RateLimitError, AuthenticationError, ServiceUnavailableError, NotImplementedError
+
+@app.exception_handler(ProviderError)
+async def provider_exception_handler(request: Request, exc: ProviderError):
+    logger.error(f"Provider error: {exc}", path=request.url.path, exc_info=True)
+    
+    status_code = 500
+    if isinstance(exc, InvalidRequestError):
+        status_code = 400
+    elif isinstance(exc, AuthenticationError):
+        status_code = 401
+    elif isinstance(exc, RateLimitError):
+        status_code = 429
+    elif isinstance(exc, ServiceUnavailableError):
+        status_code = 503
+    elif isinstance(exc, NotImplementedError):
+        status_code = 501
+    
+    error_dict = exc.to_dict()
+    if isinstance(exc, InvalidRequestError):
+        error_dict["param"] = exc.param
+    
+    return JSONResponse(
+        status_code=status_code,
+        content={
+            "error": error_dict
+        },
+    )
+
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     logger.error(f"Unhandled exception: {exc}", path=request.url.path, exc_info=True)
@@ -111,6 +140,7 @@ async def global_exception_handler(request: Request, exc: Exception):
             "error": {
                 "message": "Internal server error",
                 "type": "server_error",
+                "code": "internal_error",
                 "detail": "An unexpected error occurred. Please check the logs for more information."
             }
         },

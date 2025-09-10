@@ -2,6 +2,7 @@ import asyncio
 import uvicorn
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Depends, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -16,7 +17,7 @@ from src.core.logging import setup_logging, ContextualLogger
 from src.core.app_config import init_config
 from src.core.metrics import metrics_collector
 from src.core.auth import verify_api_key, check_rate_limit, APIKeyAuth
-from src.providers.base import ProviderConfig
+from src.providers.base import ProviderConfig, ProviderError, InvalidRequestError, AuthenticationError, RateLimitError, APIConnectionError, ServiceUnavailableError
 from src.core.app_config import ChatCompletionRequest, CompletionRequest, EmbeddingRequest
 from src.services.provider_loader import get_provider_factories
 from src.core.circuit_breaker import get_circuit_breaker
@@ -69,6 +70,30 @@ app = FastAPI(
 # Middleware setup
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+@app.exception_handler(InvalidRequestError)
+async def invalid_request_handler(request: Request, exc: InvalidRequestError):
+    return JSONResponse(status_code=400, content=exc.to_dict())
+
+@app.exception_handler(AuthenticationError)
+async def authentication_handler(request: Request, exc: AuthenticationError):
+    return JSONResponse(status_code=401, content=exc.to_dict())
+
+@app.exception_handler(RateLimitError)
+async def rate_limit_handler(request: Request, exc: RateLimitError):
+    return JSONResponse(status_code=429, content=exc.to_dict())
+
+@app.exception_handler(NotImplementedError)
+async def not_implemented_handler(request: Request, exc: NotImplementedError):
+    return JSONResponse(status_code=501, content=exc.to_dict())
+
+@app.exception_handler(APIConnectionError)
+async def api_connection_handler(request: Request, exc: APIConnectionError):
+    return JSONResponse(status_code=500, content=exc.to_dict())
+
+@app.exception_handler(ServiceUnavailableError)
+async def service_unavailable_handler(request: Request, exc: ServiceUnavailableError):
+    return JSONResponse(status_code=503, content=exc.to_dict())
 
 app.add_middleware(
     CORSMiddleware,
@@ -190,10 +215,7 @@ async def chat_completions(
 
     # All providers failed
     logger.error("All providers failed", error=str(last_exception))
-    raise HTTPException(
-        status_code=503,
-        detail="All providers are currently unavailable"
-    )
+    raise ServiceUnavailableError("All providers are currently unavailable")
 
 @app.post("/v1/completions")
 @limiter.limit(f"{settings.rate_limit_requests}/{settings.rate_limit_window}second")
@@ -249,10 +271,7 @@ async def completions(
 
     # All providers failed
     logger.error("All providers failed for completions", error=str(last_exception))
-    raise HTTPException(
-        status_code=503,
-        detail="All providers are currently unavailable"
-    )
+    raise ServiceUnavailableError("All providers are currently unavailable")
 
 @app.post("/v1/embeddings")
 @limiter.limit(f"{settings.rate_limit_requests}/{settings.rate_limit_window}second")
@@ -308,10 +327,7 @@ async def embeddings(
 
     # All providers failed
     logger.error("All providers failed for embeddings", error=str(last_exception))
-    raise HTTPException(
-        status_code=503,
-        detail="All providers are currently unavailable"
-    )
+    raise ServiceUnavailableError("All providers are currently unavailable")
 
 @app.get("/v1/models")
 async def list_models():
@@ -337,10 +353,14 @@ async def list_models():
 async def global_exception_handler(request: Request, exc: Exception):
     logger.error(f"Unhandled exception: {exc}", path=request.url.path)
 
-    return {
-        "error": "Internal server error",
-        "detail": "An unexpected error occurred"
-    }
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error": "Internal server error",
+            "code": "internal_error",
+            "detail": "An unexpected error occurred"
+        }
+    )
             
 if __name__ == "__main__":
     uvicorn.run(

@@ -6,10 +6,12 @@ Unified API for chat, image, video, and tool calling
 import json
 import time
 from typing import Dict, Any, Optional
+import httpx
 from src.core.app_config import ProviderConfig
 from src.core.metrics import metrics_collector
 from src.core.logging import ContextualLogger
 from .base import Provider
+from src.core.exceptions import InvalidRequestError, AuthenticationError, RateLimitError, APIConnectionError
 
 
 class BlackboxProvider(Provider):
@@ -37,8 +39,27 @@ class BlackboxProvider(Provider):
             self.logger.error(f"Health check failed: {e}")
             return {"error": str(e)}
 
+    def _validate_completion_request(self, request: Dict[str, Any]):
+        """Validate chat completion request"""
+        if not request.get("model"):
+            raise InvalidRequestError("Missing required 'model' parameter", param="model", code="missing_model")
+        if not request.get("messages"):
+            raise InvalidRequestError("Missing required 'messages' parameter", param="messages", code="missing_messages")
+        if 'max_tokens' in request and not isinstance(request['max_tokens'], int):
+            raise InvalidRequestError("max_tokens must be an integer", param="max_tokens", code="invalid_type")
+        if 'temperature' in request and not isinstance(request['temperature'], (int, float)) or request['temperature'] < 0 or request['temperature'] > 2:
+            raise InvalidRequestError("temperature must be a number between 0 and 2", param="temperature", code="invalid_value")
+
+    def _validate_image_request(self, request: Dict[str, Any]):
+        """Validate image generation request"""
+        if not request.get("model"):
+            raise InvalidRequestError("Missing required 'model' parameter (e.g., blackbox-image-1)", param="model", code="missing_model")
+        if not request.get("prompt"):
+            raise InvalidRequestError("Missing required 'prompt' parameter", param="prompt", code="missing_prompt")
+
     async def create_completion(self, request: Dict[str, Any]) -> Dict[str, Any]:
         """Create chat completion with Blackbox API"""
+        self._validate_completion_request(request)
         start_time = time.time()
 
         try:
@@ -59,15 +80,25 @@ class BlackboxProvider(Provider):
             if request.get("tools"):
                 endpoint = "/v1/chat/completions/tool"
 
+            headers = {
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json"
+            }
             response = await self.make_request_with_retry(
                 "POST",
                 f"{self.base_url}{endpoint}",
                 json=blackbox_request,
-                headers={
-                    "Authorization": f"Bearer {self.api_key}",
-                    "Content-Type": "application/json"
-                }
+                headers=headers
             )
+
+            # Error handling
+            if response.status_code == 401:
+                raise AuthenticationError("Blackbox Authentication failed", code="unauthorized")
+            elif response.status_code == 429:
+                raise RateLimitError("Blackbox Rate limit exceeded", code="rate_limit")
+            elif response.status_code == 400:
+                error_data = response.text
+                raise InvalidRequestError(f"Blackbox Invalid Request: {error_data}", code="invalid_request")
 
             result = response.json()
             response_time = time.time() - start_time
@@ -82,15 +113,31 @@ class BlackboxProvider(Provider):
 
             return result
 
-        except Exception as e:
-            response_time = __import__('time').time() - start_time
+        except httpx.HTTPStatusError as e:
+            response_time = time.time() - start_time
             metrics_collector.record_request(
                 self.config.name,
                 success=False,
                 response_time=response_time,
                 error_type=type(e).__name__
             )
-            raise
+            if e.response.status_code == 401:
+                raise AuthenticationError("Blackbox Authentication failed", code="unauthorized")
+            elif e.response.status_code == 429:
+                raise RateLimitError("Blackbox Rate limit exceeded", code="rate_limit")
+            elif e.response.status_code == 400:
+                raise InvalidRequestError(f"Blackbox Invalid Request: {e.response.text}", code="invalid_request")
+            else:
+                raise APIConnectionError(f"Blackbox API error: {e.response.status_code}", code="api_error")
+        except Exception as e:
+            response_time = time.time() - start_time
+            metrics_collector.record_request(
+                self.config.name,
+                success=False,
+                response_time=response_time,
+                error_type=type(e).__name__
+            )
+            raise APIConnectionError(f"Blackbox Connection error: {str(e)}", code="connection_error")
 
     async def create_text_completion(self, request: Dict[str, Any]) -> Dict[str, Any]:
         """Create text completion (mapped to chat completion)"""
@@ -108,26 +155,37 @@ class BlackboxProvider(Provider):
 
     async def create_image(self, request: Dict[str, Any]) -> Dict[str, Any]:
         """Create image generation with Blackbox API"""
+        self._validate_image_request(request)
         start_time = time.time()
 
         try:
             image_request = {
-                "model": request.get("model", "blackbox-image"),
+                "model": request.get("model", "blackbox-image-1"),
                 "prompt": request.get("prompt", ""),
                 "size": request.get("size", "1024x1024"),
                 "quality": request.get("quality", "standard"),
                 "n": request.get("n", 1)
             }
 
+            headers = {
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json"
+            }
             response = await self.make_request_with_retry(
                 "POST",
-                f"{self.base_url}/v1/image/generations",
+                f"{self.base_url}/v1/images/generations",
                 json=image_request,
-                headers={
-                    "Authorization": f"Bearer {self.api_key}",
-                    "Content-Type": "application/json"
-                }
+                headers=headers
             )
+
+            # Error handling
+            if response.status_code == 401:
+                raise AuthenticationError("Blackbox Authentication failed", code="unauthorized")
+            elif response.status_code == 429:
+                raise RateLimitError("Blackbox Rate limit exceeded", code="rate_limit")
+            elif response.status_code == 400:
+                error_data = response.text
+                raise InvalidRequestError(f"Blackbox Invalid Image Request: {error_data}", code="invalid_request")
 
             result = response.json()
             response_time = time.time() - start_time
@@ -142,15 +200,31 @@ class BlackboxProvider(Provider):
 
             return result
 
-        except Exception as e:
-            response_time = __import__('time').time() - start_time
+        except httpx.HTTPStatusError as e:
+            response_time = time.time() - start_time
             metrics_collector.record_request(
                 self.config.name,
                 success=False,
                 response_time=response_time,
                 error_type=type(e).__name__
             )
-            raise
+            if e.response.status_code == 401:
+                raise AuthenticationError("Blackbox Authentication failed", code="unauthorized")
+            elif e.response.status_code == 429:
+                raise RateLimitError("Blackbox Rate limit exceeded", code="rate_limit")
+            elif e.response.status_code == 400:
+                raise InvalidRequestError(f"Blackbox Invalid Image Request: {e.response.text}", code="invalid_request")
+            else:
+                raise APIConnectionError(f"Blackbox Image API error: {e.response.status_code}", code="api_error")
+        except Exception as e:
+            response_time = time.time() - start_time
+            metrics_collector.record_request(
+                self.config.name,
+                success=False,
+                response_time=response_time,
+                error_type=type(e).__name__
+            )
+            raise APIConnectionError(f"Blackbox Image Connection error: {str(e)}", code="connection_error")
 
     async def create_video(self, request: Dict[str, Any]) -> Dict[str, Any]:
         """Create video generation with Blackbox API"""
@@ -164,15 +238,25 @@ class BlackboxProvider(Provider):
                 "resolution": request.get("resolution", "720p")
             }
 
+            headers = {
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json"
+            }
             response = await self.make_request_with_retry(
                 "POST",
                 f"{self.base_url}/v1/video/generations",
                 json=video_request,
-                headers={
-                    "Authorization": f"Bearer {self.api_key}",
-                    "Content-Type": "application/json"
-                }
+                headers=headers
             )
+
+            # Error handling
+            if response.status_code == 401:
+                raise AuthenticationError("Blackbox Authentication failed", code="unauthorized")
+            elif response.status_code == 429:
+                raise RateLimitError("Blackbox Rate limit exceeded", code="rate_limit")
+            elif response.status_code == 400:
+                error_data = response.text
+                raise InvalidRequestError(f"Blackbox Invalid Video Request: {error_data}", code="invalid_request")
 
             result = response.json()
             response_time = time.time() - start_time
@@ -187,12 +271,28 @@ class BlackboxProvider(Provider):
 
             return result
 
-        except Exception as e:
-            response_time = __import__('time').time() - start_time
+        except httpx.HTTPStatusError as e:
+            response_time = time.time() - start_time
             metrics_collector.record_request(
                 self.config.name,
                 success=False,
                 response_time=response_time,
                 error_type=type(e).__name__
             )
-            raise
+            if e.response.status_code == 401:
+                raise AuthenticationError("Blackbox Authentication failed", code="unauthorized")
+            elif e.response.status_code == 429:
+                raise RateLimitError("Blackbox Rate limit exceeded", code="rate_limit")
+            elif e.response.status_code == 400:
+                raise InvalidRequestError(f"Blackbox Invalid Video Request: {e.response.text}", code="invalid_request")
+            else:
+                raise APIConnectionError(f"Blackbox Video API error: {e.response.status_code}", code="api_error")
+        except Exception as e:
+            response_time = time.time() - start_time
+            metrics_collector.record_request(
+                self.config.name,
+                success=False,
+                response_time=response_time,
+                error_type=type(e).__name__
+            )
+            raise APIConnectionError(f"Blackbox Video Connection error: {str(e)}", code="connection_error")

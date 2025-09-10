@@ -1,4 +1,6 @@
-from typing import Dict, Any
+from typing import Dict, Any, Union, AsyncGenerator
+import asyncio
+import json
 from src.providers.dynamic_base import DynamicProvider
 from src.core.metrics import metrics_collector
 import time
@@ -19,29 +21,66 @@ class DynamicBlackboxProvider(DynamicProvider):
             self.logger.error(f"Health check failed: {e}")
             raise
 
-    async def create_completion(self, request: Dict[str, Any]) -> Dict[str, Any]:
-        """Create chat completion with Blackbox API"""
+    async def create_completion(self, request: Dict[str, Any]) -> Union[Dict[str, Any], AsyncGenerator[str, None]]:
+        """Create chat completion with Blackbox API with streaming support"""
         start_time = time.time()
+        stream = request.get('stream', False)
         try:
-            # Blackbox is mostly OpenAI compatible.
-            response = await self.make_request_with_retry(
-                "POST",
-                f"{self.base_url}/v1/chat/completions",
-                json=request,
-                headers={
-                    "Authorization": f"Bearer {self.api_key}",
-                    "Content-Type": "application/json"
-                }
-            )
-            result = response.json()
-            response_time = time.time() - start_time
-            metrics_collector.record_request(
-                self.name,
-                success=True,
-                response_time=response_time,
-                tokens=result.get("usage", {}).get("total_tokens", 0)
-            )
-            return result
+            if stream:
+                async def stream_generator():
+                    try:
+                        response = await self.make_request_with_retry(
+                            "POST",
+                            f"{self.base_url}/v1/chat/completions",
+                            json=request,
+                            stream=True,
+                            headers={
+                                "Authorization": f"Bearer {self.api_key}",
+                                "Content-Type": "application/json"
+                            }
+                        )
+                        async with response:
+                            async for line in response.aiter_lines():
+                                if line.startswith('data: '):
+                                    data = line[6:]
+                                    if data == '[DONE]':
+                                        break
+                                    try:
+                                        chunk = json.loads(data)
+                                        yield f"data: {json.dumps(chunk)}\n\n"
+                                    except json.JSONDecodeError:
+                                        continue
+                    except Exception as e:
+                        self.logger.error(f"Streaming completion failed: {e}")
+                        raise
+                response_time = time.time() - start_time
+                metrics_collector.record_request(
+                    self.name,
+                    success=True,
+                    response_time=response_time,
+                    tokens=0  # Tokens not available in streaming
+                )
+                self.logger.info("Chat completion streaming successful", response_time=response_time)
+                return stream_generator()
+            else:
+                response = await self.make_request_with_retry(
+                    "POST",
+                    f"{self.base_url}/v1/chat/completions",
+                    json=request,
+                    headers={
+                        "Authorization": f"Bearer {self.api_key}",
+                        "Content-Type": "application/json"
+                    }
+                )
+                result = response.json()
+                response_time = time.time() - start_time
+                metrics_collector.record_request(
+                    self.name,
+                    success=True,
+                    response_time=response_time,
+                    tokens=result.get("usage", {}).get("total_tokens", 0)
+                )
+                return result
         except Exception as e:
             response_time = time.time() - start_time
             metrics_collector.record_request(

@@ -1,10 +1,22 @@
 app_name: "LLM Proxy API"
-version: "1.0.0"
+version: "2.0.0"
 company: "Your Company"
 description: "High-performance LLM proxy with intelligent routing and fallback"
-icon: "icon.ico"
 console: true
 onefile: true
+
+# Platform-specific configurations
+platforms:
+  windows:
+    icon: "icon.ico"
+    installer: true
+  linux:
+    permissions: "755"
+    icon: null
+  macos:
+    icon: "icon.icns"
+    bundle: false
+
 include_files:
   - ["config.yaml", "config.yaml"]
   - ["logs", "logs"]

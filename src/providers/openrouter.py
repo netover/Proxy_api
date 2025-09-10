@@ -1,15 +1,19 @@
 """
 OpenRouter provider implementation
 Unified endpoint for 280+ models from multiple providers
+OpenAI-compatible schema with 5-min in-memory cache for models
 """
 
 import json
 import time
+import asyncio
 from typing import Dict, Any, Optional
+import httpx
 from src.core.app_config import ProviderConfig
 from src.core.metrics import metrics_collector
 from src.core.logging import ContextualLogger
 from .base import Provider
+from src.core.exceptions import InvalidRequestError, AuthenticationError, RateLimitError, APIConnectionError
 
 
 class OpenRouterProvider(Provider):
@@ -45,8 +49,19 @@ class OpenRouterProvider(Provider):
             self.logger.error(f"Health check failed: {e}")
             return {"error": str(e)}
 
+    def _validate_request(self, request: Dict[str, Any]):
+        """Validate required parameters for OpenRouter requests"""
+        if not request.get('model'):
+            raise InvalidRequestError("Missing required 'model' parameter", param="model", code="missing_model")
+        if not request.get('messages') and not request.get('prompt'):
+            raise InvalidRequestError("Missing required 'messages' or 'prompt' parameter", code="missing_input")
+        if 'max_tokens' in request and not isinstance(request['max_tokens'], int):
+            raise InvalidRequestError("max_tokens must be an integer", param="max_tokens", code="invalid_type")
+        if 'temperature' in request and not isinstance(request['temperature'], (int, float)) or request['temperature'] < 0 or request['temperature'] > 2:
+            raise InvalidRequestError("temperature must be a number between 0 and 2", param="temperature", code="invalid_value")
+
     async def _get_models(self) -> Dict[str, Any]:
-        """Get available models with caching"""
+        """Get available models with 5-min in-memory caching"""
         current_time = time.time()
 
         async with self._lock:
@@ -54,25 +69,44 @@ class OpenRouterProvider(Provider):
                 return self._models_cache
 
             try:
+                headers = {
+                    "Authorization": f"Bearer {self.api_key}",
+                    "Content-Type": "application/json"
+                }
                 response = await self.make_request_with_retry(
                     "GET",
                     f"{self.base_url}/v1/models",
-                    headers={
-                        "Authorization": f"Bearer {self.api_key}",
-                        "Content-Type": "application/json"
-                    }
+                    headers=headers
                 )
+
+                # Error handling for models fetch
+                if response.status_code == 401:
+                    raise AuthenticationError("OpenRouter Authentication failed for models", code="unauthorized")
+                elif response.status_code == 429:
+                    raise RateLimitError("OpenRouter Rate limit for models", code="rate_limit")
+                elif response.status_code == 400:
+                    raise InvalidRequestError(f"OpenRouter Invalid Request for models: {response.text}", code="invalid_request")
 
                 self._models_cache = response.json()
                 self._models_cache_time = current_time
                 return self._models_cache
 
+            except httpx.HTTPStatusError as e:
+                if e.response.status_code == 401:
+                    raise AuthenticationError("OpenRouter Authentication failed for models", code="unauthorized")
+                elif e.response.status_code == 429:
+                    raise RateLimitError("OpenRouter Rate limit for models", code="rate_limit")
+                elif e.response.status_code == 400:
+                    raise InvalidRequestError(f"OpenRouter Invalid Request for models: {e.response.text}", code="invalid_request")
+                else:
+                    raise APIConnectionError(f"OpenRouter Models API error: {e.response.status_code}", code="api_error")
             except Exception as e:
                 self.logger.error(f"Failed to fetch models: {e}")
                 return {"data": []}
 
     async def create_completion(self, request: Dict[str, Any]) -> Dict[str, Any]:
-        """Create chat completion with OpenRouter API"""
+        """Create chat completion with OpenRouter API (OpenAI-compatible)"""
+        self._validate_request(request)
         start_time = time.time()
 
         try:
@@ -100,17 +134,27 @@ class OpenRouterProvider(Provider):
             # Remove None values
             openrouter_request = {k: v for k, v in openrouter_request.items() if v is not None}
 
+            headers = {
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json",
+                "HTTP-Referer": request.get("extra_body", {}).get("referer", ""),
+                "X-Title": request.get("extra_body", {}).get("title", "")
+            }
             response = await self.make_request_with_retry(
                 "POST",
                 f"{self.base_url}/v1/chat/completions",
                 json=openrouter_request,
-                headers={
-                    "Authorization": f"Bearer {self.api_key}",
-                    "Content-Type": "application/json",
-                    "HTTP-Referer": request.get("extra_body", {}).get("referer", ""),
-                    "X-Title": request.get("extra_body", {}).get("title", "")
-                }
+                headers=headers
             )
+
+            # Error handling
+            if response.status_code == 401:
+                raise AuthenticationError("OpenRouter Authentication failed", code="unauthorized")
+            elif response.status_code == 429:
+                raise RateLimitError("OpenRouter Rate limit exceeded", code="rate_limit")
+            elif response.status_code == 400:
+                error_data = response.text
+                raise InvalidRequestError(f"OpenRouter Invalid Request: {error_data}", code="invalid_request")
 
             result = response.json()
             response_time = time.time() - start_time
@@ -125,6 +169,22 @@ class OpenRouterProvider(Provider):
 
             return result
 
+        except httpx.HTTPStatusError as e:
+            response_time = time.time() - start_time
+            metrics_collector.record_request(
+                self.config.name,
+                success=False,
+                response_time=response_time,
+                error_type=type(e).__name__
+            )
+            if e.response.status_code == 401:
+                raise AuthenticationError("OpenRouter Authentication failed", code="unauthorized")
+            elif e.response.status_code == 429:
+                raise RateLimitError("OpenRouter Rate limit exceeded", code="rate_limit")
+            elif e.response.status_code == 400:
+                raise InvalidRequestError(f"OpenRouter Invalid Request: {e.response.text}", code="invalid_request")
+            else:
+                raise APIConnectionError(f"OpenRouter API error: {e.response.status_code}", code="api_error")
         except Exception as e:
             response_time = time.time() - start_time
             metrics_collector.record_request(
@@ -133,10 +193,11 @@ class OpenRouterProvider(Provider):
                 response_time=response_time,
                 error_type=type(e).__name__
             )
-            raise
+            raise APIConnectionError(f"OpenRouter Connection error: {str(e)}", code="connection_error")
 
     async def create_text_completion(self, request: Dict[str, Any]) -> Dict[str, Any]:
         """Create text completion (mapped to chat completion)"""
+        self._validate_request(request)
         messages = [{"role": "user", "content": request.get("prompt", "")}]
         chat_request = {
             **request,
@@ -150,5 +211,5 @@ class OpenRouterProvider(Provider):
         raise NotImplementedError("OpenRouter does not support embeddings. Use OpenAI or another provider for embeddings.")
 
     async def list_models(self) -> Dict[str, Any]:
-        """List all available models from OpenRouter"""
+        """List all available models from OpenRouter (cached)"""
         return await self._get_models()

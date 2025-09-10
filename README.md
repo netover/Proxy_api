@@ -151,6 +151,86 @@ All endpoints are OpenAI-compatible and include intelligent routing:
 - `GET /metrics` - Comprehensive performance metrics
 - `GET /health` - Health check with provider status summary
 
+## Supported Providers
+
+The proxy supports 8 LLM providers with unified OpenAI-compatible interfaces. Each provider has specific authentication, payload requirements, and limitations. All use PROXY_API_{PROVIDER}_API_KEY environment variables (e.g., PROXY_API_OPENAI_API_KEY).
+
+### OpenAI
+- **Endpoint**: `/v1/chat/completions` (standard OpenAI API)
+- **Auth**: `Authorization: Bearer {api_key}`
+- **Payload**: Standard OpenAI format: `{"model": "gpt-4", "messages": [{"role": "user", "content": "Hello"}], "max_tokens": 100, "temperature": 0.7}`
+- **Streaming**: Yes (SSE for `stream=true`)
+- **Limitations**: Rate limits apply; supports chat, text completions, embeddings
+- **Health Check**: GET `/v1/models`
+
+### Anthropic
+- **Endpoint**: `/v1/messages` (transformed to OpenAI chat format)
+- **Auth**: `x-api-key: {api_key}`, `anthropic-version: 2023-06-01`
+- **Payload**: Messages transformed to prompt: `Human: {user msg}\n\nAssistant:`, stop_sequences include "Human:"
+- **Example**: `{"model": "claude-3-sonnet-20240229", "messages": [{"role": "user", "content": "Explain AI"}], "max_tokens": 200}`
+- **Streaming**: Yes (SSE chunks with text_delta)
+- **Limitations**: No embeddings; prompt-based, multi-turn via concatenation
+- **Health Check**: Minimal POST `/v1/messages`
+
+### Perplexity
+- **Endpoint**: `/v1/ask` (query from last user message)
+- **Auth**: `x-perplexity-api-key: {api_key}`
+- **Payload**: `{"model": "llama-2-70b-chat", "query": "Last user message", "max_tokens": 100}` (messages extracted)
+- **Response**: Includes `perplexity_sources` array with title/url
+- **Streaming**: No
+- **Limitations**: Search-focused; create_text_completion alias for chat; no embeddings
+- **Health Check**: GET `/v1/models`
+
+### Grok (xAI)
+- **Endpoint**: `/v1/complete` (prompt from concatenated messages)
+- **Auth**: `Authorization: Bearer {api_key}`
+- **Payload**: `{"model": "grok-beta", "prompt": "User: Hello\nAssistant: ", "max_tokens": 100}` (role:content concat)
+- **Streaming**: No
+- **Limitations**: Text-only; no chat streaming or embeddings
+- **Health Check**: GET `/v1/models`
+
+### Blackbox
+- **Endpoint**: `/v1/chat/completions` for chat, `/v1/images/generations` for images
+- **Auth**: `Authorization: Bearer {api_key}`
+- **Payload (Chat)**: Standard OpenAI chat format
+- **Payload (Image)**: `{"model": "blackbox-alpha", "prompt": "A cat", "n": 1, "size": "1024x1024"}`
+- **Example Image Request**:
+  ```
+  POST /v1/images/generations
+  {"model": "blackbox-alpha", "prompt": "A futuristic city", "n": 1, "size": "512x512"}
+  ```
+  Response: `{"data": [{"url": "https://..."}]}`
+- **Streaming**: No for chat; non-streaming for images
+- **Limitations**: Supports create_image/create_video; no embeddings
+- **Health Check**: GET `/v1/models`
+
+### OpenRouter
+- **Endpoint**: `/v1/chat/completions` (OpenAI-compatible)
+- **Auth**: `Authorization: Bearer {api_key}`
+- **Payload**: Standard OpenAI format; models cached for 5 minutes
+- **Streaming**: Yes (proxies provider streaming)
+- **Limitations**: Aggregator; supports many models but depends on upstream providers
+- **Health Check**: GET `/v1/models`
+
+### Cohere
+- **Endpoint**: `/v1/generate` (prompt from multi-line role:content)
+- **Auth**: `Authorization: Bearer {api_key}`
+- **Payload**: `{"model": "command-xlarge-nightly", "prompt": "User: Hello\n\nAssistant: ", "max_tokens": 100}` (concatenated)
+- **Streaming**: No
+- **Limitations**: Text generation only; no chat streaming or embeddings; multi-line prompt support
+- **Health Check**: Minimal POST `/v1/generate`
+
+### Azure OpenAI
+- **Endpoint**: `/openai/deployments/{deployment}/chat/completions?api-version={version}` (OpenAI-compatible)
+- **Auth**: `api-key: {api_key}`
+- **Payload**: Standard OpenAI format with `model: "{deployment_id}"` (e.g., "gpt-4-deployment")
+- **Example**: `{"model": "gpt-4-deployment", "messages": [{"role": "user", "content": "Hello"}], "max_tokens": 100}` (api_version=2023-12-01-preview)
+- **Streaming**: Yes (SSE for `stream=true`)
+- **Limitations**: Requires deployment_id and api_version in config; Azure-specific quotas
+- **Health Check**: GET `/openai/deployments`
+
+All providers map errors to standardized ProviderError subclasses (e.g., 400→InvalidRequestError). Unsupported operations raise NotImplementedError (501).
+
 ### Authentication
 
 All endpoints require an API key in the `X-API-Key` header (configurable).
@@ -274,6 +354,60 @@ This setup ensures efficient streaming with proper error handling and client com
 
 Access metrics at `/metrics` and health at `/health`.
 
+#### Health Check Example
+```
+GET /health
+```
+Response:
+```json
+{
+  "status": "healthy",
+  "timestamp": 1699999999.123,
+  "providers": {
+    "total": 8,
+    "healthy": 7,
+    "degraded": 1,
+    "unhealthy": 0
+  },
+  "uptime": "99.95%",
+  "last_check": "2023-11-01T12:00:00Z"
+}
+```
+
+#### Metrics Example
+```
+GET /metrics
+```
+Response:
+```json
+{
+  "providers": {
+    "openai": {
+      "success_rate": 0.98,
+      "total_requests": 100,
+      "average_response_time": 1.2,
+      "total_tokens": 5000,
+      "error_count": 2
+    },
+    "anthropic": {
+      "success_rate": 0.95,
+      "total_requests": 50,
+      "average_response_time": 2.1,
+      "total_tokens": 2500,
+      "error_count": 3
+    }
+    // ... other providers
+  },
+  "summary": {
+    "average_success_rate": 0.95,
+    "total_requests": 500,
+    "average_response_time": 1.5,
+    "total_tokens": 20000
+  },
+  "timestamp": 1699999999.123
+}
+```
+
 ## Testing
 
 Run the test suite:
@@ -293,6 +427,107 @@ For production deployment:
 3. Use a reverse proxy (nginx) for SSL and load balancing
 4. Monitor logs and metrics
 5. Set up environment variables for all provider API keys
+
+### Docker Deployment
+
+The project includes a multistage Dockerfile for production deployment. To build and run:
+
+1. Build the Docker image:
+   ```bash
+   docker build -t llm-proxy-api .
+   ```
+
+2. Run the container:
+   ```bash
+   docker run -p 8000:8000 -v $(pwd)/config.yaml:/app/config.yaml llm-proxy-api
+   ```
+
+3. Using docker-compose (recommended for multi-container setups):
+   ```bash
+   docker-compose up -d
+   ```
+
+The Dockerfile uses a build stage to compile the application and a runtime stage based on Alpine Linux for minimal size. Customize the `docker-compose.yml` for volumes, environment variables, and networking.
+
+### Cross-Platform Builds
+
+Standalone executables can be built for Windows, Linux, and macOS using the provided build scripts:
+
+1. Configure `build_config.yaml` for your target platform (icon, permissions, etc.).
+
+2. **Windows:**
+   ```bash
+   python build_windows.py
+   ```
+   Creates `dist/LLM_Proxy_API.exe` with embedded config.
+
+3. **Linux:**
+   ```bash
+   python build_linux.py
+   ```
+   Creates `dist/llm-proxy-api` with executable permissions.
+
+4. **macOS:**
+   ```bash
+   python build_macos.py
+   ```
+   Creates `dist/llm-proxy-api` with macOS bundle support.
+
+Each script uses PyInstaller for one-file distribution. Test the executable on the target platform. For cross-compilation, use Docker or virtual machines.
+
+## Error Classification
+
+The API uses standardized JSON error responses with classification for better debugging:
+
+- **4xx Client Errors:**
+  - `invalid_request_error` (400): Invalid parameters, e.g., unsupported model.
+    ```json
+    {
+      "error": {
+        "message": "Model 'invalid-model' is not supported",
+        "type": "invalid_request_error",
+        "param": "model",
+        "code": "model_not_found"
+      }
+    }
+    ```
+  - `authentication_error` (401): Invalid API key.
+
+- **4xx Rate Limits:**
+  - `rate_limit_error` (429): Exceeded request rate.
+
+- **5xx Server Errors:**
+  - `service_unavailable_error` (503): All providers unavailable, with details on attempts.
+    ```json
+    {
+      "error": {
+        "message": "All providers are currently unavailable",
+        "type": "service_unavailable_error",
+        "code": "providers_unavailable",
+        "details": {
+          "attempts": 2,
+          "providers_tried": ["openai", "anthropic"],
+          "errors": [{"provider": "openai", "error_type": "TimeoutError"}]
+        }
+      }
+    }
+    ```
+  - `not_implemented_error` (501): Operation not supported by providers.
+
+- **5xx Internal:**
+  - `server_error` (500): Unexpected errors.
+
+All errors include `type` and `code` for programmatic handling. Check logs for full details.
+
+### Environment Variable Validation
+
+Run the validation script to check required PROXY_API_* variables:
+
+```bash
+python validate_env.py
+```
+
+This script checks for missing keys and provides setup guidance. Customize as needed.
 
 ## License
 

@@ -11,9 +11,10 @@ from src.core.auth import verify_api_key
 from src.core.metrics import metrics_collector
 from src.core.logging import ContextualLogger
 from src.core.rate_limiter import rate_limiter
+from src.core.exceptions import InvalidRequestError, NotImplementedError, ServiceUnavailableError
 from src.models.requests import (
-    ChatCompletionRequest, 
-    TextCompletionRequest, 
+    ChatCompletionRequest,
+    TextCompletionRequest,
     EmbeddingRequest
 )
 
@@ -28,31 +29,26 @@ class RequestRouter:
     
     async def route_request(self,
                           request: Request,
-                          request_data: Union[ChatCompletionRequest, TextCompletionRequest, EmbeddingRequest],
+                          request_data: Union[ChatCompletionRequest, TextCompletionRequest, EmbeddingRequest, Dict[str, Any]],
                           operation: str,
-                          background_tasks: BackgroundTasks) -> Dict[str, Any]:
+                          background_tasks: BackgroundTasks) -> Union[Dict[str, Any], AsyncGenerator]:
         """
         Generic request router with comprehensive error handling and fallback
         """
         app_state = request.app.state.app_state
         request_id = f"{operation}_{int(time.time() * 1000)}"
-        logger.set_context(request_id=request_id, operation=operation, model=request_data.model)
+        logger.set_context(request_id=request_id, operation=operation, model=request_data.get('model', 'unknown'))
         
         # Get providers for the model
-        providers = await app_state.provider_factory.get_providers_for_model(request_data.model)
+        model = request_data.get('model', '')
+        providers = await app_state.provider_factory.get_providers_for_model(model)
         
         if not providers:
-            logger.error("No providers available for model", model=request_data.model)
-            raise HTTPException(
-                status_code=400,
-                detail={
-                    "error": {
-                        "message": f"Model '{request_data.model}' is not supported by any available provider",
-                        "type": "invalid_request_error",
-                        "param": "model",
-                        "code": "model_not_found"
-                    }
-                }
+            logger.error("No providers available for model", model=model)
+            raise InvalidRequestError(
+                f"Model '{model}' is not supported by any available provider",
+                param="model",
+                code="model_not_found"
             )
         
         # Track attempts for metrics
@@ -68,11 +64,13 @@ class RequestRouter:
                 
                 # Choose the appropriate method based on operation
                 if operation == "chat_completion":
-                    result = await provider.create_completion(request_data.dict(exclude_unset=True))
+                    result = await provider.create_completion(request_data.dict(exclude_unset=True) if hasattr(request_data, 'dict') else request_data)
                 elif operation == "text_completion":
-                    result = await provider.create_text_completion(request_data.dict(exclude_unset=True))
+                    result = await provider.create_text_completion(request_data.dict(exclude_unset=True) if hasattr(request_data, 'dict') else request_data)
                 elif operation == "embeddings":
-                    result = await provider.create_embeddings(request_data.dict(exclude_unset=True))
+                    result = await provider.create_embeddings(request_data.dict(exclude_unset=True) if hasattr(request_data, 'dict') else request_data)
+                elif operation == "image_generation":
+                    result = await provider.create_image(request_data)
                 else:
                     raise ValueError(f"Unknown operation: {operation}")
                 
@@ -158,15 +156,9 @@ class RequestRouter:
         
         # Determine appropriate error response
         if all(attempt["error"] == "operation_not_supported" for attempt in attempt_info):
-            raise HTTPException(
-                status_code=501,
-                detail={
-                    "error": {
-                        "message": f"The {operation} operation is not supported by any provider for model '{request_data.model}'",
-                        "type": "not_implemented_error",
-                        "code": "operation_not_supported"
-                    }
-                }
+            raise NotImplementedError(
+                f"The {operation} operation is not supported by any provider for model '{model}'",
+                code="operation_not_supported"
             )
         else:
             errors = [
@@ -177,21 +169,9 @@ class RequestRouter:
                 }
                 for attempt in attempt_info if not attempt["success"]
             ]
-            raise HTTPException(
-                status_code=503,
-                detail={
-                    "error": {
-                        "message": "All providers are currently unavailable",
-                        "type": "service_unavailable_error",
-                        "code": "providers_unavailable",
-                        "details": {
-                            "attempts": len(attempt_info),
-                            "providers_tried": [a["provider"] for a in attempt_info],
-                            "errors": errors,
-                            "last_error": str(last_exception) if last_exception else None
-                        }
-                    }
-                }
+            raise ServiceUnavailableError(
+                "All providers are currently unavailable",
+                code="providers_unavailable"
             )
     
     async def _record_success_metrics(self, request_id: str, operation: str, 
@@ -280,6 +260,22 @@ async def embeddings(
         request,
         embedding_request,
         "embeddings",
+        background_tasks
+    )
+
+@router.post("/v1/images/generations")
+@rate_limiter.limit("50/minute")
+async def image_generations(
+    request: Request,
+    image_request: Dict[str, Any],
+    background_tasks: BackgroundTasks,
+    _: bool = Depends(verify_api_key)
+):
+    """Image generation endpoint for supported providers (e.g., Blackbox)"""
+    return await request_router.route_request(
+        request,
+        image_request,
+        "image_generation",
         background_tasks
     )
 
