@@ -5,6 +5,8 @@ from src.providers.base import ProviderError, InvalidRequestError, Authenticatio
 from src.providers.cohere import CohereProvider
 from src.providers.azure_openai import AzureOpenAIProvider
 from src.providers.blackbox import BlackboxProvider
+from src.providers.perplexity import PerplexityProvider
+from src.providers.grok import GrokProvider
 from src.core.app_config import ProviderConfig
 from fastapi.testclient import TestClient
 from httpx import AsyncClient
@@ -73,6 +75,33 @@ async def test_image_generations_invalid_request():
                 assert json_response["error"]["type"] == "invalid_request_error"
                 assert "Invalid image prompt" in json_response["error"]["message"]
 
+@pytest.mark.asyncio
+async def test_image_generations_auth_error():
+    """Test AuthenticationError for image generations."""
+    with patch('src.api.endpoints.get_providers_for_model') as mock_get_providers:
+        mock_blackbox = AsyncMock()
+        mock_blackbox.create_image.side_effect = AuthenticationError("Blackbox invalid API key")
+        mock_config = Mock()
+        mock_config.name = "blackbox"
+        mock_get_providers.return_value = [mock_config]
+
+        with patch('src.api.endpoints.get_provider') as mock_get_provider:
+            mock_get_provider.return_value = mock_blackbox
+
+            async with AsyncClient(app=app, base_url="http://test") as ac:
+                data = {
+                    "model": "blackbox-alpha",
+                    "prompt": "A test image",
+                    "n": 1,
+                    "size": "1024x1024"
+                }
+                headers = {"Authorization": "Bearer invalid_key"}
+                response = await ac.post("/v1/images/generations", json=data, headers=headers)
+                assert response.status_code == 401
+                json_response = response.json()
+                assert "error" in json_response
+                assert json_response["error"]["type"] == "authentication_error"
+                assert "Blackbox invalid API key" in json_response["error"]["message"]
 
 @pytest.mark.asyncio
 async def test_chat_completions_auth_error():
@@ -191,7 +220,181 @@ async def test_chat_completions_cohere_routing():
                 assert "choices" in json_response
                 assert "Cohere response" in json_response["choices"][0]["message"]["content"]
                 mock_cohere.create_completion.assert_called_once()
-
+            
+            @pytest.mark.asyncio
+            async def test_chat_completions_cohere_error():
+                """Test Cohere provider error in chat completions."""
+                cohere_config = ProviderConfig(
+                    name="cohere",
+                    type="cohere",
+                    base_url="https://api.cohere.ai",
+                    api_key_env="COHERE_API_KEY",
+                    models=["command-xlarge-nightly"],
+                    enabled=True,
+                    priority=1
+                )
+                with patch('src.api.endpoints.get_providers_for_model') as mock_get_providers:
+                    mock_cohere = AsyncMock(spec=CohereProvider)
+                    mock_cohere.create_completion.side_effect = RateLimitError("Cohere rate limit exceeded")
+                    mock_get_providers.return_value = [cohere_config]
+            
+                    with patch('src.api.endpoints.get_provider') as mock_get_provider:
+                        mock_get_provider.return_value = mock_cohere
+            
+                        async with AsyncClient(app=app, base_url="http://test") as ac:
+                            data = {
+                                "model": "command-xlarge-nightly",
+                                "messages": [{"role": "user", "content": "Hello from Cohere"}]
+                            }
+                            headers = {"Authorization": "Bearer test_key"}
+                            response = await ac.post("/v1/chat/completions", json=data, headers=headers)
+                            assert response.status_code == 429
+                            json_response = response.json()
+                            assert "error" in json_response
+                            assert json_response["error"]["type"] == "rate_limit_error"
+                            assert "Cohere rate limit exceeded" in json_response["error"]["message"]
+            
+            @pytest.mark.asyncio
+            async def test_chat_completions_perplexity_success():
+                """Test chat completions with Perplexity provider (no streaming)."""
+                perplexity_config = ProviderConfig(
+                    name="perplexity",
+                    type="perplexity",
+                    base_url="https://api.perplexity.ai",
+                    api_key_env="PERPLEXITY_API_KEY",
+                    models=["llama-3.1-sonar-small-128k-online"],
+                    enabled=True,
+                    priority=1
+                )
+                with patch('src.api.endpoints.get_providers_for_model') as mock_get_providers:
+                    mock_perplexity = AsyncMock(spec=PerplexityProvider)
+                    mock_perplexity.create_completion.return_value = {
+                        "id": "perplexity_id",
+                        "choices": [{"message": {"content": "Perplexity response with sources"}}],
+                        "model": "llama-3.1-sonar-small-128k-online",
+                        "perplexity_sources": [{"title": "Test Source", "url": "https://example.com"}]
+                    }
+                    mock_get_providers.return_value = [perplexity_config]
+            
+                    with patch('src.api.endpoints.get_provider') as mock_get_provider:
+                        mock_get_provider.return_value = mock_perplexity
+            
+                        async with AsyncClient(app=app, base_url="http://test") as ac:
+                            data = {
+                                "model": "llama-3.1-sonar-small-128k-online",
+                                "messages": [{"role": "user", "content": "What is AI?"}]
+                            }
+                            headers = {"Authorization": "Bearer test_key"}
+                            response = await ac.post("/v1/chat/completions", json=data, headers=headers)
+                            assert response.status_code == 200
+                            json_response = response.json()
+                            assert "choices" in json_response
+                            assert "Perplexity response" in json_response["choices"][0]["message"]["content"]
+                            assert "perplexity_sources" in json_response
+                            mock_perplexity.create_completion.assert_called_once()
+            
+            @pytest.mark.asyncio
+            async def test_chat_completions_perplexity_error():
+                """Test Perplexity provider error in chat completions."""
+                perplexity_config = ProviderConfig(
+                    name="perplexity",
+                    type="perplexity",
+                    base_url="https://api.perplexity.ai",
+                    api_key_env="PERPLEXITY_API_KEY",
+                    models=["llama-3.1-sonar-small-128k-online"],
+                    enabled=True,
+                    priority=1
+                )
+                with patch('src.api.endpoints.get_providers_for_model') as mock_get_providers:
+                    mock_perplexity = AsyncMock(spec=PerplexityProvider)
+                    mock_perplexity.create_completion.side_effect = InvalidRequestError("Invalid query for Perplexity")
+                    mock_get_providers.return_value = [perplexity_config]
+            
+                    with patch('src.api.endpoints.get_provider') as mock_get_provider:
+                        mock_get_provider.return_value = mock_perplexity
+            
+                        async with AsyncClient(app=app, base_url="http://test") as ac:
+                            data = {
+                                "model": "llama-3.1-sonar-small-128k-online",
+                                "messages": [{"role": "user", "content": ""}]  # Empty query
+                            }
+                            headers = {"Authorization": "Bearer test_key"}
+                            response = await ac.post("/v1/chat/completions", json=data, headers=headers)
+                            assert response.status_code == 400
+                            json_response = response.json()
+                            assert "error" in json_response
+                            assert json_response["error"]["type"] == "invalid_request_error"
+                            assert "Invalid query for Perplexity" in json_response["error"]["message"]
+            
+            @pytest.mark.asyncio
+            async def test_chat_completions_grok_success():
+                """Test chat completions with Grok provider (no streaming)."""
+                grok_config = ProviderConfig(
+                    name="grok",
+                    type="grok",
+                    base_url="https://api.x.ai/v1",
+                    api_key_env="GROK_API_KEY",
+                    models=["grok-beta"],
+                    enabled=True,
+                    priority=1
+                )
+                with patch('src.api.endpoints.get_providers_for_model') as mock_get_providers:
+                    mock_grok = AsyncMock(spec=GrokProvider)
+                    mock_grok.create_completion.return_value = {
+                        "id": "grok_id",
+                        "choices": [{"message": {"content": "Grok response"}}],
+                        "model": "grok-beta"
+                    }
+                    mock_get_providers.return_value = [grok_config]
+            
+                    with patch('src.api.endpoints.get_provider') as mock_get_provider:
+                        mock_get_provider.return_value = mock_grok
+            
+                        async with AsyncClient(app=app, base_url="http://test") as ac:
+                            data = {
+                                "model": "grok-beta",
+                                "messages": [{"role": "user", "content": "Hello from Grok"}]
+                            }
+                            headers = {"Authorization": "Bearer test_key"}
+                            response = await ac.post("/v1/chat/completions", json=data, headers=headers)
+                            assert response.status_code == 200
+                            json_response = response.json()
+                            assert "choices" in json_response
+                            assert "Grok response" in json_response["choices"][0]["message"]["content"]
+                            mock_grok.create_completion.assert_called_once()
+            
+            @pytest.mark.asyncio
+            async def test_chat_completions_grok_error():
+                """Test Grok provider error in chat completions."""
+                grok_config = ProviderConfig(
+                    name="grok",
+                    type="grok",
+                    base_url="https://api.x.ai/v1",
+                    api_key_env="GROK_API_KEY",
+                    models=["grok-beta"],
+                    enabled=True,
+                    priority=1
+                )
+                with patch('src.api.endpoints.get_providers_for_model') as mock_get_providers:
+                    mock_grok = AsyncMock(spec=GrokProvider)
+                    mock_grok.create_completion.side_effect = AuthenticationError("Grok invalid API key")
+                    mock_get_providers.return_value = [grok_config]
+            
+                    with patch('src.api.endpoints.get_provider') as mock_get_provider:
+                        mock_get_provider.return_value = mock_grok
+            
+                        async with AsyncClient(app=app, base_url="http://test") as ac:
+                            data = {
+                                "model": "grok-beta",
+                                "messages": [{"role": "user", "content": "Hello from Grok"}]
+                            }
+                            headers = {"Authorization": "Bearer test_key"}
+                            response = await ac.post("/v1/chat/completions", json=data, headers=headers)
+                            assert response.status_code == 401
+                            json_response = response.json()
+                            assert "error" in json_response
+                            assert json_response["error"]["type"] == "authentication_error"
+                            assert "Grok invalid API key" in json_response["error"]["message"]
 
 @pytest.mark.asyncio
 async def test_chat_completions_azure_streaming():
@@ -236,6 +439,22 @@ async def test_chat_completions_azure_streaming():
                 lines = content.decode('utf-8').split('\n')
                 assert any('data: ' in line for line in lines)
                 assert any('"Azure response"' in line for line in lines)
+                # Accumulate content and check full response and [DONE]
+                full_content = ""
+                has_done = False
+                for line in lines:
+                    if line.startswith('data: ') and line != 'data: [DONE]':
+                        try:
+                            data = line[6:]
+                            json_chunk = json.loads(data)
+                            if 'choices' in json_chunk and json_chunk['choices'][0].get('delta', {}).get('content'):
+                                full_content += json_chunk['choices'][0]['delta']['content']
+                        except json.JSONDecodeError:
+                            pass
+                    elif line == 'data: [DONE]':
+                        has_done = True
+                assert full_content == "Azure response"
+                assert has_done
 
 def test_chat_completions_streaming():
     """Test streaming chat completions endpoint."""
@@ -504,3 +723,45 @@ async def test_rate_limit_exceeded():
             assert response1.status_code == 200  # Assuming mock success
             # Second would fail, but since mock raises Exception, need to catch in test or adjust
             # For now, note as basic; full rate limit test requires slowapi mock
+
+@pytest.mark.asyncio
+async def test_rate_limit_exceeded_full():
+    """Test full rate limit exceeded with slowapi mock."""
+    from slowapi.errors import RateLimitExceeded
+    with patch('src.core.rate_limiter.rate_limiter.limit') as mock_limit:
+        calls = [0]
+        def limited_wrapper(func):
+            async def wrapper(*args, **kwargs):
+                nonlocal calls
+                calls[0] += 1
+                if calls[0] > 1:
+                    raise RateLimitExceeded("Rate limit exceeded")
+                return await func(*args, **kwargs)
+            return wrapper
+        mock_limit.side_effect = limited_wrapper
+
+        async with AsyncClient(app=app, base_url="http://test") as ac:
+            data = {
+                "model": "gpt-3.5-turbo",
+                "messages": [{"role": "user", "content": "Hello"}]
+            }
+            headers = {"Authorization": "Bearer test_key"}
+            # First request should succeed (assuming underlying success)
+            with patch('src.api.endpoints.get_providers_for_model') as mock_providers:
+                mock_provider = AsyncMock()
+                mock_provider.create_completion.return_value = {"choices": [{"message": {"content": "Success"}}]}
+                mock_config = Mock()
+                mock_config.name = "openai"
+                mock_providers.return_value = [mock_config]
+                with patch('src.api.endpoints.get_provider') as mock_get:
+                    mock_get.return_value = mock_provider
+                    response1 = await ac.post("/v1/chat/completions", json=data, headers=headers)
+                    assert response1.status_code == 200
+
+            # Second request should fail with 429
+            response2 = await ac.post("/v1/chat/completions", json=data, headers=headers)
+            assert response2.status_code == 429
+            json_response = response2.json()
+            assert "error" in json_response
+            assert json_response["error"]["type"] == "rate_limit_error"
+            assert "Rate limit exceeded" in json_response["error"]["message"]
