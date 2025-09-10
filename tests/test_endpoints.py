@@ -867,3 +867,241 @@ async def test_chat_completions_context_condensation():
                     # Verify retry happened
                     assert mock_provider.create_completion.call_count == 2
                     mock_condense.assert_called_once()
+
+@pytest.mark.asyncio
+async def test_chat_completions_cache_hit():
+    """Test cache hit in context condensation - no provider call."""
+    from src.core.app_config import ProviderConfig
+    config = ProviderConfig(
+        name="openai",
+        type="openai",
+        base_url="https://api.openai.com/v1",
+        api_key_env="OPENAI_API_KEY",
+        models=["gpt-3.5-turbo"],
+        enabled=True,
+        priority=1
+    )
+    with patch('src.api.endpoints.get_providers_for_model') as mock_get_providers:
+        mock_get_providers.return_value = [config]
+        
+        mock_provider = AsyncMock()
+        mock_provider.create_completion.return_value = {"choices": [{"message": {"content": "Cached response"}}]}
+        
+        with patch('src.api.endpoints.get_provider') as mock_get_provider:
+            mock_get_provider.return_value = mock_provider
+            
+            # Patch app.state.cache to return cached summary
+            with patch('main.app.state.cache', {'test_hash': ("Cached summary", time.time() - 100)}):  # Within TTL
+                with patch('main.condense_context') as mock_condense:
+                    mock_condense.return_value = "Unused due to cache"  # Should not be called
+                    
+                    async with AsyncClient(app=app, base_url="http://test") as ac:
+                        chunks = ["cached chunk1", "cached chunk2"]
+                        long_content = "a" * 10000
+                        data = {
+                            "model": "gpt-3.5-turbo",
+                            "messages": [{"role": "user", "content": long_content}],
+                            "stream": False
+                        }
+                        headers = {"Authorization": "Bearer test_key"}
+                        response = await ac.post("/v1/chat/completions", json=data, headers=headers)
+                        assert response.status_code == 200
+                        json_response = response.json()
+                        assert "Cached response" in json_response["choices"][0]["message"]["content"]
+                        mock_provider.create_completion.assert_not_called()  # Cache hit, no call
+                        mock_condense.assert_not_called()
+
+@pytest.mark.asyncio
+async def test_adaptive_max_tokens():
+    """Test adaptive max_tokens calculation in condensation."""
+    from src.core.app_config import ProviderConfig
+    config = ProviderConfig(
+        name="openai",
+        type="openai",
+        base_url="https://api.openai.com/v1",
+        api_key_env="OPENAI_API_KEY",
+        models=["gpt-3.5-turbo"],
+        enabled=True,
+        priority=1
+    )
+    with patch('src.api.endpoints.get_providers_for_model') as mock_get_providers:
+        mock_get_providers.return_value = [config]
+        
+        mock_provider = AsyncMock()
+        mock_provider.create_completion.return_value = {"choices": [{"message": {"content": "Adaptive response"}}]}
+        
+        with patch('src.api.endpoints.get_provider') as mock_get_provider:
+            mock_get_provider.return_value = mock_provider
+            
+            with patch('main.condense_context') as mock_condense:
+                async def side_effect(request, chunks, max_tokens):
+                    assert max_tokens == 256  # For short chunks, adaptive = min(500*0.5, 512) = 250, but test with short
+                    return "Adaptive summary"
+                mock_condense.side_effect = side_effect
+                
+                async with AsyncClient(app=app, base_url="http://test") as ac:
+                    short_content = "short message"
+                    data = {
+                        "model": "gpt-3.5-turbo",
+                        "messages": [{"role": "user", "content": short_content}],
+                        "stream": False
+                    }
+                    headers = {"Authorization": "Bearer test_key"}
+                    response = await ac.post("/v1/chat/completions", json=data, headers=headers)
+                    assert response.status_code == 200
+                    mock_condense.assert_called_once()
+                    # For long, would be different, but test asserts call with adaptive
+
+@pytest.mark.asyncio
+async def test_fallback_truncation():
+    """Test fallback to truncation when condensation fails."""
+    from src.core.app_config import ProviderConfig
+    config = ProviderConfig(
+        name="openai",
+        type="openai",
+        base_url="https://api.openai.com/v1",
+        api_key_env="OPENAI_API_KEY",
+        models=["gpt-3.5-turbo"],
+        enabled=True,
+        priority=1
+    )
+    with patch('src.api.endpoints.get_providers_for_model') as mock_get_providers:
+        mock_get_providers.return_value = [config]
+        
+        mock_provider = AsyncMock()
+        success_response = {
+            "id": "chatcmpl_test",
+            "choices": [{"message": {"content": "Truncated response"}}],
+            "model": "gpt-3.5-turbo"
+        }
+        mock_provider.create_completion.side_effect = [
+            ValueError("context_length_exceeded"),
+            success_response
+        ]
+        
+        with patch('src.api.endpoints.get_provider') as mock_get_provider:
+            mock_get_provider.return_value = mock_provider
+            
+            with patch('main.condense_context') as mock_condense:
+                mock_condense.side_effect = ValueError("Condensation failed")
+                
+                async with AsyncClient(app=app, base_url="http://test") as ac:
+                    long_content = "full long message " + "a" * 10000
+                    data = {
+                        "model": "gpt-3.5-turbo",
+                        "messages": [{"role": "user", "content": long_content}],
+                        "stream": False
+                    }
+                    headers = {"Authorization": "Bearer test_key"}
+                    response = await ac.post("/v1/chat/completions", json=data, headers=headers)
+                    assert response.status_code == 200
+                    json_response = response.json()
+                    assert "Truncated response" in json_response["choices"][0]["message"]["content"]
+                    assert mock_provider.create_completion.call_count == 2
+                    mock_condense.assert_called_once()
+                    # Verify truncation: the prompt in second call is shorter
+                    call_args = mock_provider.create_completion.call_args_list[1][0][0]["messages"][0]["content"]
+                    assert len(call_args) < len(long_content)  # Truncated
+
+@pytest.mark.asyncio
+async def test_configurable_keywords():
+    """Test configurable error keywords for detection."""
+    from src.core.app_config import ProviderConfig, AppConfig
+    config = ProviderConfig(
+        name="openai",
+        type="openai",
+        base_url="https://api.openai.com/v1",
+        api_key_env="OPENAI_API_KEY",
+        models=["gpt-3.5-turbo"],
+        enabled=True,
+        priority=1
+    )
+    with patch('src.api.endpoints.get_providers_for_model') as mock_get_providers:
+        mock_get_providers.return_value = [config]
+        
+        mock_provider = AsyncMock()
+        success_response = {
+            "id": "chatcmpl_test",
+            "choices": [{"message": {"content": "Custom keyword response"}}],
+            "model": "gpt-3.5-turbo"
+        }
+        mock_provider.create_completion.side_effect = [
+            ValueError("custom_context_error"),
+            success_response
+        ]
+        
+        with patch('src.api.endpoints.get_provider') as mock_get_provider:
+            mock_get_provider.return_value = mock_provider
+            
+            # Override app.state.condensation_config.error_keywords
+            with patch('main.app.state.condensation_config', Mock(error_keywords=["custom_context_error"])):
+                with patch('main.condense_context') as mock_condense:
+                    mock_condense.return_value = "Custom summary"
+                    
+                    async with AsyncClient(app=app, base_url="http://test") as ac:
+                        long_content = "a" * 10000
+                        data = {
+                            "model": "gpt-3.5-turbo",
+                            "messages": [{"role": "user", "content": long_content}],
+                            "stream": False
+                        }
+                        headers = {"Authorization": "Bearer test_key"}
+                        response = await ac.post("/v1/chat/completions", json=data, headers=headers)
+                        assert response.status_code == 200
+                        json_response = response.json()
+                        assert "Custom summary" in json_response["choices"][0]["message"]["content"]
+                        assert mock_provider.create_completion.call_count == 2
+
+@pytest.mark.asyncio
+async def test_background_timeout():
+    """Test timeout in condensation with fallback."""
+    from src.core.app_config import ProviderConfig
+    config = ProviderConfig(
+        name="openai",
+        type="openai",
+        base_url="https://api.openai.com/v1",
+        api_key_env="OPENAI_API_KEY",
+        models=["gpt-3.5-turbo"],
+        enabled=True,
+        priority=1
+    )
+    with patch('src.api.endpoints.get_providers_for_model') as mock_get_providers:
+        mock_get_providers.return_value = [config]
+        
+        mock_provider = AsyncMock()
+        success_response = {
+            "id": "chatcmpl_test",
+            "choices": [{"message": {"content": "Timeout fallback response"}}],
+            "model": "gpt-3.5-turbo"
+        }
+        mock_provider.create_completion.side_effect = [
+            ValueError("context_length_exceeded"),
+            success_response
+        ]
+        
+        with patch('src.api.endpoints.get_provider') as mock_get_provider:
+            mock_get_provider.return_value = mock_provider
+            
+            with patch('main.condense_context') as mock_condense:
+                # Mock to timeout
+                async def timeout_condense(request, chunks, max_tokens):
+                    await asyncio.sleep(15)  # Longer than 10s timeout
+                    return "Never reached"
+                mock_condense.side_effect = timeout_condense
+                
+                async with AsyncClient(app=app, base_url="http://test") as ac:
+                    long_content = "a" * 10000
+                    data = {
+                        "model": "gpt-3.5-turbo",
+                        "messages": [{"role": "user", "content": long_content}],
+                        "stream": False
+                    }
+                    headers = {"Authorization": "Bearer test_key"}
+                    response = await ac.post("/v1/chat/completions", json=data, headers=headers)
+                    assert response.status_code == 200
+                    json_response = response.json()
+                    assert "Timeout fallback response" in json_response["choices"][0]["message"]["content"]
+                    assert mock_provider.create_completion.call_count == 2
+                    # Verify truncation happened due to timeout
+                    call_args = mock_provider.create_completion.call_args_list[1][0][0]["messages"][0]["content"]
+                    assert len(call_args) < len(long_content)

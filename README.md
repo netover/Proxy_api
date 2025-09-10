@@ -346,14 +346,33 @@ console.log('Full response:', fullContent);
 This setup ensures efficient streaming with proper error handling and client compatibility.
 ## Automatic Context Condensation
 
-The LLM Proxy API includes automatic context condensation for non-streaming requests to both `/v1/chat/completions` and `/v1/completions` endpoints. When a provider returns a context length exceeded error (detected by keywords like "context_length_exceeded" or "maximum context length" in the error message), the proxy automatically:
+The LLM Proxy API includes automatic context condensation for non-streaming requests to both `/v1/chat/completions` and `/v1/completions` endpoints. When a provider returns a context length exceeded error (detected by configurable keywords like "context_length_exceeded" or "maximum context length" in the error message), the proxy automatically:
 
 1. Extracts the content from all messages (chat) or the prompt (completions).
-2. Uses the top-priority enabled provider to generate a concise summary (limited to 512 tokens by default) that preserves key entities and intents.
+2. Uses the top-priority enabled provider to generate a concise summary (with adaptive max_tokens limited to min(input_size * 0.5, 512) by default) that preserves key entities and intents, leveraging in-memory caching to avoid redundant computations.
 3. Replaces the full history/prompt with a system message containing the summary followed by the original last message (chat) or "Resumo: {summary}" as the new prompt (completions).
-4. Retries the request with the condensed context (streaming is disabled for the retry to ensure compatibility).
+4. Retries the request with the condensed context (streaming is disabled for the retry to ensure compatibility), with fallback to truncating input to half length if condensation times out (10s) or fails.
 
-This feature prevents interruptions from long conversation histories or prompts without requiring client-side handling. It only applies to non-streaming requests (`stream=false`); streaming requests raise the original error to maintain real-time behavior.
+This feature prevents interruptions from long conversation histories or prompts without requiring client-side handling, with optimizations for performance and reliability. It only applies to non-streaming requests (`stream=false`); streaming requests raise the original error to maintain real-time behavior.
+
+### Optimizations
+- **Local Cache**: In-memory cache for summaries using MD5 hash of chunks as key with TTL (default 300s) to avoid redundant condensations for repeated inputs.
+- **Adaptive Max Tokens**: Dynamically calculated as min(original_size * adaptive_factor, max_tokens_default) based on input length (approximated by character count) to preserve more context for larger inputs (default factor 0.5, default 512).
+- **Fallback Truncation**: If condensation fails due to timeout or error, automatically truncates messages/prompt to half original length and retries without summarization.
+- **Non-Blocking Timeout Handling**: Condensation executed with asyncio.wait_for(timeout=10s) for non-blocking operation; triggers fallback on asyncio.TimeoutError.
+- **Dynamic Configuration**: All settings configurable via `config.yaml` under `condensation` key for customization (e.g., custom error keywords, lower adaptive factor for aggressive reduction).
+
+### Config Example
+```yaml
+condensation:
+  max_tokens_default: 512
+  error_keywords:
+    - "context_length_exceeded"
+    - "maximum context length"
+    - "custom_error"
+  adaptive_factor: 0.5
+  cache_ttl: 300
+```
 
 ### Example for Chat Completions
 

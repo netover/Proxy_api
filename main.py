@@ -45,6 +45,8 @@ async def lifespan(app: FastAPI):
         config = init_config()
         app.state.config = config
         app.config = config
+        app.state.condensation_config = config.condensation
+        app.state.cache = {}
         api_key_auth = APIKeyAuth(settings.proxy_api_keys)
         app.state.api_key_auth = api_key_auth
         app.state.provider_factories = get_provider_factories(config.providers)
@@ -211,17 +213,26 @@ async def chat_completions(
                     return response
                 except Exception as e:
                     msg = str(e).lower()
+                    config = request.app.state.condensation_config
                     # Detecta erro de contexto longo
-                    if ("context_length_exceeded" in msg or "maximum context length" in msg) and not req.get("stream", False):
-                        # Condensa e reenvia
+                    if any(keyword in msg for keyword in config.error_keywords) and not req.get("stream", False):
+                        # Extract chunks
                         chunks = [m["content"] for m in req["messages"]]
-                        summary = await condense_context(request, chunks, max_tokens=512)
-                        req["messages"] = [
-                            {"role": "system", "content": f"Resumo: {summary}"},
-                            req["messages"][-1]
-                        ]
-                        logger.info("Contexto resumido automaticamente após erro", error=str(e))
-                        # Retry with condensed context (disable stream for retry)
+                        original_size = sum(len(c) for c in chunks)
+                        adaptive_max_tokens = min(original_size * config.adaptive_factor, config.max_tokens_default)
+                        try:
+                            summary = await asyncio.wait_for(condense_context(request, chunks, max_tokens=adaptive_max_tokens), timeout=10)
+                            req["messages"] = [
+                                {"role": "system", "content": f"Resumo: {summary}"},
+                                req["messages"][-1]
+                            ]
+                            logger.info("Contexto resumido automaticamente após erro", error=str(e))
+                        except (asyncio.TimeoutError, Exception) as condense_e:
+                            logger.warning("Condensation failed, falling back to truncation", error=str(condense_e))
+                            # Fallback: truncate to last half
+                            truncated_messages = req["messages"][-len(req["messages"])//2:]
+                            req["messages"] = truncated_messages
+                        # Retry with updated req (disable stream for retry)
                         req["stream"] = False
                         async def make_retry():
                             return await provider.create_completion(req)
@@ -296,17 +307,28 @@ async def completions(
                     return response
                 except Exception as e:
                     msg = str(e).lower()
+                    config = request.app.state.condensation_config
                     # Detecta erro de contexto longo
-                    if ("context_length_exceeded" in msg or "maximum context length" in msg) and not req.get("stream", False):
-                        # Condensa e reenvia
+                    if any(keyword in msg for keyword in config.error_keywords) and not req.get("stream", False):
+                        # Extract chunks
                         if isinstance(req["prompt"], str):
                             chunks = [req["prompt"]]
                         else:
                             chunks = req["prompt"]
-                        summary = await condense_context(request, chunks, max_tokens=512)
-                        req["prompt"] = f"Resumo: {summary}"
-                        logger.info("Contexto resumido automaticamente após erro", error=str(e))
-                        # Retry with condensed context (disable stream for retry)
+                        original_size = sum(len(c) for c in chunks)
+                        adaptive_max_tokens = min(original_size * config.adaptive_factor, config.max_tokens_default)
+                        try:
+                            summary = await asyncio.wait_for(condense_context(request, chunks, max_tokens=adaptive_max_tokens), timeout=10)
+                            req["prompt"] = f"Resumo: {summary}"
+                            logger.info("Contexto resumido automaticamente após erro", error=str(e))
+                        except (asyncio.TimeoutError, Exception) as condense_e:
+                            logger.warning("Condensation failed, falling back to truncation", error=str(condense_e))
+                            # Fallback: truncate to last half
+                            if isinstance(req["prompt"], str):
+                                req["prompt"] = req["prompt"][-len(req["prompt"])//2:]
+                            else:
+                                req["prompt"] = req["prompt"][-len(req["prompt"])//2:]
+                        # Retry with updated req (disable stream for retry)
                         req["stream"] = False
                         async def make_retry():
                             return await provider.create_text_completion(req)

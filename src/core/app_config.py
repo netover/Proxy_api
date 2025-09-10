@@ -34,7 +34,13 @@ def create_default_config(config_path: Path) -> Dict[str, Any]:
                 "retry_attempts": 3,
                 "retry_delay": 1.0
             }
-        ]
+        ],
+        "condensation": {
+            "max_tokens_default": 512,
+            "error_keywords": ["context_length_exceeded", "maximum context length"],
+            "adaptive_factor": 0.5,
+            "cache_ttl": 300
+        }
     }
 
     try:
@@ -82,9 +88,18 @@ class ProviderConfig(BaseModel):
         return list(set(v))  # Remove duplicates
 
 
+class CondensationConfig(BaseModel):
+    """Configuration for context condensation feature"""
+    max_tokens_default: int = Field(512, ge=1, le=4096, description="Default max tokens for condensation")
+    error_keywords: List[str] = Field(default_factory=lambda: ["context_length_exceeded", "maximum context length"], description="Keywords to detect context length errors")
+    adaptive_factor: float = Field(0.5, ge=0.1, le=1.0, description="Factor for adaptive max_tokens calculation")
+    cache_ttl: int = Field(300, ge=60, le=3600, description="Cache TTL in seconds for summaries")
+
+
 class AppConfig(BaseModel):
     """Main application configuration"""
     providers: List[ProviderConfig] = Field(..., min_length=1)
+    condensation: CondensationConfig = Field(default_factory=CondensationConfig)
 
     @field_validator('providers')
     @classmethod

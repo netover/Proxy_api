@@ -18,6 +18,14 @@ log_level: "INFO"
 log_file: null
 config_file: "config.yaml"
 
+condensation:
+  max_tokens_default: 512
+  error_keywords:
+    - "context_length_exceeded"
+    - "maximum context length"
+  adaptive_factor: 0.5
+  cache_ttl: 300
+
 providers:
   - name: "openai_default"
     type: "openai"
