@@ -1,6 +1,7 @@
-from typing import Dict, Any
+from typing import Dict, Any, Union, AsyncGenerator
 from src.core.provider_factory import BaseProvider
 from src.core.unified_config import ProviderConfig
+import json
 
 class OpenAIProvider(BaseProvider):
     """OpenAI API provider implementation"""
@@ -25,7 +26,7 @@ class OpenAIProvider(BaseProvider):
                 "error": str(e)
             }
 
-    async def create_completion(self, request: Dict[str, Any]) -> Union[Dict[str, Any], async_generator]:
+    async def create_completion(self, request: Dict[str, Any]) -> Union[Dict[str, Any], AsyncGenerator]:
         """Create chat completion using OpenAI API with streaming support"""
         headers = {"Authorization": f"Bearer {self.api_key}"}
         
@@ -82,7 +83,7 @@ class OpenAIProvider(BaseProvider):
             
             return data
 
-    async def create_text_completion(self, request: Dict[str, Any]) -> Union[Dict[str, Any], async_generator]:
+    async def create_text_completion(self, request: Dict[str, Any]) -> Union[Dict[str, Any], AsyncGenerator]:
         """Create text completion using OpenAI API with streaming support"""
         headers = {"Authorization": f"Bearer {self.api_key}"}
         

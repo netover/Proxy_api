@@ -4,6 +4,7 @@ import asyncio
 from src.core.unified_config import ConfigManager
 from src.core.provider_factory import ProviderFactory
 from src.core.logging import ContextualLogger
+from src.core.rate_limiter import rate_limiter
 
 logger = ContextualLogger(__name__)
 
