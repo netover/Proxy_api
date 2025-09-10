@@ -122,7 +122,15 @@ async def condense_context(request: Request, chunks: List[str], max_tokens: int 
         if time.time() - timestamp < condensation_config.cache_ttl:
             logger.debug(f"Cache hit for chunk hash: {chunk_hash}")
             return summary
-    
+
+    # Proactive truncation if content would be too long
+    content = "\n\n---\n\n".join(chunks)
+    if len(content) > condensation_config.truncation_threshold:
+        truncate_len = condensation_config.truncation_threshold // 2
+        content = content[-truncate_len:]
+        use_max_tokens = min(use_max_tokens, truncate_len // 4)
+        logger.info(f"Proactively truncated content from {len(content) + truncate_len} to {len(content)} chars due to threshold {condensation_config.truncation_threshold}")
+
     # Prepare providers for parallel or sequential
     enabled_providers = [p for p in request.app.state.config.providers if p.enabled]
     sorted_providers = sorted(enabled_providers, key=lambda p: p.priority)

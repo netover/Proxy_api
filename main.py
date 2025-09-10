@@ -11,6 +11,8 @@ from typing import Dict, Any, List
 import time
 from http import HTTPStatus
 import httpx
+from fastapi import BackgroundTasks
+import uuid
 
 from src.core.config import settings
 from src.core.logging import setup_logging, ContextualLogger
@@ -47,6 +49,7 @@ async def lifespan(app: FastAPI):
         app.config = config
         app.state.condensation_config = config.settings.condensation
         app.state.cache = {}
+        app.state.summary_cache = {}
         api_key_auth = APIKeyAuth(settings.proxy_api_keys)
         app.state.api_key_auth = api_key_auth
         app.state.provider_factories = get_provider_factories(config.providers)
@@ -169,6 +172,7 @@ def get_providers_for_model(request: Request, model: str) -> List[ProviderConfig
 @limiter.limit(f"{settings.rate_limit_requests}/{settings.rate_limit_window}second")
 async def chat_completions(
     request: Request,
+    background_tasks: BackgroundTasks,
     completion_request: ChatCompletionRequest,
     _: bool = Depends(verify_api_key)
 ):
@@ -181,6 +185,20 @@ async def chat_completions(
 
     # Serialize to dict for consistency
     req = completion_request.dict(exclude_unset=True)
+
+    # Proactive long context check and background processing
+    config = request.app.state.condensation_config
+    total_content = sum(len(m["content"]) for m in req.get("messages", []))
+    if total_content > config.truncation_threshold:
+        request_id = str(uuid.uuid4())
+        full_chunks = [m["content"] for m in req["messages"]]
+        background_tasks.add_task(background_condense, request_id, request, full_chunks)
+        # Truncate for immediate non-blocking response
+        truncate_len = config.truncation_threshold // 2
+        num_messages_to_keep = max(1, len(req["messages"]) * truncate_len // total_content)
+        truncated_messages = req["messages"][-num_messages_to_keep:]
+        req["messages"] = truncated_messages
+        logger.info(f"Proactive truncation for long context ({total_content} chars), background task added: {request_id}")
 
     # Find providers that support this model
     providers = get_providers_for_model(request, model)
@@ -263,6 +281,7 @@ async def chat_completions(
 @limiter.limit(f"{settings.rate_limit_requests}/{settings.rate_limit_window}second")
 async def completions(
     request: Request,
+    background_tasks: BackgroundTasks,
     completion_request: CompletionRequest,
     _: bool = Depends(verify_api_key)
 ):
@@ -275,6 +294,26 @@ async def completions(
 
     # Serialize to dict for consistency
     req = completion_request.dict(exclude_unset=True)
+
+    # Proactive long context check and background processing
+    config = request.app.state.condensation_config
+    prompt = req.get("prompt", "")
+    if isinstance(prompt, list):
+        total_content = sum(len(p) for p in prompt)
+    else:
+        total_content = len(prompt)
+    if total_content > config.truncation_threshold:
+        request_id = str(uuid.uuid4())
+        full_chunks = prompt if isinstance(prompt, list) else [prompt]
+        background_tasks.add_task(background_condense, request_id, request, full_chunks)
+        # Truncate for immediate non-blocking response
+        truncate_len = config.truncation_threshold // 2
+        if isinstance(prompt, list):
+            num_items_to_keep = max(1, len(prompt) * truncate_len // total_content)
+            req["prompt"] = prompt[-num_items_to_keep:]
+        else:
+            req["prompt"] = prompt[-truncate_len:]
+        logger.info(f"Proactive truncation for long prompt ({total_content} chars), background task added: {request_id}")
 
     # Find providers that support this model
     providers = get_providers_for_model(request, model)
@@ -410,6 +449,15 @@ async def embeddings(
     # All providers failed
     logger.error("All providers failed for embeddings", error=str(last_exception))
     raise ServiceUnavailableError("All providers are currently unavailable")
+
+async def background_condense(request_id: str, request: Request, chunks: List[str]):
+    """Background task to compute full context summary and store in cache"""
+    try:
+        summary = await condense_context(request, chunks)
+        request.app.state.summary_cache[request_id] = summary
+        logger.info(f"Background summary stored for request_id: {request_id}")
+    except Exception as e:
+        logger.error(f"Background condensation failed for {request_id}: {e}")
 
 @app.get("/v1/models")
 async def list_models():

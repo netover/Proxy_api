@@ -60,6 +60,7 @@ class CondensationSettings(BaseModel):
     cache_persist: bool = Field(default=False, description="Enable persistent cache (e.g., file/Redis)")
     adaptive_enabled: bool = Field(default=True, description="Enable adaptive token limit calculation")
     adaptive_factor: float = Field(default=0.5, ge=0.1, le=1.0, description="Factor for adaptive max_tokens")
+    truncation_threshold: int = Field(default=2000, ge=500, le=10000, description="Content length threshold for proactive truncation before summarization")
     max_tokens_default: int = Field(default=512, ge=100, le=4096, description="Default max tokens for summaries")
     error_keywords: List[str] = Field(default_factory=lambda: ["context_length_exceeded", "token_limit"], description="Keywords to detect long context errors")
     fallback_strategies: List[str] = Field(default_factory=lambda: ["truncate", "secondary_provider"], description="Fallback strategies on failure")

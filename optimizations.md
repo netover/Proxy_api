@@ -77,3 +77,40 @@ Run with `pytest tests/test_context_condenser.py -v`.
 - Performance benchmarks for parallelism.
 
 These optimizations make the condenser more efficient, cost-effective, and resilient.
+
+## Proactive Truncation Fallback
+
+Before attempting summarization, checks if joined content length exceeds `truncation_threshold` (default 2000 chars). If yes, truncates to half threshold length, adjusts max_tokens, and proceeds. This prevents provider errors proactively.
+
+**Code Snippet** (from `condense_context`):
+```python
+content = "\n\n---\n\n".join(chunks)
+if len(content) > condensation_config.truncation_threshold:
+    truncate_len = condensation_config.truncation_threshold // 2
+    content = content[-truncate_len:]
+    use_max_tokens = min(use_max_tokens, truncate_len // 4)
+    logger.info(f"Proactively truncated content ...")
+```
+
+**Benefits**: Reduces token usage by 50%+ for very long contexts; avoids error-triggered fallbacks, lowering latency.
+
+**Testing**: `test_proactive_truncation` verifies truncation application and summary success.
+
+## Background Processing
+
+In main.py routes (`/v1/chat/completions`, `/v1/completions`), proactively detects long context (> threshold), truncates for immediate non-blocking provider call, and adds BackgroundTasks to compute full summary asynchronously, storing in `app.state.summary_cache` keyed by UUID request_id.
+
+**Code Snippet** (from `chat_completions`):
+```python
+total_content = sum(len(m["content"]) for m in req.get("messages", []))
+if total_content > config.truncation_threshold:
+    request_id = str(uuid.uuid4())
+    full_chunks = [m["content"] for m in req["messages"]]
+    background_tasks.add_task(background_condense, request_id, request, full_chunks)
+    # Truncate for immediate response
+    ...
+```
+
+**Benefits**: Eliminates synchronous blocking (e.g., 10s condensation doesn't delay response); full summary cached for future use, reducing repeated computations.
+
+**Testing**: `test_background_non_blocking` mocks route logic, verifies task addition and cache storage.

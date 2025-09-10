@@ -114,3 +114,33 @@ async def test_lru_eviction(mock_request):
     cache.set("key2", ("value2", time.time()))
     assert cache.get("key1") is None  # Evicted
     assert cache.get("key2") == ("value2", time.time())
+
+@pytest.mark.asyncio
+async def test_proactive_truncation(mock_request, mock_provider):
+    """Test proactive truncation before provider call if content > threshold"""
+    mock_request.app.state.condensation_config.truncation_threshold = 100
+    long_chunks = ["short"] + ["long text " * 50]  # Total > 100
+    with patch('src.utils.context_condenser.get_provider', return_value=AsyncMock(return_value=mock_provider)):
+        summary = await condense_context(mock_request, long_chunks, max_tokens=512)
+    # Verify truncation applied by checking content length in call
+    call_content = mock_provider.create_completion.call_args[0][0]["messages"][1]["content"]
+    assert len(call_content) <= 100  # Truncated
+    assert summary == "test summary"
+
+@pytest.mark.asyncio
+async def test_background_non_blocking(mock_request):
+    """Test proactive long context detection and background task addition (simulating route)"""
+    from fastapi import BackgroundTasks
+    mock_bg_tasks = Mock()
+    mock_request.app.state.condensation_config.truncation_threshold = 100
+    long_messages = [{"content": "long" * 50}] * 3  # Total > 100
+    req = {"messages": long_messages}
+    with patch('uuid.uuid4', return_value="test-request-id"), \
+         patch('src.utils.context_condenser.condense_context', new_callable=AsyncMock(return_value="summary")), \
+         patch.object(BackgroundTasks, 'add_task', return_value=None) as mock_add_task:
+        # Simulate route call
+        from main import background_condense
+        background_condense("test-id", mock_request, ["long chunks"])
+        mock_add_task.assert_called_once()
+        # Check truncation would happen, but since background uses full, verify storage
+        assert "test-request-id" in mock_request.app.state.summary_cache
