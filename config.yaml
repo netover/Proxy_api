@@ -20,11 +20,21 @@ config_file: "config.yaml"
 
 condensation:
   max_tokens_default: 512
-  error_keywords:
+  error_patterns:
     - "context_length_exceeded"
     - "maximum context length"
+    - "token limit exceeded"
+    - "input too long"
   adaptive_factor: 0.5
   cache_ttl: 300
+  dynamic_reload: true
+  parallel_providers: 1
+  cache_size: 1000
+  cache_persist: false
+  truncation_threshold: 4000
+  fallback_strategies:
+    - "truncate"
+    - "secondary_provider"
 
 providers:
   - name: "openai_default"

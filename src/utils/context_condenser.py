@@ -5,6 +5,7 @@ import time
 import asyncio
 import json
 import os
+import re
 from pathlib import Path
 from collections import OrderedDict
 from src.providers.base import get_provider
@@ -200,9 +201,8 @@ async def condense_context(request: Request, chunks: List[str], max_tokens: int 
                 error_msg = str(e)
                 logger.error(f"Condensation failed: {error_msg}")
             
-            if not fallback_attempted and condensation_config.error_keywords:
-                error_lower = error_msg.lower()
-                if any(keyword.lower() in error_lower for keyword in condensation_config.error_keywords):
+            if not fallback_attempted and condensation_config.error_patterns:
+                if any(re.search(pattern, error_msg, re.IGNORECASE) for pattern in condensation_config.error_patterns):
                     fallback_applied = False
                     if "truncate" in condensation_config.fallback_strategies:
                         half_len = len(content) // 2

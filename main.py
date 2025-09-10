@@ -193,7 +193,15 @@ async def chat_completions(
         request_id = str(uuid.uuid4())
         full_chunks = [m["content"] for m in req["messages"]]
         background_tasks.add_task(background_condense, request_id, request, full_chunks)
-        # Truncate for immediate non-blocking response
+        # Return processing status for non-streaming requests
+        if not req.get("stream", False):
+            return {
+                "status": "processing",
+                "request_id": request_id,
+                "message": "Long context detected; summarization in progress. Poll /summary/{request_id} for result.",
+                "estimated_time": "5-10 seconds"
+            }
+        # For streaming, truncate and proceed
         truncate_len = config.truncation_threshold // 2
         num_messages_to_keep = max(1, len(req["messages"]) * truncate_len // total_content)
         truncated_messages = req["messages"][-num_messages_to_keep:]
@@ -231,27 +239,23 @@ async def chat_completions(
                     response = await circuit_breaker.execute(make_completion)
                     return response
                 except Exception as e:
-                    msg = str(e).lower()
+                    msg = str(e)
                     config = request.app.state.condensation_config
-                    # Detecta erro de contexto longo
-                    if any(keyword in msg for keyword in config.error_keywords) and not req.get("stream", False):
-                        # Extract chunks
+                    # Detecta erro de contexto longo with regex
+                    if any(re.search(pattern, msg, re.IGNORECASE) for pattern in config.error_patterns) and not req.get("stream", False):
+                        request_id = str(uuid.uuid4())
                         chunks = [m["content"] for m in req["messages"]]
-                        original_size = sum(len(c) for c in chunks)
-                        adaptive_max_tokens = min(original_size * config.adaptive_factor, config.max_tokens_default)
-                        try:
-                            summary = await asyncio.wait_for(condense_context(request, chunks, max_tokens=adaptive_max_tokens), timeout=10)
-                            req["messages"] = [
-                                {"role": "system", "content": f"Resumo: {summary}"},
-                                req["messages"][-1]
-                            ]
-                            logger.info("Contexto resumido automaticamente após erro", error=str(e))
-                        except (asyncio.TimeoutError, Exception) as condense_e:
-                            logger.warning("Condensation failed, falling back to truncation", error=str(condense_e))
-                            # Fallback: truncate to last half
-                            truncated_messages = req["messages"][-len(req["messages"])//2:]
-                            req["messages"] = truncated_messages
-                        # Retry with updated req (disable stream for retry)
+                        background_tasks.add_task(background_condense, request_id, request, chunks)
+                        # Return processing for non-streaming
+                        return {
+                            "status": "processing",
+                            "request_id": request_id,
+                            "message": f"Context error detected ({str(e)}); summarization in progress. Poll /summary/{request_id} for result.",
+                            "estimated_time": "5-10 seconds"
+                        }
+                        # For immediate fallback, truncate and retry
+                        truncated_messages = req["messages"][-len(req["messages"])//2:]
+                        req["messages"] = truncated_messages
                         req["stream"] = False
                         async def make_retry():
                             return await provider.create_completion(req)
@@ -306,7 +310,15 @@ async def completions(
         request_id = str(uuid.uuid4())
         full_chunks = prompt if isinstance(prompt, list) else [prompt]
         background_tasks.add_task(background_condense, request_id, request, full_chunks)
-        # Truncate for immediate non-blocking response
+        # Return processing status for non-streaming requests
+        if not req.get("stream", False):
+            return {
+                "status": "processing",
+                "request_id": request_id,
+                "message": "Long prompt detected; summarization in progress. Poll /summary/{request_id} for result.",
+                "estimated_time": "5-10 seconds"
+            }
+        # For streaming, truncate and proceed
         truncate_len = config.truncation_threshold // 2
         if isinstance(prompt, list):
             num_items_to_keep = max(1, len(prompt) * truncate_len // total_content)
@@ -346,29 +358,28 @@ async def completions(
                     response = await circuit_breaker.execute(make_text_completion)
                     return response
                 except Exception as e:
-                    msg = str(e).lower()
+                    msg = str(e)
                     config = request.app.state.condensation_config
-                    # Detecta erro de contexto longo
-                    if any(keyword in msg for keyword in config.error_keywords) and not req.get("stream", False):
-                        # Extract chunks
+                    # Detecta erro de contexto longo with regex
+                    if any(re.search(pattern, msg, re.IGNORECASE) for pattern in config.error_patterns) and not req.get("stream", False):
+                        request_id = str(uuid.uuid4())
                         if isinstance(req["prompt"], str):
                             chunks = [req["prompt"]]
                         else:
                             chunks = req["prompt"]
-                        original_size = sum(len(c) for c in chunks)
-                        adaptive_max_tokens = min(original_size * config.adaptive_factor, config.max_tokens_default)
-                        try:
-                            summary = await asyncio.wait_for(condense_context(request, chunks, max_tokens=adaptive_max_tokens), timeout=10)
-                            req["prompt"] = f"Resumo: {summary}"
-                            logger.info("Contexto resumido automaticamente após erro", error=str(e))
-                        except (asyncio.TimeoutError, Exception) as condense_e:
-                            logger.warning("Condensation failed, falling back to truncation", error=str(condense_e))
-                            # Fallback: truncate to last half
-                            if isinstance(req["prompt"], str):
-                                req["prompt"] = req["prompt"][-len(req["prompt"])//2:]
-                            else:
-                                req["prompt"] = req["prompt"][-len(req["prompt"])//2:]
-                        # Retry with updated req (disable stream for retry)
+                        background_tasks.add_task(background_condense, request_id, request, chunks)
+                        # Return processing for non-streaming
+                        return {
+                            "status": "processing",
+                            "request_id": request_id,
+                            "message": f"Context error detected ({str(e)}); summarization in progress. Poll /summary/{request_id} for result.",
+                            "estimated_time": "5-10 seconds"
+                        }
+                        # For immediate fallback, truncate and retry
+                        if isinstance(req["prompt"], str):
+                            req["prompt"] = req["prompt"][-len(req["prompt"])//2:]
+                        else:
+                            req["prompt"] = req["prompt"][-len(req["prompt"])//2:]
                         req["stream"] = False
                         async def make_retry():
                             return await provider.create_text_completion(req)
@@ -453,11 +464,31 @@ async def embeddings(
 async def background_condense(request_id: str, request: Request, chunks: List[str]):
     """Background task to compute full context summary and store in cache"""
     try:
+        start_time = time.time()
         summary = await condense_context(request, chunks)
-        request.app.state.summary_cache[request_id] = summary
-        logger.info(f"Background summary stored for request_id: {request_id}")
+        latency = time.time() - start_time
+        request.app.state.summary_cache[request_id] = {"summary": summary, "timestamp": time.time(), "latency": latency}
+        # Record metrics (assuming metrics_collector updated later)
+        logger.info(f"Background summary stored for request_id: {request_id}, latency: {latency}s")
     except Exception as e:
         logger.error(f"Background condensation failed for {request_id}: {e}")
+        request.app.state.summary_cache[request_id] = {"error": str(e), "timestamp": time.time()}
+
+@app.get("/summary/{request_id}")
+async def get_summary_status(request_id: str, request: Request):
+    """Poll for background summarization status"""
+    cache = request.app.state.summary_cache
+    if request_id not in cache:
+        return {"status": "not_found", "message": "Request ID not found or processing not started"}
+    result = cache[request_id]
+    if "error" in result:
+        return {"status": "error", "error": result["error"], "timestamp": result["timestamp"]}
+    return {
+        "status": "completed",
+        "summary": result["summary"],
+        "timestamp": result["timestamp"],
+        "latency": result.get("latency", 0)
+    }
 
 @app.get("/v1/models")
 async def list_models():

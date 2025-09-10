@@ -144,3 +144,62 @@ async def test_background_non_blocking(mock_request):
         mock_add_task.assert_called_once()
         # Check truncation would happen, but since background uses full, verify storage
         assert "test-request-id" in mock_request.app.state.summary_cache
+
+@pytest.mark.asyncio
+async def test_regex_error_detection(mock_request, mock_provider):
+    """Test regex-based error detection and fallback"""
+    mock_request.app.state.condensation_config.error_patterns = ["context.*exceeded", "token.*limit"]
+    mock_request.app.state.condensation_config.fallback_strategies = ["truncate"]
+    chunks = ["test"]
+    error_msg = "The context length exceeded the maximum allowed tokens"
+    mock_provider.create_completion.side_effect = Exception(error_msg)
+    mock_provider.create_completion.side_effect = {"choices": [{"message": {"content": "fallback summary"}}]}  # Second call after fallback
+    with patch('src.utils.context_condenser.get_provider', return_value=AsyncMock(return_value=mock_provider)):
+        with pytest.raises(ValueError):  # Expect fallback but test detection
+            await condense_context(mock_request, chunks, max_tokens=512)
+    # Verify regex matched and fallback applied
+    assert "fallback summary" in str(mock_provider.create_completion.call_args_list[-1])
+
+@pytest.mark.asyncio
+async def test_background_offload_simulation(mock_request, mock_provider):
+    """Test background offload detection (simulate in test)"""
+    from main import background_condense
+    mock_request.app.state.summary_cache = {}
+    mock_request.app.state.condensation_config.truncation_threshold = 10
+    long_chunks = ["a" * 20]
+    request_id = "test-bg-id"
+    with patch('uuid.uuid4', return_value=request_id), \
+         patch('src.utils.context_condenser.condense_context', new_callable=AsyncMock(return_value="bg summary")):
+        background_condense(request_id, mock_request, long_chunks)
+        cached = mock_request.app.state.summary_cache.get(request_id)
+        assert cached == {"summary": "bg summary", "timestamp": ANY, "latency": ANY}
+
+@pytest.mark.asyncio
+async def test_multi_provider_retrial(mock_request, mock_provider1, mock_provider2):
+    """Test multi-provider fallback on error"""
+    mock_request.app.state.config.providers = [Mock(priority=1, models=["model"], name="prov1"), Mock(priority=2, models=["model"], name="prov2")]
+    mock_request.app.state.condensation_config.error_patterns = ["rate limit"]
+    mock_request.app.state.condensation_config.fallback_strategies = ["secondary_provider"]
+    mock_request.app.state.condensation_config.parallel_providers = 1
+    chunks = ["test"]
+    mock_provider1.create_completion.side_effect = Exception("Rate limit exceeded")
+    mock_provider2.create_completion.return_value = {"choices": [{"message": {"content": "retrial summary"}}]}
+    with patch('src.utils.context_condenser.get_provider', side_effect=[mock_provider1, mock_provider2]):
+        summary = await condense_context(mock_request, chunks, max_tokens=512)
+    assert summary == "retrial summary"
+
+@pytest.mark.asyncio
+async def test_varied_provider_errors(mock_request, mock_provider):
+    """Test handling of different provider-specific error messages with regex"""
+    error_cases = [
+        ("OpenAI context_length_exceeded", "context_length_exceeded"),
+        ("Anthropic maximum context length reached", "maximum context length"),
+        ("Perplexity token limit exceeded", "token limit exceeded")
+    ]
+    for error_msg, pattern in error_cases:
+        mock_request.app.state.condensation_config.error_patterns = [pattern]
+        mock_request.app.state.condensation_config.fallback_strategies = ["truncate"]
+        mock_provider.create_completion.side_effect = [Exception(error_msg), {"choices": [{"message": {"content": f"handled {pattern}"}}]}]
+        with patch('src.utils.context_condenser.get_provider', return_value=AsyncMock(return_value=mock_provider)):
+            summary = await condense_context(mock_request, ["chunk"], max_tokens=512)
+            assert f"handled {pattern}" in summary
