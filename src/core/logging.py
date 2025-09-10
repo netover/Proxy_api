@@ -17,7 +17,9 @@ class JSONFormatter(logging.Formatter):
             "message": record.getMessage(),
             "module": record.module,
             "function": record.funcName,
-            "line": record.lineno
+            "line": record.lineno,
+            "process": getattr(record, 'process', None),
+            "thread": getattr(record, 'thread', None)
         }
         
         if hasattr(record, 'extra_data'):
@@ -39,18 +41,15 @@ def setup_logging(log_level: str = "INFO", log_file: Path = None):
     root_logger = logging.getLogger()
     root_logger.setLevel(getattr(logging, log_level.upper()))
     
-    # Clear existing handlers
-    for handler in root_logger.handlers[:]:
-        root_logger.removeHandler(handler)
-    
-    # Console handler with colors
-    console_handler = logging.StreamHandler(sys.stdout)
-    console_formatter = logging.Formatter(
-        "%(asctime)s | %(levelname)-8s | %(name)s:%(lineno)d | %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S"
-    )
-    console_handler.setFormatter(console_formatter)
-    root_logger.addHandler(console_handler)
+    # Console handler with colors - add only if not exists
+    if not any(isinstance(h, logging.StreamHandler) for h in root_logger.handlers):
+        console_handler = logging.StreamHandler(sys.stdout)
+        console_formatter = logging.Formatter(
+            "%(asctime)s | %(levelname)-8s | %(name)s:%(lineno)d | %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S"
+        )
+        console_handler.setFormatter(console_formatter)
+        root_logger.addHandler(console_handler)
     
     # Handle encoding issues on Windows
     if sys.platform == "win32":
@@ -61,10 +60,10 @@ def setup_logging(log_level: str = "INFO", log_file: Path = None):
             errors='replace'
         )
     
-    # File handler with JSON format
-    if log_file:
+    # File handler with JSON format - add only if not exists
+    if log_file and not any(isinstance(h, RotatingFileHandler) for h in root_logger.handlers):
         file_handler = RotatingFileHandler(
-            log_file, 
+            log_file,
             maxBytes=10*1024*1024,  # 10MB
             backupCount=5
         )

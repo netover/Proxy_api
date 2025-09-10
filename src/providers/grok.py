@@ -4,6 +4,7 @@ Uses xAI SDK with OpenAI-compatible interface
 """
 
 import json
+import time
 from typing import Dict, Any, Optional
 from src.core.app_config import ProviderConfig
 from src.core.metrics import metrics_collector
@@ -18,85 +19,65 @@ class GrokProvider(Provider):
         super().__init__(config)
         self.base_url = config.base_url or "https://api.x.ai/v1"
         self.logger = ContextualLogger(f"provider.{config.name}")
-
-        # Import xAI SDK if available
-        try:
-            import xai_sdk
-            self.xai_client = xai_sdk.Client(api_key=self.api_key)
-            self.sdk_available = True
-        except ImportError:
-            self.logger.warning("xAI SDK not available. Install with: pip install xai-sdk")
-            self.sdk_available = False
-            self.xai_client = None
+        # Add Authorization header for Grok API
+        self.client.headers.update({"Authorization": f"Bearer {self.api_key}"})
 
     async def _health_check(self) -> Dict[str, Any]:
         """Check Grok API health"""
-        if not self.sdk_available:
-            return {"error": "xAI SDK not available"}
-
         try:
-            # Simple health check by attempting to get model info
-            # Note: This is a placeholder - actual implementation depends on SDK
-            return {"status": "healthy", "sdk_available": True}
+            response = await self.client.get(f"{self.base_url}/models")
+            response.raise_for_status()
+            return {"status": "healthy"}
         except Exception as e:
             self.logger.error(f"Health check failed: {e}")
             return {"error": str(e)}
 
     async def create_completion(self, request: Dict[str, Any]) -> Dict[str, Any]:
         """Create chat completion with Grok API"""
-        start_time = __import__('time').time()
-
-        if not self.sdk_available:
-            raise RuntimeError("xAI SDK not available. Install with: pip install xai-sdk")
+        start_time = time.time()
 
         try:
             # Extract parameters
-            model = request.get("model", "grok-4")
+            model = request.get("model", "grok-beta")
             messages = request.get("messages", [])
             max_tokens = request.get("max_tokens", 1024)
             temperature = request.get("temperature", 0.7)
+            top_p = request.get("top_p", 1.0)
             stream = request.get("stream", False)
 
-            # Convert messages to xAI format
-            prompt = self._convert_messages_to_prompt(messages)
-
-            # Prepare xAI request
-            xai_request = {
+            # Prepare request body (OpenAI compatible)
+            body = {
                 "model": model,
-                "prompt": prompt,
+                "messages": messages,
                 "max_tokens": max_tokens,
                 "temperature": temperature,
+                "top_p": top_p,
                 "stream": stream
             }
 
-            # Add search parameters if enabled
-            if request.get("extra_body", {}).get("search_enabled", False):
-                xai_request["search_parameters"] = {
-                    "max_search_results": request.get("extra_body", {}).get("search_parameters", {}).get("max_search_results", 5)
-                }
-                xai_request["include_citations"] = request.get("extra_body", {}).get("include_citations", True)
-                xai_request["search_timeout"] = request.get("extra_body", {}).get("search_timeout", 10)
-
-            # Make request using xAI SDK
-            # Note: This is a placeholder - actual implementation depends on SDK methods
-            response = await self._make_xai_request(xai_request)
-
-            # Convert xAI response to OpenAI format
-            result = self._convert_xai_response_to_openai(response)
-            response_time = __import__('time').time() - start_time
+            # Make request using httpx
+            response = await self.client.post(
+                f"{self.base_url}/chat/completions",
+                json=body
+            )
+            response.raise_for_status()
+            result = response.json()
+            response_time = time.time() - start_time
 
             # Record metrics
+            usage = result.get("usage", {})
+            total_tokens = usage.get("total_tokens", 0)
             metrics_collector.record_request(
                 self.config.name,
                 success=True,
                 response_time=response_time,
-                tokens=result.get("usage", {}).get("total_tokens", 0)
+                tokens=total_tokens
             )
 
             return result
 
         except Exception as e:
-            response_time = __import__('time').time() - start_time
+            response_time = time.time() - start_time
             metrics_collector.record_request(
                 self.config.name,
                 success=False,
@@ -105,51 +86,8 @@ class GrokProvider(Provider):
             )
             raise
 
-    async def _make_xai_request(self, request_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Make request to xAI API using SDK"""
-        # Placeholder - actual implementation depends on xAI SDK
-        # This would use the xAI SDK methods
-        if self.xai_client:
-            # Example: response = await self.xai_client.generate(request_data)
-            # For now, return mock response
-            return {
-                "choices": [{"message": {"content": "Mock Grok response"}}],
-                "usage": {"total_tokens": 100}
-            }
-        else:
-            raise RuntimeError("xAI client not initialized")
 
-    def _convert_messages_to_prompt(self, messages: list) -> str:
-        """Convert OpenAI message format to xAI prompt format"""
-        prompt_parts = []
-        for message in messages:
-            role = message.get("role", "user")
-            content = message.get("content", "")
-            if role == "system":
-                prompt_parts.append(f"System: {content}")
-            elif role == "user":
-                prompt_parts.append(f"Human: {content}")
-            elif role == "assistant":
-                prompt_parts.append(f"Assistant: {content}")
-        return "\n\n".join(prompt_parts)
 
-    def _convert_xai_response_to_openai(self, xai_response: Dict[str, Any]) -> Dict[str, Any]:
-        """Convert xAI response to OpenAI format"""
-        return {
-            "id": f"grok-{__import__('time').time()}",
-            "object": "chat.completion",
-            "created": int(__import__('time').time()),
-            "model": "grok-4",
-            "choices": [{
-                "index": 0,
-                "message": {
-                    "role": "assistant",
-                    "content": xai_response.get("choices", [{}])[0].get("message", {}).get("content", "")
-                },
-                "finish_reason": "stop"
-            }],
-            "usage": xai_response.get("usage", {"total_tokens": 0})
-        }
 
     async def create_text_completion(self, request: Dict[str, Any]) -> Dict[str, Any]:
         """Create text completion (mapped to chat completion)"""
@@ -157,7 +95,7 @@ class GrokProvider(Provider):
         chat_request = {
             **request,
             "messages": messages,
-            "model": request.get("model", "grok-4")
+            "model": request.get("model", "grok-beta")
         }
         return await self.create_completion(chat_request)
 

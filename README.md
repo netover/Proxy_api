@@ -63,6 +63,15 @@ To add a new provider:
 - `GET /metrics` - View performance metrics
 - `GET /health` - Health check
 
+## Web UI
+
+The project includes two separate user interfaces:
+
+- **FastAPI API (main.py)**: The core proxy API for LLM requests. Run with `python main.py`
+- **Flask Configuration UI (web_ui.py)**: A simple web interface for viewing and editing configuration. Run with `python web_ui.py`
+
+To use both, run them on different ports (default: FastAPI on 8000, Flask on 5000). No integration is required; they serve different purposes: API for programmatic access, Flask for configuration management.
+
 ## Adding New Providers
 
 To add a new provider:

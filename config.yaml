@@ -1,63 +1,11 @@
 providers:
-  - name: "openai"
-    type: "openai"
-    module: "src.providers.dynamic_openai"
-    class: "DynamicOpenAIProvider"
-    api_key_env: "OPENAI_API_KEY"
-    base_url: "https://api.openai.com/v1"
-    models:
-      - "gpt-4"
-      - "gpt-3.5-turbo"
-      - "text-davinci-003"
-      - "text-embedding-ada-002"
-    priority: 1
-
-  - name: "anthropic"
-    type: "anthropic"
-    module: "src.providers.dynamic_anthropic"
-    class: "DynamicAnthropicProvider"
-    api_key_env: "ANTHROPIC_API_KEY"
-    base_url: "https://api.anthropic.com"
-    models:
-      - "claude-3-sonnet-20240229"
-      - "claude-3-opus-20240229"
-    priority: 2
-
-  - name: "perplexity"
-    type: "perplexity"
-    module: "src.providers.dynamic_perplexity"
-    class: "DynamicPerplexityProvider"
-    api_key_env: "PERPLEXITY_API_KEY"
-    base_url: "https://api.perplexity.ai"
-    models:
-      - "sonar-pro"
-      - "sonar-small-online"
-      - "sonar-medium-online"
-      - "sonar-small-chat"
-      - "sonar-medium-chat"
-      - "mistral-7b"
-      - "codellama-34b"
-      - "llama-2-70b"
-    priority: 3
-
-  - name: "openrouter"
-    type: "openrouter"
-    module: "src.providers.dynamic_openrouter"
-    class: "DynamicOpenRouterProvider"
-    api_key_env: "OPENROUTER_API_KEY"
-    base_url: "https://openrouter.ai/api"
-    models:
-      - "google/gemini-flash-1.5"
-      - "mistralai/mistral-7b-instruct"
-      - "openai/gpt-4o"
-    priority: 4
-
-  - name: "blackbox"
-    type: "blackbox"
-    module: "src.providers.dynamic_blackbox"
-    class: "DynamicBlackboxProvider"
-    api_key_env: "BLACKBOX_API_KEY"
-    base_url: "https://api.blackbox.ai"
-    models:
-      - "blackbox-chat"
-    priority: 5
+- name: testprovider
+  type: openai
+  module: src.providers.openai
+  class: OpenAIProvider
+  api_key_env: OPENAI_API_KEY
+  base_url: https://api.openai.com/v1
+  models:
+  - gpt-4
+  priority: 10
+  enabled: true

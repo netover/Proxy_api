@@ -4,6 +4,7 @@ Unified endpoint for 280+ models from multiple providers
 """
 
 import json
+import time
 from typing import Dict, Any, Optional
 from src.core.app_config import ProviderConfig
 from src.core.metrics import metrics_collector
@@ -21,6 +22,7 @@ class OpenRouterProvider(Provider):
         self._models_cache = None
         self._models_cache_time = 0
         self._cache_ttl = 300  # 5 minutes
+        self._lock = asyncio.Lock()
 
     async def _health_check(self) -> Dict[str, Any]:
         """Check OpenRouter API health"""
@@ -45,32 +47,33 @@ class OpenRouterProvider(Provider):
 
     async def _get_models(self) -> Dict[str, Any]:
         """Get available models with caching"""
-        current_time = __import__('time').time()
+        current_time = time.time()
 
-        if self._models_cache and (current_time - self._models_cache_time) < self._cache_ttl:
-            return self._models_cache
+        async with self._lock:
+            if self._models_cache and (current_time - self._models_cache_time) < self._cache_ttl:
+                return self._models_cache
 
-        try:
-            response = await self.make_request_with_retry(
-                "GET",
-                f"{self.base_url}/v1/models",
-                headers={
-                    "Authorization": f"Bearer {self.api_key}",
-                    "Content-Type": "application/json"
-                }
-            )
+            try:
+                response = await self.make_request_with_retry(
+                    "GET",
+                    f"{self.base_url}/v1/models",
+                    headers={
+                        "Authorization": f"Bearer {self.api_key}",
+                        "Content-Type": "application/json"
+                    }
+                )
 
-            self._models_cache = response.json()
-            self._models_cache_time = current_time
-            return self._models_cache
+                self._models_cache = response.json()
+                self._models_cache_time = current_time
+                return self._models_cache
 
-        except Exception as e:
-            self.logger.error(f"Failed to fetch models: {e}")
-            return {"data": []}
+            except Exception as e:
+                self.logger.error(f"Failed to fetch models: {e}")
+                return {"data": []}
 
     async def create_completion(self, request: Dict[str, Any]) -> Dict[str, Any]:
         """Create chat completion with OpenRouter API"""
-        start_time = __import__('time').time()
+        start_time = time.time()
 
         try:
             # Prepare request for OpenRouter API
@@ -110,7 +113,7 @@ class OpenRouterProvider(Provider):
             )
 
             result = response.json()
-            response_time = __import__('time').time() - start_time
+            response_time = time.time() - start_time
 
             # Record metrics
             metrics_collector.record_request(
@@ -123,7 +126,7 @@ class OpenRouterProvider(Provider):
             return result
 
         except Exception as e:
-            response_time = __import__('time').time() - start_time
+            response_time = time.time() - start_time
             metrics_collector.record_request(
                 self.config.name,
                 success=False,

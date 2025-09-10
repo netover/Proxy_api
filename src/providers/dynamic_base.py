@@ -1,103 +1,19 @@
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional, List
-import asyncio
-import httpx
-import time
-from src.core.metrics import metrics_collector
+from typing import Dict, Any
+from src.providers.base import Provider
+from src.core.app_config import ProviderConfig
 from src.core.logging import ContextualLogger
-from src.core.circuit_breaker import get_circuit_breaker, CircuitBreakerOpenException
-from src.core.config import settings
+import httpx
 
-
-class DynamicProvider(ABC):
+class DynamicProvider(Provider):
     """Base class for dynamically loaded AI providers"""
 
-    def __init__(self, name: str, api_key: str, base_url: str, models: List[str], priority: int):
-        self.name = name
-        self.api_key = api_key or ""
-        self.base_url = base_url
-        self.models = models
-        self.priority = priority
-        self.logger = ContextualLogger(f"provider.{name}")
-
-        # Connection pooling setup
-        self.client = httpx.AsyncClient(
-            timeout=httpx.Timeout(30),
-            limits=httpx.Limits(
-                max_keepalive_connections=20,
-                max_connections=100,
-                keepalive_expiry=30.0
-            ),
-            headers={
-                "User-Agent": "LLM-Proxy-API/1.0"
-            }
-        )
-
-        if not self.api_key:
-            self.logger.warning(f"API key for {name} not found in environment")
-
-
-    async def health_check(self) -> Dict[str, Any]:
-        """Check provider health"""
-        start_time = time.time()
-        try:
-            result = await self._health_check()
-            response_time = time.time() - start_time
-
-            metrics_collector.record_request(
-                self.name,
-                success=True,
-                response_time=response_time,
-                error_type=None
-            )
-
-            return {
-                "status": "healthy" if result else "unhealthy",
-                "response_time": response_time,
-                "details": result
-            }
-        except httpx.HTTPStatusError as e:
-            response_time = time.time() - start_time
-            metrics_collector.record_request(
-                self.name,
-                success=False,
-                response_time=response_time,
-                error_type=type(e).__name__
-            )
-            return {
-                "status": "unhealthy",
-                "response_time": response_time,
-                "error": f"HTTP {e.response.status_code}: {e.response.text}"
-            }
-        except (httpx.ConnectError, httpx.TimeoutException) as e:
-            response_time = time.time() - start_time
-            metrics_collector.record_request(
-                self.name,
-                success=False,
-                response_time=response_time,
-                error_type=type(e).__name__
-            )
-            return {
-                "status": "unhealthy",
-                "response_time": response_time,
-                "error": f"Connection error: {str(e)}"
-            }
-        except Exception as e:
-            response_time = time.time() - start_time
-            metrics_collector.record_request(
-                self.name,
-                success=False,
-                response_time=response_time,
-                error_type=type(e).__name__
-            )
-            return {
-                "status": "unhealthy",
-                "response_time": response_time,
-                "error": f"Unexpected error: {str(e)}"
-            }
+    def __init__(self, config: ProviderConfig):
+        super().__init__(config)
+        self.logger = ContextualLogger(f"provider.{config.name}")
 
     @abstractmethod
-    async def _health_check(self) -> Any:
+    async def _health_check(self) -> Dict[str, Any]:
         """Internal health check implementation"""
         pass
 
@@ -122,69 +38,24 @@ class DynamicProvider(ABC):
         url: str,
         **kwargs
     ) -> httpx.Response:
-        """Make HTTP request with retry logic and circuit breaker"""
-        # Get circuit breaker for this provider
-        circuit_breaker = get_circuit_breaker(
-            f"provider_{self.name}",
-            failure_threshold=settings.circuit_breaker_threshold,
-            recovery_timeout=settings.circuit_breaker_timeout
-        )
-        
-        async def _make_request() -> httpx.Response:
-            """Internal request function"""
-            last_exception = None
-
-            # Include the initial attempt in the loop
-            for attempt in range(settings.provider_retries + 1):
-                try:
-                    if attempt > 0:
-                        await asyncio.sleep(1.0 * (2 ** (attempt - 1)))
-
-                    response = await self.client.request(method, url, **kwargs)
-                    response.raise_for_status()
-                    return response
-
-                except httpx.HTTPStatusError as e:
-                    last_exception = e
-                    # Do not retry on 4xx client errors, except for 429 Too Many Requests
-                    if 400 <= e.response.status_code < 500 and e.response.status_code != 429:
-                        self.logger.error(f"Request failed with non-retriable status code {e.response.status_code}: {e.response.text}")
-                        break # Exit retry loop for client errors
-
-                    # Check if we should retry
-                    if attempt < settings.provider_retries:
-                        self.logger.warning(
-                            f"Request attempt {attempt + 1} failed with HTTP {e.response.status_code}, retrying..."
-                        )
-                    continue
-                except (httpx.ConnectError, httpx.TimeoutException) as e:
-                    last_exception = e
-                    # Check if we should retry
-                    if attempt < settings.provider_retries:
-                        self.logger.warning(
-                            f"Request attempt {attempt + 1} failed with connection error: {e}, retrying..."
-                        )
-                    continue
-                except Exception as e:
-                    last_exception = e
-                    self.logger.error(f"Unexpected error during request: {e}")
-                    break
-
-            raise last_exception
-        
-        # Execute with circuit breaker
+        """Make HTTP request with retry logic and error handling"""
         try:
-            return await circuit_breaker.execute(_make_request)
-        except CircuitBreakerOpenException:
-            self.logger.error(f"Circuit breaker is open for provider {self.name}")
-            raise httpx.RequestError(f"Circuit breaker is open for provider {self.name}", request=None)
-        except Exception as e:
-            self.logger.error(f"Request failed after all retries: {e}")
+            response = await self.client.request(method, url, **kwargs)
+            response.raise_for_status()
+            return response
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                self.logger.error("Model not found (404)")
+                raise ValueError(f"Model not found: {e.response.text}")
+            elif e.response.status_code == 401:
+                self.logger.error("Authentication failed (401)")
+                raise ValueError(f"Authentication failed: {e.response.text}")
+            else:
+                self.logger.error(f"HTTP error {e.response.status_code}: {e.response.text}")
+                raise
+        except httpx.RequestError as e:
+            self.logger.error(f"Request error: {e}")
             raise
-
-            
-    async def __aenter__(self):
-        return self
-
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        await self.client.aclose()
+        except Exception as e:
+            self.logger.error(f"Unexpected error: {e}")
+            raise

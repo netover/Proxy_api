@@ -4,6 +4,7 @@ Unified API for chat, image, video, and tool calling
 """
 
 import json
+import time
 from typing import Dict, Any, Optional
 from src.core.app_config import ProviderConfig
 from src.core.metrics import metrics_collector
@@ -38,7 +39,7 @@ class BlackboxProvider(Provider):
 
     async def create_completion(self, request: Dict[str, Any]) -> Dict[str, Any]:
         """Create chat completion with Blackbox API"""
-        start_time = __import__('time').time()
+        start_time = time.time()
 
         try:
             # Prepare request for Blackbox API
@@ -69,7 +70,7 @@ class BlackboxProvider(Provider):
             )
 
             result = response.json()
-            response_time = __import__('time').time() - start_time
+            response_time = time.time() - start_time
 
             # Record metrics
             metrics_collector.record_request(
@@ -107,7 +108,7 @@ class BlackboxProvider(Provider):
 
     async def create_image(self, request: Dict[str, Any]) -> Dict[str, Any]:
         """Create image generation with Blackbox API"""
-        start_time = __import__('time').time()
+        start_time = time.time()
 
         try:
             image_request = {
@@ -129,7 +130,7 @@ class BlackboxProvider(Provider):
             )
 
             result = response.json()
-            response_time = __import__('time').time() - start_time
+            response_time = time.time() - start_time
 
             # Record metrics
             metrics_collector.record_request(
@@ -153,7 +154,7 @@ class BlackboxProvider(Provider):
 
     async def create_video(self, request: Dict[str, Any]) -> Dict[str, Any]:
         """Create video generation with Blackbox API"""
-        start_time = __import__('time').time()
+        start_time = time.time()
 
         try:
             video_request = {
@@ -174,7 +175,7 @@ class BlackboxProvider(Provider):
             )
 
             result = response.json()
-            response_time = __import__('time').time() - start_time
+            response_time = time.time() - start_time
 
             # Record metrics
             metrics_collector.record_request(

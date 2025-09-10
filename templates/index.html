@@ -1,62 +1,82 @@
+<!-- HTML5 Doctype: Declares document type for browser to use modern HTML5 rendering mode. Functionality: Ensures consistent parsing across browsers. Issue: None. Opt: None needed. -->
 <!DOCTYPE html>
+<!-- HTML root element: Sets language for screen readers and search engines. Functionality: Improves accessibility (ARIA) and SEO. Issue: Hard-coded 'en'; dynamic if multi-lang. Opt: Add dir="ltr" for text direction. -->
 <html lang="en">
 <head>
+    <!-- Meta charset: Specifies UTF-8 encoding for full unicode support. Functionality: Prevents garbled characters in international inputs (e.g., API keys). Issue: Default in modern browsers, but explicit good. Opt: None. -->
     <meta charset="UTF-8">
+    <!-- Viewport meta: Enables responsive scaling on mobile. Functionality: Initial scale 1.0, width=device-width for fluid layout. Issue: Fixed; no user-scalable=no for accessibility. Opt: Add user-scalable=yes. -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LLM Proxy Config</title>
+    <!-- Title: Sets page title in tab/bookmark. Functionality: User-friendly name for config UI. Issue: Static; could be dynamic. Opt: Add meta description for SEO if public. -->
+    <title>LLM Proxy Configuration</title>
+    <!-- CSS link: Loads style.css from static folder via Flask url_for for path resolution. Functionality: Applies neumorphic styling. Issue: If /static not served or auth applied, 404 or blocked. Opt: Inline critical CSS for performance, add preload. -->
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-    <div class="container">
+    <!-- Body: Main content wrapper. Functionality: Contains all UI elements. Issue: No role or lang repeat. Opt: Add onload for JS init. -->
+    <div class="container" role="main" aria-label="Configuration form container">  <!-- Add ARIA: role=main for screen readers, aria-label for description. -->
+        <!-- H1: Page heading. Functionality: Semantic title. Issue: None. Opt: Add id for skip links. -->
         <h1>LLM Proxy Configuration</h1>
 
+        <!-- Flash messages: Jinja block to display Flask flashed messages with categories (error/success). Functionality: User feedback from server validation/saves. Issue: No auto-dismiss; static display. Opt: Add JS for fade-out, ARIA live region for dynamic updates. -->
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
-                <div class="flash-messages">
+                <div class="flash-messages" role="alert" aria-live="polite">  <!-- Add ARIA: role=alert for screen reader announcement, aria-live for dynamic. -->
                 {% for category, message in messages %}
-                    <div class="flash {{ category }}">{{ message }}</div>
+                    <div class="flash {{ category }}" role="status">{{ message }}</div>  <!-- ARIA: role=status for non-interactive messages. -->
                 {% endfor %}
                 </div>
             {% endif %}
         {% endwith %}
 
-        <form action="{{ url_for('save') }}" method="post">
+        <!-- Main form: Submits config data to server. Functionality: POST to save route with form data. Issue: No CSRF protection (vulnerable to attacks; use Flask-WTF). Action mismatch if route renamed. No client validation. Opt: Add CSRF token <input type="hidden" name="csrf_token" value="placeholder"> if WtfForms, inline JS for validation. -->
+        <form action="{{ url_for('save_config') }}" method="post" role="form" aria-label="LLM Proxy configuration form">  <!-- Fix: Update action to save_config. Add ARIA: role=form, aria-label for screen readers. -->
 
+            <!-- Fieldset: Groups server settings semantically. Functionality: No border for style, legend for title. Issue: No ARIA. Opt: Add aria-labelledby to legend id. -->
             <fieldset class="neumorphic-card">
-                <legend>Server Settings</legend>
+                <legend id="server-legend">Server Settings</legend>  <!-- Add id for ARIA reference. -->
                 <div class="form-group">
-                    <label for="port">Server Port</label>
-                    <input type="number" id="port" name="port" value="{{ env_vars.get('PROXY_API_PORT', 8000) }}" class="neumorphic-input">
+                    <!-- Label: Associates with input via for/id. Functionality: Accessibility for screen readers. Issue: No required indicator. Opt: Add * for visual, aria-required. -->
+                    <label for="port" aria-describedby="port-help">Server Port <span aria-hidden="true">*</span></label>  <!-- Add required indicator, aria-describedby for help. -->
+                    <input type="number" id="port" name="port" value="{{ env_vars.get('PROXY_API_PORT', 8000) }}" class="neumorphic-input" aria-required="true" min="1" max="65535" required>  <!-- Add ARIA required, min/max for validation, HTML5 required. Note: Default 8000; server uses 10000 – sync via env. -->
+                    <small id="port-help" class="help-text">Port between 1 and 65535.</small>  <!-- Help text for validation. -->
                 </div>
                 <div class="form-group">
-                    <label for="api_key_header">API Key Header</label>
-                    <input type="text" id="api_key_header" name="api_key_header" value="{{ env_vars.get('PROXY_API_API_KEY_HEADER', 'X-API-Key') }}" class="neumorphic-input">
+                    <label for="api_key_header" aria-describedby="header-help">API Key Header</label>
+                    <input type="text" id="api_key_header" name="api_key_header" value="{{ env_vars.get('PROXY_API_API_KEY_HEADER', 'X-API-Key') }}" class="neumorphic-input" aria-describedby="header-help" pattern="[A-Za-z0-9_-]+" title="Alphanumeric, underscore, hyphen only.">  <!-- Add ARIA, pattern for validation. -->
+                    <small id="header-help" class="help-text">Header name for API key (e.g., X-API-Key).</small>
                 </div>
             </fieldset>
 
+            <!-- Fieldset for providers: Groups all provider configs. Functionality: Loops over config.providers, renders editable cards. Issue: No add/remove buttons; static to existing only. No type select (hidden, can't change). Opt: Add JS for dynamic add/remove/reindex, select for type to update module/class/base_url. -->
             <fieldset class="neumorphic-card">
-                <legend>Providers</legend>
-                <div id="provider-list">
+                <legend id="providers-legend">Providers</legend>
+                <div id="provider-list" aria-labelledby="providers-legend">  <!-- ARIA: aria-labelledby for section. -->
                     {% for provider in config.get('providers', []) %}
-                    <div class="provider-card neumorphic-card-inset">
+                    <div class="provider-card neumorphic-card-inset" role="group" aria-labelledby="provider-{{ loop.index0 }}-name">  <!-- ARIA: role=group for provider section. -->
                         <div class="form-group">
-                            <label>Name</label>
-                            <input type="text" name="provider_name_{{ loop.index0 }}" value="{{ provider.name }}" class="neumorphic-input">
+                            <label id="provider-{{ loop.index0 }}-name" for="name-{{ loop.index0 }}">Name <span aria-hidden="true">*</span></label>  <!-- ARIA: id for label, required. -->
+                            <input type="text" id="name-{{ loop.index0 }}" name="provider_name_{{ loop.index0 }}" value="{{ provider.name }}" class="neumorphic-input" aria-required="true" required>  <!-- ARIA required, HTML5 required. -->
                         </div>
                         <div class="form-group">
-                            <label>API Key</label>
-                            <input type="password" name="api_key_value_{{ loop.index0 }}" value="{{ provider.api_key_value }}" class="neumorphic-input" placeholder="Enter API Key">
+                            <label for="key-{{ loop.index0 }}">API Key</label>
+                            <input type="password" id="key-{{ loop.index0 }}" name="api_key_value_{{ loop.index0 }}" value="" class="neumorphic-input" placeholder="Enter API Key" autocomplete="new-password">  <!-- Add autocomplete for security. -->
                             <input type="hidden" name="api_key_env_{{ loop.index0 }}" value="{{ provider.api_key_env }}">
                         </div>
+                        <!-- Enabled checkbox: New for opt-in. Functionality: Allows toggling provider enabled. Default checked if provider.enabled or True. Issue: Backend must handle 'enabled_i' as bool. Opt: Sync with config. -->
                         <div class="form-group">
-                            <label>Models (comma-separated)</label>
-                            <textarea name="models_{{ loop.index0 }}" class="neumorphic-textarea" rows="3">{{ provider.models | join(', ') }}</textarea>
+                            <label for="enabled-{{ loop.index0 }}">Enabled</label>
+                            <input type="checkbox" id="enabled-{{ loop.index0 }}" name="enabled_{{ loop.index0 }}" value="true" checked="{{ 'checked' if (provider.enabled if provider.enabled is defined else True) else '' }}" class="neumorphic-input">
                         </div>
                         <div class="form-group">
-                            <label>Priority</label>
-                            <input type="number" name="priority_{{ loop.index0 }}" value="{{ provider.priority }}" class="neumorphic-input">
+                            <label for="models-{{ loop.index0 }}">Models (comma-separated) <span aria-hidden="true">*</span></label>
+                            <textarea id="models-{{ loop.index0 }}" name="models_{{ loop.index0 }}" class="neumorphic-textarea" rows="3" aria-required="true" required>{{ provider.models | join(', ') }}</textarea>
                         </div>
-                        <!-- Hidden fields to preserve data -->
+                        <div class="form-group">
+                            <label for="priority-{{ loop.index0 }}">Priority <span aria-hidden="true">*</span></label>
+                            <input type="number" id="priority-{{ loop.index0 }}" name="priority_{{ loop.index0 }}" value="{{ provider.priority }}" class="neumorphic-input" aria-required="true" min="0" required>  <!-- ARIA, min for validation. -->
+                        </div>
+                        <!-- Hidden fields: Preserve backend data. Functionality: Sent with form for save. Issue: Type hidden; if change type, module/class not updated. Opt: JS to update hidden on type select (add select). -->
                         <input type="hidden" name="module_{{ loop.index0 }}" value="{{ provider.module }}">
                         <input type="hidden" name="class_{{ loop.index0 }}" value="{{ provider.class }}">
                         <input type="hidden" name="type_{{ loop.index0 }}" value="{{ provider.type }}">
@@ -66,10 +86,76 @@
                 </div>
             </fieldset>
 
+            <!-- Form actions: Container for buttons. Functionality: Centers submit. Issue: No cancel/reset. Opt: Add reset button. -->
             <div class="form-actions">
-                <button type="submit" class="neumorphic-btn">Save Changes</button>
+                <button type="submit" class="neumorphic-btn" aria-label="Save configuration changes">Save Changes</button>  <!-- ARIA: aria-label for description. -->
             </div>
         </form>
     </div>
+    <!-- Inline JS for client-side validation. Functionality: Validates form on submit, prevents if invalid, adds error classes/messages. Issue: No dynamic add support. Opt: Use vanilla JS for no deps, add for each provider. -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const form = document.querySelector('form[role="form"]');
+            form.addEventListener('submit', function(e) {
+                let valid = true;
+                // Validate port
+                const port = document.getElementById('port');
+                if (port.value && (isNaN(port.value) || port.value < 1 || port.value > 65535)) {
+                    port.classList.add('error');
+                    valid = false;
+                } else {
+                    port.classList.remove('error');
+                }
+                // Validate header pattern
+                const header = document.getElementById('api_key_header');
+                const headerPattern = /^[A-Za-z0-9_-]+$/;
+                if (header.value && !headerPattern.test(header.value)) {
+                    header.classList.add('error');
+                    valid = false;
+                } else {
+                    header.classList.remove('error');
+                }
+                // Validate providers (loop over name fields)
+                const names = form.querySelectorAll('input[name^="provider_name_"]');
+                names.forEach(function(nameInput) {
+                    if (!nameInput.value.trim()) {
+                        nameInput.classList.add('error');
+                        valid = false;
+                    } else {
+                        nameInput.classList.remove('error');
+                    }
+                });
+                const models = form.querySelectorAll('textarea[name^="models_"]');
+                models.forEach(function(modelInput) {
+                    if (!modelInput.value.trim()) {
+                        modelInput.classList.add('error');
+                        valid = false;
+                    } else {
+                        modelInput.classList.remove('error');
+                    }
+                });
+                const priorities = form.querySelectorAll('input[name^="priority_"]');
+                priorities.forEach(function(priInput) {
+                    const pri = parseInt(priInput.value);
+                    if (isNaN(pri) || pri < 0) {
+                        priInput.classList.add('error');
+                        valid = false;
+                    } else {
+                        priInput.classList.remove('error');
+                    }
+                });
+                if (!valid) {
+                    e.preventDefault();
+                    alert('Please fix the errors before submitting.');  // Simple alert; opt: custom messages.
+                }
+            });
+            // Remove error on input
+            form.addEventListener('input', function(e) {
+                if (e.target.classList.contains('error')) {
+                    e.target.classList.remove('error');
+                }
+            });
+        });
+    </script>
 </body>
 </html>

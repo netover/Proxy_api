@@ -4,6 +4,7 @@ OpenAI-compatible API with real-time search capabilities
 """
 
 import json
+import time
 from typing import Dict, Any, Optional
 from src.core.app_config import ProviderConfig
 from src.core.metrics import metrics_collector
@@ -38,7 +39,7 @@ class PerplexityProvider(Provider):
 
     async def create_completion(self, request: Dict[str, Any]) -> Dict[str, Any]:
         """Create chat completion with Perplexity API"""
-        start_time = __import__('time').time()
+        start_time = time.time()
 
         try:
             # Prepare request for Perplexity API
@@ -70,7 +71,7 @@ class PerplexityProvider(Provider):
             )
 
             result = response.json()
-            response_time = __import__('time').time() - start_time
+            response_time = time.time() - start_time
 
             # Record metrics
             metrics_collector.record_request(
@@ -83,7 +84,7 @@ class PerplexityProvider(Provider):
             return result
 
         except Exception as e:
-            response_time = __import__('time').time() - start_time
+            response_time = time.time() - start_time
             metrics_collector.record_request(
                 self.config.name,
                 success=False,

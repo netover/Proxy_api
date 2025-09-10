@@ -265,3 +265,51 @@ class TestAnthropicProvider:
 
         with pytest.raises(NotImplementedError):
             await provider.create_embeddings(request)
+
+@pytest.mark.parametrize("api_key_env, expected_providers", [
+    ("TEST_EMPTY_KEY", 0),  # Empty API key
+    ("TEST_VALID_KEY", 1),  # Valid API key
+])
+def test_provider_loader_empty_api_key(api_key_env, expected_providers, monkeypatch):
+    """Test provider_loader with mocked empty api_key"""
+    monkeypatch.setenv(api_key_env, "" if expected_providers == 0 else "test_key")
+    
+    config = ProviderConfig(
+        name="test_provider",
+        type="openai",
+        api_key_env=api_key_env,
+        base_url="https://api.example.com/v1",
+        models=["test-model"],
+        enabled=True,
+        priority=1
+    )
+    
+    factories = get_provider_factories([config])
+    # Count how many factories were successfully loaded (not skipped)
+    loaded_count = len(factories)
+    
+    assert loaded_count == expected_providers
+
+@pytest.mark.parametrize("enabled", [True, False])
+def test_provider_loader_disabled_provider(enabled, monkeypatch):
+    """Test provider_loader with disabled providers"""
+    monkeypatch.setenv("TEST_KEY", "test_key")
+    
+    config = ProviderConfig(
+        name="test_disabled",
+        type="openai",
+        api_key_env="TEST_KEY",
+        base_url="https://api.example.com/v1",
+        models=["test-model"],
+        enabled=enabled,
+        priority=1
+    )
+    
+    factories = get_provider_factories([config])
+    # Count how many factories were successfully loaded (not skipped)
+    loaded_count = len(factories)
+    
+    if enabled:
+        assert loaded_count == 1
+    else:
+        assert loaded_count == 0  # Skips disabled

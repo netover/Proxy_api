@@ -17,6 +17,8 @@ class Provider(ABC):
         self.config = config
         self.api_key = os.getenv(config.api_key_env, "")
         self.logger = ContextualLogger(f"provider.{config.name}")
+        if not self.api_key:
+            raise ValueError("API key is required for this provider")
 
         # Connection pooling setup
         self.client = httpx.AsyncClient(
@@ -32,8 +34,6 @@ class Provider(ABC):
             }
         )
 
-        if not self.api_key:
-            self.logger.warning(f"API key for {config.name} not found in environment")
 
 
     async def health_check(self) -> Dict[str, Any]:
@@ -183,27 +183,28 @@ class Provider(ABC):
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         await self.client.aclose()
 
-# Import implementations after base class
-from src.providers.openai import OpenAIProvider
-from src.providers.anthropic import AnthropicProvider
-from src.providers.perplexity import PerplexityProvider
-from src.providers.grok import GrokProvider
-from src.providers.blackbox import BlackboxProvider
-from src.providers.openrouter import OpenRouterProvider
-
-# Provider factory
-PROVIDER_CLASSES = {
-    "openai": OpenAIProvider,
-    "anthropic": AnthropicProvider,
-    "perplexity": PerplexityProvider,
-    "grok": GrokProvider,
-    "blackbox": BlackboxProvider,
-    "openrouter": OpenRouterProvider
-}
-
 def get_provider(config: ProviderConfig) -> Provider:
-    """Factory function to get provider instance"""
-    provider_class = PROVIDER_CLASSES.get(config.type.lower())
-    if not provider_class:
+    """Factory function to get provider instance with lazy imports"""
+    provider_type = config.type.lower()
+    
+    # Mapping of type to module and class name
+    provider_mapping = {
+        "openai": ("src.providers.openai", "OpenAIProvider"),
+        "anthropic": ("src.providers.anthropic", "AnthropicProvider"),
+        "perplexity": ("src.providers.perplexity", "PerplexityProvider"),
+        "grok": ("src.providers.grok", "GrokProvider"),
+        "blackbox": ("src.providers.blackbox", "BlackboxProvider"),
+        "openrouter": ("src.providers.openrouter", "OpenRouterProvider")
+    }
+    
+    if provider_type not in provider_mapping:
         raise ValueError(f"Unsupported provider type: {config.type}")
-    return provider_class(config)
+    
+    module_path, class_name = provider_mapping[provider_type]
+    
+    try:
+        module = importlib.import_module(module_path)
+        provider_class = getattr(module, class_name)
+        return provider_class(config)
+    except (ImportError, AttributeError) as e:
+        raise ValueError(f"Failed to load provider class for {config.type}: {e}")

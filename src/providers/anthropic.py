@@ -128,6 +128,14 @@ class AnthropicProvider(Provider):
                            tokens=tokens)
 
             # Convert back to OpenAI-style response format
+            content = result.get("content", [])
+            if isinstance(content, list) and content:
+                content = content[0]
+            else:
+                content = {}
+            if not isinstance(content, dict):
+                content = {}
+            
             return {
                 "id": result.get("id", ""),
                 "object": "text_completion",
@@ -135,7 +143,7 @@ class AnthropicProvider(Provider):
                 "model": result.get("model", ""),
                 "choices": [
                     {
-                        "text": result.get("content", [{}])[0].get("text", ""),
+                        "text": content.get("text", ""),
                         "index": 0,
                         "logprobs": None,
                         "finish_reason": result.get("stop_reason", "stop")

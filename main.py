@@ -6,18 +6,21 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
-from slowapi.errors import RateLimitExceeded
 from typing import Dict, Any, List
 import time
 from http import HTTPStatus
+import httpx
 
 from src.core.config import settings
 from src.core.logging import setup_logging, ContextualLogger
 from src.core.app_config import init_config
 from src.core.metrics import metrics_collector
-from src.core.auth import verify_api_key, check_rate_limit
-from src.providers.base import get_provider
+from src.core.auth import verify_api_key, check_rate_limit, APIKeyAuth
 from src.providers.base import ProviderConfig
+from src.core.app_config import ChatCompletionRequest, CompletionRequest, EmbeddingRequest
+from src.services.provider_loader import get_provider_factories
+from src.core.circuit_breaker import get_circuit_breaker
+from datetime import datetime
 
 
 # Setup logging
@@ -40,6 +43,9 @@ async def lifespan(app: FastAPI):
         config = init_config()
         app.state.config = config
         app.config = config
+        api_key_auth = APIKeyAuth(settings.proxy_api_keys)
+        app.state.api_key_auth = api_key_auth
+        app.state.provider_factories = get_provider_factories(config.providers)
         logger.info(f"Loaded {len(app.state.config.providers)} providers")
     except Exception as e:
         logger.error(f"Failed to load configuration: {e}")
@@ -78,19 +84,19 @@ app.add_middleware(GZipMiddleware, minimum_size=1000)
 @app.get("/")
 async def root():
     """Root endpoint with API information"""
+    # Dynamically generate endpoints from app routes
+    endpoints = {}
+    for route in app.routes:
+        if hasattr(route, 'path') and route.path.startswith('/v1/'):
+            endpoints[route.path.replace('/v1/', '')] = route.path
+        elif route.path in ['/health', '/metrics', '/providers']:
+            endpoints[route.path.lstrip('/')] = route.path
+    
     return {
         "name": settings.app_name,
         "version": settings.app_version,
         "status": "operational",
-        "endpoints": {
-            "chat_completions": "/v1/chat/completions",
-            "completions": "/v1/completions",
-            "embeddings": "/v1/embeddings",
-            "models": "/v1/models",
-            "health": "/health",
-            "metrics": "/metrics",
-            "providers": "/providers"
-        }
+        "endpoints": endpoints
     }
 
 @app.get("/health")
@@ -121,34 +127,37 @@ async def list_providers():
         for provider in app.config.providers
     ]
 
+def get_providers_for_model(request: Request, model: str) -> List[ProviderConfig]:
+    """Get sorted list of enabled providers that support the given model"""
+    providers = [
+        provider for provider in request.app.config.providers
+        if provider.enabled and model in provider.models
+    ]
+    providers.sort(key=lambda p: p.priority)
+    return providers
+
 @app.post("/v1/chat/completions")
 @limiter.limit(f"{settings.rate_limit_requests}/{settings.rate_limit_window}second")
 async def chat_completions(
     request: Request,
-    completion_request: Dict[str, Any],
+    completion_request: ChatCompletionRequest,
     _: bool = Depends(verify_api_key)
 ):
 
     """OpenAI-compatible chat completions endpoint with intelligent routing"""
 
-    model = completion_request.get("model")
+    model = completion_request.model
     if not model:
         raise HTTPException(status_code=HTTPStatus.BAD_REQUEST, detail="Model is required")
 
     # Find providers that support this model
-    providers = [
-        provider for provider in app.config.providers
-        if provider.enabled and model in provider.models
-    ]
+    providers = get_providers_for_model(request, model)
         
     if not providers:
         raise HTTPException(
             status_code=400,
             detail=f"Model '{model}' is not supported by any provider"
         )
-
-    # Sort providers by priority (lower number = higher priority)
-    providers.sort(key=lambda p: p.priority)
 
     # Try providers in order
     last_exception = None
@@ -159,16 +168,22 @@ async def chat_completions(
 
             # Get provider instance
             provider = get_provider(provider_config)
-
+        
+            # Wrap with circuit breaker
+            circuit_breaker = get_circuit_breaker(f"provider_{provider_config.name}")
+        
+            async def make_completion():
+                return await provider.create_completion(completion_request)
+        
             # Make the request
-            response = await provider.create_completion(completion_request)
+            response = await circuit_breaker.execute(make_completion)
 
             logger.info("Request completed successfully",
                        provider=provider_config.name)
 
             return response
 
-        except Exception as e:
+        except (httpx.RequestError, ValueError, NotImplementedError) as e:
             last_exception = e
             logger.error(f"Provider {provider_config.name} failed: {e}")
             continue
@@ -184,30 +199,24 @@ async def chat_completions(
 @limiter.limit(f"{settings.rate_limit_requests}/{settings.rate_limit_window}second")
 async def completions(
     request: Request,
-    completion_request: Dict[str, Any],
+    completion_request: CompletionRequest,
     _: bool = Depends(verify_api_key)
 ):
 
     """OpenAI-compatible completions endpoint with intelligent routing"""
 
-    model = completion_request.get("model")
+    model = completion_request.model
     if not model:
         raise HTTPException(status_code=HTTPStatus.BAD_REQUEST, detail="Model is required")
 
     # Find providers that support this model
-    providers = [
-        provider for provider in app.config.providers
-        if provider.enabled and model in provider.models
-    ]
+    providers = get_providers_for_model(request, model)
 
     if not providers:
         raise HTTPException(
             status_code=400,
             detail=f"Model '{model}' is not supported by any provider"
         )
-
-    # Sort providers by priority (lower number = higher priority)
-    providers.sort(key=lambda p: p.priority)
 
     # Try providers in order
     last_exception = None
@@ -218,16 +227,22 @@ async def completions(
 
             # Get provider instance
             provider = get_provider(provider_config)
-
+        
+            # Wrap with circuit breaker
+            circuit_breaker = get_circuit_breaker(f"provider_{provider_config.name}")
+        
+            async def make_text_completion():
+                return await provider.create_text_completion(completion_request)
+        
             # Make the request
-            response = await provider.create_text_completion(completion_request)
+            response = await circuit_breaker.execute(make_text_completion)
 
             logger.info("Completions request completed successfully",
                        provider=provider_config.name)
 
             return response
 
-        except Exception as e:
+        except (httpx.RequestError, ValueError, NotImplementedError) as e:
             last_exception = e
             logger.error(f"Provider {provider_config.name} failed: {e}")
             continue
@@ -243,30 +258,24 @@ async def completions(
 @limiter.limit(f"{settings.rate_limit_requests}/{settings.rate_limit_window}second")
 async def embeddings(
     request: Request,
-    embedding_request: Dict[str, Any],
+    embedding_request: EmbeddingRequest,
     _: bool = Depends(verify_api_key)
 ):
 
     """OpenAI-compatible embeddings endpoint with intelligent routing"""
 
-    model = embedding_request.get("model")
+    model = embedding_request.model
     if not model:
         raise HTTPException(status_code=400, detail="Model is required")
 
     # Find providers that support this model
-    providers = [
-        provider for provider in app.config.providers
-        if provider.enabled and model in provider.models
-    ]
+    providers = get_providers_for_model(request, model)
     
     if not providers:
         raise HTTPException(
             status_code=400,
             detail=f"Model '{model}' is not supported by any provider"
         )
-
-    # Sort providers by priority (lower number = higher priority)
-    providers.sort(key=lambda p: p.priority)
 
     # Try providers in order
     last_exception = None
@@ -277,16 +286,22 @@ async def embeddings(
 
             # Get provider instance
             provider = get_provider(provider_config)
-
+        
+            # Wrap with circuit breaker
+            circuit_breaker = get_circuit_breaker(f"provider_{provider_config.name}")
+        
+            async def make_embeddings():
+                return await provider.create_embeddings(embedding_request)
+        
             # Make the request
-            response = await provider.create_embeddings(embedding_request)
+            response = await circuit_breaker.execute(make_embeddings)
 
             logger.info("Embeddings request completed successfully",
                        provider=provider_config.name)
 
             return response
 
-        except Exception as e:
+        except (httpx.RequestError, ValueError, NotImplementedError) as e:
             last_exception = e
             logger.error(f"Provider {provider_config.name} failed: {e}")
             continue
@@ -308,7 +323,7 @@ async def list_models():
                 models.append({
                     "id": model,
                     "object": "model",
-                    "created": 1677610602,  # Default timestamp
+                    "created": int(datetime.utcnow().timestamp()),  # Dynamic timestamp
                     "owned_by": provider.name
                 })
 

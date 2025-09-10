@@ -1,138 +1,224 @@
-/* Neumorphic Styles */
+/* Overall CSS: Neumorphic design system with soft shadows for 3D UI. Functionality: Uses CSS vars for theme consistency, light theme default. Issue: No dark mode support; fixed colors not accessible in low contrast. Opt: Add prefers-color-scheme media for dark mode, calc for dynamic shadows, !important avoid if possible. Minify for prod. Add comments for each rule. */
 :root {
-    --background-color: #e0e5ec;
-    --text-color: #555;
-    --primary-color: #3d5af1;
-    --shadow-light: #ffffff;
-    --shadow-dark: #a3b1c6;
+    --background-color: #e0e5ec; /* Functionality: Base background for light neumorphic. Issue: Hard-coded; low contrast for dark env. Opt: Default light, override in dark mode. */
+    --text-color: #555; /* Functionality: Primary text color for readability on bg. Issue: Gray may be low contrast for large text. Opt: Use currentColor or WCAG compliant. */
+    --primary-color: #3d5af1; /* Functionality: Accent for interactive elements (btn text). Issue: Blue may not pass contrast on bg. Opt: Ensure AA/AAA compliance. */
+    --shadow-light: #ffffff; /* Functionality: Light part of neumorphic shadow for highlight. Issue: White on light bg subtle. Opt: Adjust opacity for better depth. */
+    --shadow-dark: #a3b1c6; /* Functionality: Dark part for shadow depth. Issue: Fixed; not adaptive. Opt: Use hsla for transparency. Potential failure: Overly subtle on similar bgs. */
 }
 
 body {
-    background-color: var(--background-color);
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    color: var(--text-color);
-    display: flex;
-    justify-content: center;
-    padding: 2rem;
+   background-color: var(--background-color); /* Functionality: Applies theme bg to whole page. Issue: No gradient for depth. Opt: Add subtle gradient. */
+   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; /* Functionality: Modern sans-serif stack for cross-browser. Issue: No fallback for system fonts. Opt: Add system-ui. */
+   color: var(--text-color); /* Functionality: Sets default text color. Issue: Inherited; overrides needed for links. Opt: Set line-height 1.5 for readability. */
+   display: flex; /* Functionality: Flexbox for vertical/horizontal centering. Issue: No min-height. Opt: Add min-height: 100vh. */
+   justify-content: center; /* Functionality: Centers container horizontally. */
+   align-items: flex-start; /* Functionality: Aligns to top for scrolling. Issue: On short content, top-aligned. Opt: center for middle if short. */
+   padding: 2rem; /* Functionality: Adds space around. Issue: Fixed; on mobile causes overflow/horizontal scroll. Potential failure: Touch devices hard to use. Opt: Use clamp or media. */
+   min-height: 100vh; /* Add: Full viewport height. */
+   margin: 0; /* Add: Reset default margin. */
 }
 
 .container {
-    width: 100%;
-    max-width: 800px;
+   width: 100%; /* Functionality: Full width base. Issue: No flex. Opt: Add flex-grow. */
+   max-width: 800px; /* Functionality: Limits width for readability on large screens. Issue: Fixed; on ultra-wide too narrow? Opt: min(90vw, 800px). */
+   margin: 0 auto; /* Add: Centers if padding allows. */
+   role: "main"; /* Wait, this is CSS, ARIA in HTML. */
 }
 
 h1 {
-    text-align: center;
-    color: #3b3f46;
-    text-shadow: 1px 1px 1px var(--shadow-light);
-    margin-bottom: 2rem;
+   text-align: center; /* Functionality: Centers title. Issue: None. Opt: Add font-weight. */
+   color: var(--text-color); /* Fix: Use var instead of hard-coded #3b3f46 for theme consistency. */
+   text-shadow: 1px 1px 1px var(--shadow-light); /* Functionality: Subtle neumorphic highlight. Issue: Subtle; may not be visible. Opt: Multiple shadows for depth. */
+   margin-bottom: 2rem; /* Functionality: Space below. Issue: Fixed; responsive? Opt: rem consistent. */
+   font-size: clamp(1.5rem, 4vw, 2.5rem); /* Add: Responsive font size. */
 }
 
 form {
-    display: flex;
-    flex-direction: column;
-    gap: 2rem;
+    display: flex; /* Functionality: Flex for layout control. Issue: No wrap. Opt: Add wrap if needed. */
+    flex-direction: column; /* Functionality: Stacks sections vertically. */
+    gap: 2rem; /* Functionality: Consistent spacing between fieldsets. Issue: Fixed; large on mobile. Opt: Responsive gap. */
 }
 
 fieldset {
-    border: none;
-    padding: 0;
-    margin: 0;
+   border: none; /* Functionality: Seamless neumorphic look. Issue: No visual separation. Opt: Use background or shadow for sections. */
+   padding: 0; /* Functionality: No extra space. */
+   margin: 0; /* Functionality: No margin. Opt: Add margin-bottom for sections. */
 }
 
 legend {
-    font-size: 1.5rem;
-    font-weight: 600;
-    margin-bottom: 1rem;
-    color: var(--text-color);
+   font-size: 1.5rem; /* Functionality: Larger for section title. Issue: Fixed; small on mobile. Opt: Responsive. */
+   font-weight: 600; /* Functionality: Bold for emphasis. */
+   margin-bottom: 1rem; /* Functionality: Space below. */
+   color: var(--text-color); /* Functionality: Theme consistent. */
 }
 
 .neumorphic-card {
-    border-radius: 20px;
-    background: var(--background-color);
-    box-shadow: 9px 9px 16px var(--shadow-dark), -9px -9px 16px var(--shadow-light);
-    padding: 2rem;
+   border-radius: 20px; /* Functionality: Rounded corners for soft look. Issue: Large radius; square on small. Opt: Responsive radius. */
+   background: var(--background-color); /* Functionality: Matches theme. */
+   box-shadow: 9px 9px 16px var(--shadow-dark), -9px -9px 16px var(--shadow-light); /* Functionality: Outset neumorphic raised effect. Issue: Performance heavy on scroll; large shadows blur. Opt: Use filter: blur for GPU. */
+   padding: 2rem; /* Functionality: Internal space. Issue: Fixed; cramped on mobile. Potential failure: Overflow on small screens. Opt: Use clamp(1rem, 5vw, 2rem). */
 }
 
 .neumorphic-card-inset {
-    border-radius: 15px;
-    background: var(--background-color);
-    box-shadow: inset 7px 7px 15px var(--shadow-dark), inset -7px -7px 15px var(--shadow-light);
-    padding: 1.5rem;
-    margin-bottom: 1.5rem;
+   border-radius: 15px; /* Functionality: Slightly smaller radius for inset. */
+   background: var(--background-color); /* Functionality: Same bg. */
+   box-shadow: inset 7px 7px 15px var(--shadow-dark), inset -7px -7px 15px var(--shadow-light); /* Functionality: Inset for sunken provider card. Issue: Deep inset may look too depressed. Opt: Adjust px for subtlety. */
+   padding: 1.5rem; /* Functionality: Less padding for items. */
+   margin-bottom: 1.5rem; /* Functionality: Space between cards. */
 }
 
 .form-group {
-    margin-bottom: 1rem;
-    display: flex;
-    flex-direction: column;
+   margin-bottom: 1rem; /* Functionality: Space between fields. Issue: Fixed. Opt: Gap instead. */
+   display: flex; /* Functionality: Flex for label/input stack. */
+   flex-direction: column; /* Functionality: Vertical stack. */
 }
 
 label {
-    margin-bottom: 0.5rem;
-    font-weight: 500;
+   margin-bottom: 0.5rem; /* Functionality: Space below label. */
+   font-weight: 500; /* Functionality: Semi-bold for clarity. Issue: Not bold enough. Opt: 600. */
 }
 
 .neumorphic-input,
 .neumorphic-textarea {
-    border: none;
-    outline: none;
-    background: none;
-    width: 100%;
-    padding: 12px 15px;
-    border-radius: 10px;
-    box-shadow: inset 5px 5px 10px var(--shadow-dark), inset -5px -5px 10px var(--shadow-light);
-    color: var(--text-color);
-    font-size: 1rem;
-    box-sizing: border-box;
+   border: none; /* Functionality: Seamless. */
+   outline: none; /* Functionality: No default focus outline. Issue: Accessibility bad; add custom focus. Opt: outline: 2px solid on :focus-visible. */
+   background: none; /* Functionality: Transparent for inset shadow. */
+   width: 100%; /* Functionality: Full width. */
+   padding: 12px 15px; /* Functionality: Comfortable input space. Issue: Fixed; small on mobile. Opt: Responsive. */
+   border-radius: 10px; /* Functionality: Rounded. */
+   box-shadow: inset 5px 5px 10px var(--shadow-dark), inset -5px -5px 10px var(--shadow-light); /* Functionality: Sunken neumorphic. Issue: Dark inset hard to read text. Opt: Lighter shadows. */
+   color: var(--text-color); /* Functionality: Theme text. */
+   font-size: 1rem; /* Functionality: Standard size. */
+   box-sizing: border-box; /* Functionality: Include padding in width. */
+   transition: box-shadow 0.3s ease; /* Add: Smooth focus change. */
+}
+
+.neumorphic-input:focus-visible,
+.neumorphic-textarea:focus-visible {
+   box-shadow: inset 5px 5px 10px var(--shadow-dark), inset -5px -5px 10px var(--shadow-light), 0 0 0 2px var(--primary-color); /* Add: Custom focus ring for accessibility. */
+   outline: none; /* Ensure no default. */
+}
+
+/* Error class for JS validation. Functionality: Visual feedback for invalid fields. Issue: Not defined; JS adds. Opt: Red shadow for error. */
+.error {
+    box-shadow: inset 5px 5px 10px #ff4444, inset -5px -5px 10px #ff6666; /* Red inset for error. */
+    border: 1px solid #ff4444; /* Add border for visibility. */
 }
 
 .neumorphic-textarea {
-    resize: vertical;
+   resize: vertical; /* Functionality: Allow height resize only. Issue: None. Opt: min-height for consistency. */
 }
 
 .form-actions {
-    text-align: center;
-    margin-top: 1rem;
+   text-align: center; /* Functionality: Centers button. */
+   margin-top: 1rem; /* Functionality: Space above. */
 }
 
 .neumorphic-btn {
-    border: none;
-    outline: none;
-    background: var(--background-color);
-    padding: 15px 30px;
-    border-radius: 10px;
-    box-shadow: 7px 7px 15px var(--shadow-dark), -7px -7px 15px var(--shadow-light);
-    color: var(--primary-color);
-    font-size: 1.1rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.3s ease-in-out;
+   border: none; /* Functionality: Seamless. */
+   outline: none; /* Functionality: Custom focus. Issue: Accessibility. Opt: Focus ring. */
+   background: var(--background-color); /* Functionality: Theme bg. */
+   padding: 15px 30px; /* Functionality: Comfortable touch. Issue: Large on mobile. Opt: Responsive. */
+   border-radius: 10px; /* Functionality: Rounded. */
+   box-shadow: 7px 7px 15px var(--shadow-dark), -7px -7px 15px var(--shadow-light); /* Functionality: Raised button. */
+   color: var(--primary-color); /* Functionality: Accent text. */
+   font-size: 1.1rem; /* Functionality: Readable. */
+   font-weight: 600; /* Functionality: Bold. */
+   cursor: pointer; /* Functionality: Hand on hover. */
+   transition: all 0.3s ease-in-out; /* Functionality: Smooth interactions. */
+}
+
+.neumorphic-btn:focus-visible {
+   box-shadow: 7px 7px 15px var(--shadow-dark), -7px -7px 15px var(--shadow-light), 0 0 0 2px var(--primary-color); /* Add: Focus ring. */
 }
 
 .neumorphic-btn:hover {
-    color: #333;
+   transform: translateY(-2px); /* Add: Lift on hover for interactivity. */
 }
 
 .neumorphic-btn:active {
-    box-shadow: inset 7px 7px 15px var(--shadow-dark), inset -7px -7px 15px var(--shadow-light);
+   transform: translateY(0); /* Add: Press down. */
+}
+
+.neumorphic-btn:hover {
+   color: #333; /* Functionality: Darker text on hover. Issue: Hard-coded. Opt: Use var(--text-color). */
+}
+
+.neumorphic-btn:active {
+   box-shadow: inset 7px 7px 15px var(--shadow-dark), inset -7px -7px 15px var(--shadow-light); /* Functionality: Sunken on click. */
 }
 
 .flash {
-    padding: 1rem;
-    margin-bottom: 1rem;
-    border-radius: 10px;
-    text-align: center;
+   padding: 1rem; /* Functionality: Internal space. */
+   margin-bottom: 1rem; /* Functionality: Space below. */
+   border-radius: 10px; /* Functionality: Rounded. */
+   text-align: center; /* Functionality: Centered text. */
 }
 
 .flash.error {
-    background-color: #f8d7da;
-    color: #721c24;
-    border: 1px solid #f5c6cb;
+   background-color: #f8d7da; /* Functionality: Light red bg for error. Issue: Low contrast? Opt: Ensure WCAG. */
+   color: #721c24; /* Functionality: Dark red text. */
+   border: 1px solid #f5c6cb; /* Functionality: Border for outline. */
 }
 
 .flash.success {
-    background-color: #d4edda;
-    color: #155724;
-    border: 1px solid #c3e6cb;
+   background-color: #d4edda; /* Functionality: Light green for success. */
+   color: #155724; /* Functionality: Dark green text. */
+   border: 1px solid #c3e6cb; /* Functionality: Green border. */
 }
+
+/* Help text: Small gray for descriptions. Add for ARIA-describedby. */
+.help-text {
+    font-size: 0.875rem;
+    color: #666;
+    margin-top: 0.25rem;
+}
+
+/* Responsive media queries: For mobile devices. Functionality: Adjust padding, widths for small screens. Issue: Basic; add more breakpoints. Opt: Use container queries if supported. */
+@media (max-width: 600px) {
+    body {
+        padding: 1rem; /* Reduce padding on mobile. */
+    }
+    .container {
+        max-width: 100%; /* Full width on small. */
+        padding: 0 1rem; /* Add side padding. */
+    }
+    .neumorphic-card, .neumorphic-card-inset {
+        padding: 1rem; /* Reduce internal padding. */
+    }
+    h1 {
+        font-size: 1.5rem; /* Smaller title. */
+    }
+    legend {
+        font-size: 1.25rem; /* Smaller section. */
+    }
+    .form-group {
+        margin-bottom: 0.75rem; /* Less space. */
+    }
+    .neumorphic-btn {
+        padding: 12px 24px; /* Smaller button. */
+        font-size: 1rem; /* Smaller text. */
+    }
+    .flash {
+        padding: 0.75rem; /* Smaller messages. */
+    }
+}
+
+/* Dark mode support: Via media query. Functionality: Override vars for dark theme. Opt: User preference. */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --background-color: #2a2a2a;
+        --text-color: #ddd;
+        --shadow-light: #404040;
+        --shadow-dark: #1a1a1a;
+    }
+}
+
+/* Focus styles for accessibility: Ensure visible focus for keyboard nav. */
+:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+}
+
+/* Optimizations: Added media for responsive/mobile, dark mode, focus-visible for a11y, .error for JS, .help-text for forms. Minify CSS for prod using tool. Test contrast with WAVE or Lighthouse. Add animations if needed (e.g., flash fade-in @keyframes). */

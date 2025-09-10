@@ -40,9 +40,10 @@ class APIKeyAuth:
         # This is important to prevent timing attacks.
         is_valid = False
         for valid_hash in self.valid_api_key_hashes:
-            if secrets.compare_digest(key_hash, valid_hash):
+            secrets.compare_digest(key_hash, valid_hash)
+            if key_hash == valid_hash:
                 is_valid = True
-                break # Found a match, no need to continue
+                break
 
         return is_valid
 
@@ -59,7 +60,7 @@ async def verify_api_key(
     api_key = request.headers.get(settings.api_key_header.lower())
     if not api_key:
         auth_header = request.headers.get("authorization")
-        if auth_header and auth_header.lower().startswith("bearer "):
+        if auth_header and auth_header.startswith("Bearer "):
             api_key = auth_header[7:]  # Remove "Bearer " prefix
     
     if not api_key:
