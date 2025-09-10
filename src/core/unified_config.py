@@ -106,11 +106,11 @@ class ProxyConfig(BaseModel):
         if len(enabled_priorities) != len(set(enabled_priorities)):
             raise ValueError("Enabled provider priorities must be unique")
         
-        # Validate API keys exist
+        # Validate API keys exist with prefix
         missing_keys = []
         for provider in v:
-            if provider.enabled and not os.getenv(provider.api_key_env):
-                missing_keys.append(provider.api_key_env)
+            if provider.enabled and not os.getenv(f"PROXY_API_{provider.api_key_env}"):
+                missing_keys.append(f"PROXY_API_{provider.api_key_env}")
         
         if missing_keys:
             raise ValueError(f"Missing required environment variables: {missing_keys}")

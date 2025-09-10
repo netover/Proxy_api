@@ -6,8 +6,7 @@ import json
 import time
 from contextlib import asynccontextmanager
 
-from src.core.unified_config import config_manager
-from src.core.provider_factory import provider_factory, ProviderStatus
+from src.core.provider_factory import ProviderStatus
 from src.core.auth import verify_api_key
 from src.core.metrics import metrics_collector
 from src.core.logging import ContextualLogger
@@ -28,17 +27,19 @@ class RequestRouter:
         self.circuit_breakers = {}
     
     async def route_request(self,
+                          request: Request,
                           request_data: Union[ChatCompletionRequest, TextCompletionRequest, EmbeddingRequest],
                           operation: str,
                           background_tasks: BackgroundTasks) -> Dict[str, Any]:
         """
         Generic request router with comprehensive error handling and fallback
         """
+        app_state = request.app.state.app_state
         request_id = f"{operation}_{int(time.time() * 1000)}"
         logger.set_context(request_id=request_id, operation=operation, model=request_data.model)
         
         # Get providers for the model
-        providers = await provider_factory.get_providers_for_model(request_data.model)
+        providers = await app_state.provider_factory.get_providers_for_model(request_data.model)
         
         if not providers:
             logger.error("No providers available for model", model=request_data.model)
@@ -229,7 +230,8 @@ async def chat_completions(
 ):
     """OpenAI-compatible chat completions endpoint"""
     return await request_router.route_request(
-        completion_request, 
+        request,
+        completion_request,
         "chat_completion",
         background_tasks
     )
@@ -244,8 +246,9 @@ async def text_completions(
 ):
     """OpenAI-compatible text completions endpoint"""
     return await request_router.route_request(
+        request,
         completion_request,
-        "text_completion", 
+        "text_completion",
         background_tasks
     )
 
@@ -259,6 +262,7 @@ async def embeddings(
 ):
     """OpenAI-compatible embeddings endpoint"""
     return await request_router.route_request(
+        request,
         embedding_request,
         "embeddings",
         background_tasks
@@ -266,10 +270,11 @@ async def embeddings(
 
 # Enhanced utility endpoints
 @router.get("/v1/models")
-async def list_models():
+async def list_models(request: Request):
     """List all available models across providers"""
-    config = config_manager.load_config()
-    provider_info = await provider_factory.get_all_provider_info()
+    app_state = request.app.state.app_state
+    config = app_state.config_manager.load_config()
+    provider_info = await app_state.provider_factory.get_all_provider_info()
     
     models = []
     for provider in provider_info:
@@ -290,11 +295,12 @@ async def list_models():
     }
 
 @router.get("/health")
-async def health_check():
+async def health_check(request: Request):
     """Comprehensive health check"""
-    provider_info = await provider_factory.get_all_provider_info()
+    app_state = request.app.state.app_state
+    provider_info = await app_state.provider_factory.get_all_provider_info()
     
-    healthy_count = sum(1 for p in provider_info 
+    healthy_count = sum(1 for p in provider_info
                        if p.status == ProviderStatus.HEALTHY)
     total_count = len(provider_info)
     
@@ -324,10 +330,11 @@ async def health_check():
     }
 
 @router.get("/metrics")
-async def get_metrics():
+async def get_metrics(request: Request):
     """Comprehensive metrics endpoint"""
+    app_state = request.app.state.app_state
     metrics = metrics_collector.get_all_stats()
-    provider_info = await provider_factory.get_all_provider_info()
+    provider_info = await app_state.provider_factory.get_all_provider_info()
     
     # Add provider status to metrics
     for provider_name, provider_metrics in metrics.items():
@@ -352,9 +359,10 @@ async def get_metrics():
     }
 
 @router.get("/providers")
-async def list_providers():
+async def list_providers(request: Request):
     """List all configured providers with detailed information"""
-    provider_info = await provider_factory.get_all_provider_info()
+    app_state = request.app.state.app_state
+    provider_info = await app_state.provider_factory.get_all_provider_info()
     
     return {
         "providers": [
