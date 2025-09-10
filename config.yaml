@@ -1,11 +1,36 @@
+# Global application settings
+app_name: "LLM Proxy API"
+app_version: "2.0.0"
+debug: false
+host: "127.0.0.1"
+port: 8000
+api_keys:
+  - "your-api-key-here"
+api_key_header: "X-API-Key"
+cors_origins:
+  - "*"
+rate_limit_rpm: 1000
+rate_limit_window: 60
+request_timeout: 300
+circuit_breaker_threshold: 5
+circuit_breaker_timeout: 60
+log_level: "INFO"
+log_file: null
+config_file: "config.yaml"
+
 providers:
-- name: testprovider
-  type: openai
-  module: src.providers.openai
-  class: OpenAIProvider
-  api_key_env: OPENAI_API_KEY
-  base_url: https://api.openai.com/v1
-  models:
-  - gpt-4
-  priority: 10
-  enabled: true
+  - name: "openai_default"
+    type: "openai"
+    base_url: "https://api.openai.com/v1"
+    api_key_env: "OPENAI_API_KEY"
+    models:
+      - "gpt-4"
+    enabled: true
+    priority: 10
+    timeout: 30
+    max_retries: 3
+    retry_delay: 1.0
+    rate_limit: null
+    max_connections: 10
+    keepalive_timeout: 30
+    custom_headers: {}

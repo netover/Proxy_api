@@ -1,25 +1,19 @@
-import os
-import importlib
-from typing import List, Dict, Callable
-from src.core.app_config import ProviderConfig
-from src.core.logging import ContextualLogger
+from typing import Dict, List
+from src.core.provider_factory import provider_factory
+from src.core.unified_config import config_manager
+import asyncio
 
-logger = ContextualLogger(__name__)
+async def get_provider_factories(cfgs: List) -> Dict[str, any]:
+    """
+    Deprecated: Use provider_factory.initialize_providers instead.
+    This function is maintained for backward compatibility but delegates to the centralized factory.
+    """
+    config = config_manager.load_config()
+    providers = await provider_factory.initialize_providers(config.providers)
+    return {name: provider for name, provider in providers.items()}
 
-def get_provider_factories(cfgs: List[ProviderConfig]) -> Dict[str, Callable]:
-    factories = {}
-    # Filter enabled providers
-    enabled_cfgs = [cfg for cfg in cfgs if cfg.enabled]
-    for cfg in enabled_cfgs:
-        try:
-            api_key = os.getenv(cfg.api_key_env)
-            if not api_key:
-                logger.error(f"API key missing for provider {cfg.name}, skipping")
-                continue
-            module = importlib.import_module(cfg.module)
-            cls = getattr(module, cfg.class_)
-            factories[cfg.name] = lambda c=cfg: cls(c)
-        except Exception as e:
-            logger.error(f"Failed to load factory for provider {cfg.name}: {e}")
-            continue
-    return factories
+def instantiate_providers(provider_cfgs: List) -> Dict[str, any]:
+    """
+    Synchronous wrapper for initialize_providers for backward compatibility.
+    """
+    return asyncio.run(get_provider_factories(provider_cfgs))

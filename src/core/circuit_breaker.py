@@ -117,20 +117,27 @@ class CircuitBreakerOpenException(Exception):
 # Global circuit breaker registry
 _circuit_breakers: Dict[str, CircuitBreaker] = {}
 
+from src.core.unified_config import config_manager
+
 def get_circuit_breaker(
     name: str,
-    failure_threshold: int = 5,
-    recovery_timeout: int = 60,
+    failure_threshold: int = None,
+    recovery_timeout: int = None,
     expected_exception: tuple = (Exception,)
 ) -> CircuitBreaker:
-    """Get or create circuit breaker"""
+    """Get or create circuit breaker using unified config defaults"""
+    config = config_manager.load_config()
+    threshold = failure_threshold or config.settings.circuit_breaker_threshold
+    timeout = recovery_timeout or config.settings.circuit_breaker_timeout
+    
     if name not in _circuit_breakers:
         _circuit_breakers[name] = CircuitBreaker(
             name=name,
-            failure_threshold=failure_threshold,
-            recovery_timeout=recovery_timeout,
+            failure_threshold=threshold,
+            recovery_timeout=timeout,
             expected_exception=expected_exception
         )
+        logger.info(f"Created circuit breaker for {name} with threshold={threshold}, timeout={timeout}")
     return _circuit_breakers[name]
 
 def get_all_circuit_breakers() -> Dict[str, CircuitBreaker]:

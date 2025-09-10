@@ -3,34 +3,36 @@ Grok (xAI) provider implementation
 Uses xAI SDK with OpenAI-compatible interface
 """
 
-import json
-import time
-from typing import Dict, Any, Optional
-from src.core.app_config import ProviderConfig
+from typing import Dict, Any
+from src.core.provider_factory import BaseProvider
+from src.core.unified_config import ProviderConfig
 from src.core.metrics import metrics_collector
 from src.core.logging import ContextualLogger
-from .base import Provider
+import time
 
-
-class GrokProvider(Provider):
+class GrokProvider(BaseProvider):
     """Grok (xAI) provider with OpenAI-compatible interface"""
 
     def __init__(self, config: ProviderConfig):
         super().__init__(config)
-        self.base_url = config.base_url or "https://api.x.ai/v1"
-        self.logger = ContextualLogger(f"provider.{config.name}")
-        # Add Authorization header for Grok API
-        self.client.headers.update({"Authorization": f"Bearer {self.api_key}"})
 
-    async def _health_check(self) -> Dict[str, Any]:
+    async def _perform_health_check(self) -> Dict[str, Any]:
         """Check Grok API health"""
         try:
-            response = await self.client.get(f"{self.base_url}/models")
+            response = await self.make_request(
+                "GET", f"{self.config.base_url}/models"
+            )
             response.raise_for_status()
-            return {"status": "healthy"}
+            return {
+                "healthy": True,
+                "details": {"status_code": response.status_code}
+            }
         except Exception as e:
             self.logger.error(f"Health check failed: {e}")
-            return {"error": str(e)}
+            return {
+                "healthy": False,
+                "error": str(e)
+            }
 
     async def create_completion(self, request: Dict[str, Any]) -> Dict[str, Any]:
         """Create chat completion with Grok API"""
@@ -55,12 +57,12 @@ class GrokProvider(Provider):
                 "stream": stream
             }
 
-            # Make request using httpx
-            response = await self.client.post(
-                f"{self.base_url}/chat/completions",
+            # Make request using self.make_request
+            response = await self.make_request(
+                "POST",
+                f"{self.config.base_url}/chat/completions",
                 json=body
             )
-            response.raise_for_status()
             result = response.json()
             response_time = time.time() - start_time
 
@@ -68,26 +70,27 @@ class GrokProvider(Provider):
             usage = result.get("usage", {})
             total_tokens = usage.get("total_tokens", 0)
             metrics_collector.record_request(
-                self.config.name,
+                self.name,
                 success=True,
                 response_time=response_time,
                 tokens=total_tokens
             )
+
+            self.logger.info("Chat completion successful",
+                             response_time=response_time,
+                             tokens=total_tokens)
 
             return result
 
         except Exception as e:
             response_time = time.time() - start_time
             metrics_collector.record_request(
-                self.config.name,
+                self.name,
                 success=False,
                 response_time=response_time,
                 error_type=type(e).__name__
             )
             raise
-
-
-
 
     async def create_text_completion(self, request: Dict[str, Any]) -> Dict[str, Any]:
         """Create text completion (mapped to chat completion)"""

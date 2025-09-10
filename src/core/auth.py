@@ -7,7 +7,7 @@ from fastapi import Request, HTTPException, Depends
 from typing import Any
 import hashlib
 import secrets
-from src.core.config import settings
+from src.core.unified_config import config_manager
 from src.core.logging import ContextualLogger
 
 logger = ContextualLogger(__name__)
@@ -57,7 +57,7 @@ async def verify_api_key(
 ) -> bool:
     """Verify API key from request headers using the application's auth instance"""
     # Check for API key in custom header or Authorization header
-    api_key = request.headers.get(settings.api_key_header.lower())
+    api_key = request.headers.get(config_manager.load_config().settings.api_key_header.lower())
     if not api_key:
         auth_header = request.headers.get("authorization")
         if auth_header and auth_header.startswith("Bearer "):
