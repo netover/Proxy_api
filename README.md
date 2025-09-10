@@ -374,6 +374,32 @@ condensation:
   cache_ttl: 300
 ```
 
+- **Test Coverage**: 5 dedicated integration tests in `tests/test_endpoints.py` verify functionality using pytest mocks (AsyncMock for providers, patch for app.state.cache/config/condense_context) and FastAPI's AsyncClient: cache hits (no redundant calls), adaptive max_tokens assertion via side_effect, fallback truncation (shorter input length on retry), configurable keywords (override error_keywords and trigger custom ValueError), timeout handling (mock sleep >10s, assert truncated retry).
+
+### Adaptive Calculation Formula
+The adaptive max_tokens is computed as:
+`original_size = sum(len(c) for c in chunks)` (character count approximation for tokens)
+`adaptive_max_tokens = min(original_size * adaptive_factor, max_tokens_default)`
+Example: For input chunks totaling 1000 characters, adaptive_factor=0.5, max_tokens_default=512 → adaptive_max_tokens = min(500, 512) = 500. This scales summary length proportionally while capping to prevent excessive computation.
+
+### Condensation Process Flowchart
+```mermaid
+flowchart TD
+    A[Receive non-streaming request] --> B{Context length error? <br> (any keyword in str(e).lower())}
+    B -->|No| C[Return original error]
+    B -->|Yes| D[Extract chunks from messages/prompt]
+    D --> E{Cache hit? <br> (md5(join(chunks)) in app.state.cache <br> and time.time() - ts < cache_ttl)}
+    E -->|Yes| F[Use cached summary]
+    E -->|No| G[Compute adaptive_max_tokens = <br> min(sum(len(c) for c in chunks) * factor, default)]
+    G --> H[summary = await asyncio.wait_for( <br> condense_context(..., max_tokens=adaptive), <br> timeout=10)]
+    H -->|Success| I[Update input: "Resumo: {summary}" + last]
+    H -->|TimeoutError/Exception| J[Fallback: Truncate chunks to half length]
+    J --> I
+    F --> I
+    I --> K[Retry request with updated input, stream=False]
+    K --> L[Return successful response]
+```
+
 ### Example for Chat Completions
 
 Send a request with an excessively long message to trigger the error:
