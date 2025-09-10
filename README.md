@@ -175,6 +175,96 @@ Responses include `_proxy_info` with routing details:
 }
 ```
 
+### Streaming with SSE
+
+When `stream=True` in the request, the endpoint returns a `StreamingResponse` with `media_type="text/event-stream"`. The response uses Server-Sent Events (SSE) format for real-time delivery of completion chunks.
+
+Each event is a line starting with `data: ` followed by a JSON object containing the partial completion data (similar to non-streaming but with `delta` instead of full `choices`). The stream ends with `data: [DONE]`.
+
+#### Client-Side Handling
+
+To consume the stream:
+
+1. Set `Accept: text/event-stream` header if needed.
+2. Read the response as a stream and parse line by line.
+3. For lines starting with `data: `, extract the JSON after the prefix and parse it.
+4. Accumulate `delta.content` from chunks to build the full response.
+5. Handle errors and the `[DONE]` marker to end processing.
+
+#### Example with curl
+
+```bash
+curl -X POST http://localhost:8000/v1/chat/completions \
+  -H "Authorization: Bearer your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-3.5-turbo",
+    "messages": [{"role": "user", "content": "Explain quantum computing"}],
+    "stream": true
+  }' \
+  --no-buffer
+```
+
+This will output lines like:
+```
+data: {"id": "chatcmpl-abc", "object": "chat.completion.chunk", "choices": [{"delta": {"content": "Quantum computing "}}]}
+
+data: {"id": "chatcmpl-abc", "object": "chat.completion.chunk", "choices": [{"delta": {"content": "is a revolutionary..."}}]}
+
+data: [DONE]
+```
+
+#### JavaScript Example
+
+```javascript
+const response = await fetch('/v1/chat/completions', {
+  method: 'POST',
+  headers: {
+    'Authorization': 'Bearer your-api-key',
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    model: 'gpt-3.5-turbo',
+    messages: [{role: 'user', content: 'Hello'}],
+    stream: true
+  })
+});
+
+const reader = response.body.getReader();
+const decoder = new TextDecoder();
+
+let fullContent = '';
+while (true) {
+  const {done, value} = await reader.read();
+  if (done) break;
+  
+  const chunk = decoder.decode(value);
+  const lines = chunk.split('\n');
+  
+  for (const line of lines) {
+    if (line.startsWith('data: ')) {
+      const data = line.slice(6);
+      if (data === '[DONE]') {
+        console.log('Stream complete');
+        break;
+      }
+      try {
+        const json = JSON.parse(data);
+        if (json.choices && json.choices[0].delta && json.choices[0].delta.content) {
+          fullContent += json.choices[0].delta.content;
+          console.log('Received:', json.choices[0].delta.content);
+        }
+      } catch (e) {
+        console.error('Parse error:', e);
+      }
+    }
+  }
+}
+console.log('Full response:', fullContent);
+```
+
+This setup ensures efficient streaming with proper error handling and client compatibility.
+
 ## Monitoring & Metrics
 
 - **Health Monitoring**: Background health checks every 60 seconds

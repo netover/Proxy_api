@@ -169,6 +169,14 @@ class RequestRouter:
                 }
             )
         else:
+            errors = [
+                {
+                    "provider": attempt["provider"],
+                    "error_type": attempt["error"],
+                    "error_message": attempt.get("error_message", "Unknown error")
+                }
+                for attempt in attempt_info if not attempt["success"]
+            ]
             raise HTTPException(
                 status_code=503,
                 detail={
@@ -179,6 +187,7 @@ class RequestRouter:
                         "details": {
                             "attempts": len(attempt_info),
                             "providers_tried": [a["provider"] for a in attempt_info],
+                            "errors": errors,
                             "last_error": str(last_exception) if last_exception else None
                         }
                     }
@@ -229,12 +238,15 @@ async def chat_completions(
     _: bool = Depends(verify_api_key)
 ):
     """OpenAI-compatible chat completions endpoint"""
-    return await request_router.route_request(
+    result = await request_router.route_request(
         request,
         completion_request,
         "chat_completion",
         background_tasks
     )
+    if completion_request.stream:
+        return StreamingResponse(result, media_type="text/event-stream")
+    return result
 
 @router.post("/v1/completions")
 @rate_limiter.limit("100/minute")
@@ -245,12 +257,15 @@ async def text_completions(
     _: bool = Depends(verify_api_key)
 ):
     """OpenAI-compatible text completions endpoint"""
-    return await request_router.route_request(
+    result = await request_router.route_request(
         request,
         completion_request,
         "text_completion",
         background_tasks
     )
+    if completion_request.stream:
+        return StreamingResponse(result, media_type="text/event-stream")
+    return result
 
 @router.post("/v1/embeddings")
 @rate_limiter.limit("200/minute")
