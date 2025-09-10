@@ -14,7 +14,7 @@ import httpx
 
 from src.core.config import settings
 from src.core.logging import setup_logging, ContextualLogger
-from src.core.app_config import init_config
+from src.core.unified_config import config_manager
 from src.core.metrics import metrics_collector
 from src.core.auth import verify_api_key, check_rate_limit, APIKeyAuth
 from src.providers.base import ProviderConfig, ProviderError, InvalidRequestError, AuthenticationError, RateLimitError, APIConnectionError, ServiceUnavailableError
@@ -42,15 +42,16 @@ async def lifespan(app: FastAPI):
     
     # Initialize configuration
     try:
-        config = init_config()
+        config = config_manager.load_config()
         app.state.config = config
         app.config = config
-        app.state.condensation_config = config.condensation
+        app.state.condensation_config = config.settings.condensation
         app.state.cache = {}
         api_key_auth = APIKeyAuth(settings.proxy_api_keys)
         app.state.api_key_auth = api_key_auth
         app.state.provider_factories = get_provider_factories(config.providers)
         logger.info(f"Loaded {len(app.state.config.providers)} providers")
+        app.state.config_mtime = config_manager._last_modified
     except Exception as e:
         logger.error(f"Failed to load configuration: {e}")
         raise

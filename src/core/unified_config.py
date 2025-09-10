@@ -53,6 +53,27 @@ class ProviderConfig(BaseModel):
                 raise ValueError(f"Invalid header name: {key}")
         return v
 
+class CondensationSettings(BaseModel):
+    """Condensation-specific settings for context summarization"""
+    cache_ttl: int = Field(default=3600, ge=60, le=86400, description="Cache TTL in seconds")
+    cache_size: int = Field(default=1000, ge=100, le=10000, description="Max cache size for LRU")
+    cache_persist: bool = Field(default=False, description="Enable persistent cache (e.g., file/Redis)")
+    adaptive_enabled: bool = Field(default=True, description="Enable adaptive token limit calculation")
+    adaptive_factor: float = Field(default=0.5, ge=0.1, le=1.0, description="Factor for adaptive max_tokens")
+    max_tokens_default: int = Field(default=512, ge=100, le=4096, description="Default max tokens for summaries")
+    error_keywords: List[str] = Field(default_factory=lambda: ["context_length_exceeded", "token_limit"], description="Keywords to detect long context errors")
+    fallback_strategies: List[str] = Field(default_factory=lambda: ["truncate", "secondary_provider"], description="Fallback strategies on failure")
+    parallel_providers: int = Field(default=3, ge=1, le=5, description="Max concurrent providers for parallelism")
+    dynamic_reload: bool = Field(default=True, description="Enable dynamic config reloading")
+    
+    @field_validator('fallback_strategies')
+    @classmethod
+    def validate_fallbacks(cls, v):
+        valid_strategies = {"truncate", "secondary_provider", "default_summary"}
+        invalid = [s for s in v if s not in valid_strategies]
+        if invalid:
+            raise ValueError(f"Invalid fallback strategies: {invalid}. Must be one of {valid_strategies}")
+        return v
 class GlobalSettings(BaseModel):
     """Global application settings"""
     # App info
@@ -82,6 +103,7 @@ class GlobalSettings(BaseModel):
     log_level: str = Field(default="INFO", regex=r'^(DEBUG|INFO|WARNING|ERROR|CRITICAL)$')
     log_file: Optional[Path] = Field(default=None)
     config_file: Path = Field(default=Path("config.yaml"))
+    condensation: CondensationSettings = Field(default_factory=CondensationSettings, description="Settings for context condensation optimizations")
     
     class Config:
         env_prefix = "PROXY_API_"
@@ -164,7 +186,8 @@ class ConfigManager:
         default_config = ProxyConfig(
             settings=GlobalSettings(
                 api_keys=["your-api-key-here"],
-                debug=True
+                debug=True,
+                condensation=CondensationSettings()  # Use defaults
             ),
             providers=[
                 ProviderConfig(
