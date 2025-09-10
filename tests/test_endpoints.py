@@ -766,6 +766,57 @@ async def test_rate_limit_exceeded_full():
             assert json_response["error"]["type"] == "rate_limit_error"
             assert "Rate limit exceeded" in json_response["error"]["message"]
 @pytest.mark.asyncio
+async def test_text_completions_context_condensation():
+    """Test automatic context condensation on text completions endpoint."""
+    from src.core.app_config import ProviderConfig
+    import json
+    config = ProviderConfig(
+        name="openai",
+        type="openai",
+        base_url="https://api.openai.com/v1",
+        api_key_env="OPENAI_API_KEY",
+        models=["gpt-3.5-turbo-instruct"],
+        enabled=True,
+        priority=1
+    )
+    with patch('src.api.endpoints.get_providers_for_model') as mock_get_providers:
+        mock_get_providers.return_value = [config]
+        
+        mock_provider = AsyncMock()
+        success_response = {
+            "id": "textcmpl_test",
+            "choices": [{"text": "Response after condensation"}],
+            "model": "gpt-3.5-turbo-instruct"
+        }
+        mock_provider.create_text_completion.side_effect = [
+            ValueError("context_length_exceeded"),
+            success_response
+        ]
+        
+        with patch('src.api.endpoints.get_provider') as mock_get_provider:
+            mock_get_provider.return_value = mock_provider
+            
+            with patch('main.condense_context') as mock_condense:
+                mock_condense.return_value = "Condensed prompt summary"
+                
+                async with AsyncClient(app=app, base_url="http://test") as ac:
+                    # Long prompt to trigger context error
+                    long_prompt = "a" * 10000
+                    data = {
+                        "model": "gpt-3.5-turbo-instruct",
+                        "prompt": long_prompt,
+                        "stream": False  # Non-streaming to trigger condensation
+                    }
+                    headers = {"Authorization": "Bearer test_key"}
+                    response = await ac.post("/v1/completions", json=data, headers=headers)
+                    assert response.status_code == 200
+                    json_response = response.json()
+                    assert "choices" in json_response
+                    assert "Response after condensation" in json_response["choices"][0]["text"]
+                    # Verify retry happened
+                    assert mock_provider.create_text_completion.call_count == 2
+                    mock_condense.assert_called_once()
+@pytest.mark.asyncio
 async def test_chat_completions_context_condensation():
     """Test automatic context condensation on context length exceeded error."""
     from src.core.app_config import ProviderConfig

@@ -261,6 +261,9 @@ async def completions(
     if not model:
         raise HTTPException(status_code=HTTPStatus.BAD_REQUEST, detail="Model is required")
 
+    # Serialize to dict for consistency
+    req = completion_request.dict(exclude_unset=True)
+
     # Find providers that support this model
     providers = get_providers_for_model(request, model)
 
@@ -282,12 +285,35 @@ async def completions(
         
             # Wrap with circuit breaker
             circuit_breaker = get_circuit_breaker(f"provider_{provider_config.name}")
-        
-            async def make_text_completion():
-                return await provider.create_text_completion(completion_request)
-        
-            # Make the request
-            response = await circuit_breaker.execute(make_text_completion)
+
+            async def try_text_completion(req):
+                async def make_text_completion():
+                    return await provider.create_text_completion(req)
+                
+                try:
+                    # Make the request
+                    response = await circuit_breaker.execute(make_text_completion)
+                    return response
+                except Exception as e:
+                    msg = str(e).lower()
+                    # Detecta erro de contexto longo
+                    if ("context_length_exceeded" in msg or "maximum context length" in msg) and not req.get("stream", False):
+                        # Condensa e reenvia
+                        if isinstance(req["prompt"], str):
+                            chunks = [req["prompt"]]
+                        else:
+                            chunks = req["prompt"]
+                        summary = await condense_context(request, chunks, max_tokens=512)
+                        req["prompt"] = f"Resumo: {summary}"
+                        logger.info("Contexto resumido automaticamente após erro", error=str(e))
+                        # Retry with condensed context (disable stream for retry)
+                        req["stream"] = False
+                        async def make_retry():
+                            return await provider.create_text_completion(req)
+                        return await circuit_breaker.execute(make_retry)
+                    raise e
+
+            response = await try_text_completion(req)
 
             logger.info("Completions request completed successfully",
                        provider=provider_config.name)
