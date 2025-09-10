@@ -2,7 +2,7 @@ import asyncio
 import uvicorn
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Depends, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -206,7 +206,10 @@ async def chat_completions(
             logger.info("Request completed successfully",
                        provider=provider_config.name)
 
-            return response
+            if hasattr(response, '__aiter__'):
+                return StreamingResponse(response, media_type="text/event-stream")
+            else:
+                return response
 
         except (httpx.RequestError, ValueError, NotImplementedError) as e:
             last_exception = e
@@ -262,7 +265,10 @@ async def completions(
             logger.info("Completions request completed successfully",
                        provider=provider_config.name)
 
-            return response
+            if hasattr(response, '__aiter__'):
+                return StreamingResponse(response, media_type="text/event-stream")
+            else:
+                return response
 
         except (httpx.RequestError, ValueError, NotImplementedError) as e:
             last_exception = e
