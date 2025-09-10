@@ -468,7 +468,7 @@ async def background_condense(request_id: str, request: Request, chunks: List[st
         summary = await condense_context(request, chunks)
         latency = time.time() - start_time
         request.app.state.summary_cache[request_id] = {"summary": summary, "timestamp": time.time(), "latency": latency}
-        # Record metrics (assuming metrics_collector updated later)
+        metrics_collector.record_summary(False, latency)
         logger.info(f"Background summary stored for request_id: {request_id}, latency: {latency}s")
     except Exception as e:
         logger.error(f"Background condensation failed for {request_id}: {e}")

@@ -32,11 +32,33 @@ class ProviderMetrics:
             return 0.0
         return self.failed_requests / self.total_requests
 
+
+@dataclass
+class SummarizationMetrics:
+    """Metrics for context summarization operations"""
+    total_summaries: int = 0
+    cache_hits: int = 0
+    cache_misses: int = 0
+    total_latency: float = 0.0
+    avg_latency: float = 0.0
+    
+    def record_summary(self, is_cache_hit: bool, latency: float = 0.0):
+        """Record a summarization event"""
+        self.total_summaries += 1
+        if is_cache_hit:
+            self.cache_hits += 1
+        else:
+            self.cache_misses += 1
+            self.total_latency += latency
+            self.avg_latency = self.total_latency / max(self.cache_misses, 1)
+        # For cache hits, latency is 0, so avg remains for computation time
+
 class MetricsCollector:
     """Collect and manage metrics for all providers"""
     
     def __init__(self):
         self.providers: Dict[str, ProviderMetrics] = {}
+        self.summarization_metrics = SummarizationMetrics()
         self.request_history = deque(maxlen=1000)  # Keep last 1000 requests
         self.start_time = datetime.now()
     
@@ -86,10 +108,15 @@ class MetricsCollector:
         provider = self.get_or_create_provider(provider_name)
         return asdict(provider)
     
+    def record_summary(self, is_cache_hit: bool, latency: float = 0.0):
+        """Record summarization metrics"""
+        self.summarization_metrics.record_summary(is_cache_hit, latency)
+    
     def get_all_stats(self) -> Dict[str, Any]:
         """Get stats for all providers"""
         return {
             "providers": {name: asdict(metrics) for name, metrics in self.providers.items()},
+            "summarization": asdict(self.summarization_metrics),
             "uptime": (datetime.now() - self.start_time).total_seconds(),
             "total_requests": sum(p.total_requests for p in self.providers.values()),
             "successful_requests": sum(p.successful_requests for p in self.providers.values()),

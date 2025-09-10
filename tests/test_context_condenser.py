@@ -203,3 +203,91 @@ async def test_varied_provider_errors(mock_request, mock_provider):
         with patch('src.utils.context_condenser.get_provider', return_value=AsyncMock(return_value=mock_provider)):
             summary = await condense_context(mock_request, ["chunk"], max_tokens=512)
             assert f"handled {pattern}" in summary
+@pytest.mark.asyncio
+async def test_timeout_error_fallback(mock_request, mock_provider):
+    """Test fallback on timeout error"""
+    mock_request.app.state.condensation_config.error_patterns = ["timeout"]
+    mock_request.app.state.condensation_config.fallback_strategies = ["truncate"]
+    chunks = ["test chunk"]
+    mock_provider.create_completion.side_effect = asyncio.TimeoutError("Request timed out")
+    mock_provider.create_completion.side_effect = {"choices": [{"message": {"content": "fallback summary"}}]}  # Second call after fallback
+    with patch('src.utils.context_condenser.get_provider', return_value=AsyncMock(return_value=mock_provider)):
+        summary = await condense_context(mock_request, chunks, max_tokens=512)
+    assert "fallback summary" == summary
+
+@pytest.mark.asyncio
+async def test_rate_limit_error_fallback(mock_request, mock_provider):
+    """Test fallback on rate limit error"""
+    mock_request.app.state.condensation_config.error_patterns = ["rate limit"]
+    mock_request.app.state.condensation_config.fallback_strategies = ["secondary_provider"]
+    mock_request.app.state.config.providers = [Mock(priority=1, models=["model"], name="prov1"), Mock(priority=2, models=["model"], name="prov2")]
+    chunks = ["test"]
+    mock_provider.create_completion.side_effect = RateLimitError("Rate limit exceeded")
+    mock_provider2 = AsyncMock(return_value={"choices": [{"message": {"content": "rate limit fallback"}}]})
+    with patch('src.utils.context_condenser.get_provider', side_effect=[mock_provider, mock_provider2]):
+        summary = await condense_context(mock_request, chunks, max_tokens=512)
+    assert "rate limit fallback" == summary
+
+@pytest.mark.asyncio
+async def test_provider_failure_fallback_sequential(mock_request):
+    """Test sequential fallback on provider failure"""
+    mock_request.app.state.condensation_config.parallel_providers = 1
+    mock_request.app.state.condensation_config.fallback_strategies = ["secondary_provider"]
+    mock_request.app.state.config.providers = [Mock(priority=1, models=["model"], name="prov1"), Mock(priority=2, models=["model"], name="prov2")]
+    chunks = ["test"]
+    prov1 = AsyncMock()
+    prov1.create_completion.side_effect = Exception("Provider failed")
+    prov2 = AsyncMock(return_value={"choices": [{"message": {"content": "sequential fallback"}}]})
+    with patch('src.utils.context_condenser.get_provider', side_effect=[prov1, prov2]):
+        summary = await condense_context(mock_request, chunks, max_tokens=512)
+    assert "sequential fallback" == summary
+
+@pytest.mark.asyncio
+async def test_provider_failure_fallback_parallel(mock_request):
+    """Test parallel fallback on all providers failing except one"""
+    mock_request.app.state.condensation_config.parallel_providers = 2
+    mock_request.app.state.config.providers = [Mock(priority=1, models=["model"], name="prov1"), Mock(priority=2, models=["model"], name="prov2")]
+    chunks = ["test"]
+    prov1_success = AsyncMock(return_value={"choices": [{"message": {"content": "parallel success"}}]})
+    prov2_fail = AsyncMock(side_effect=Exception("Failed"))
+    with patch('src.utils.context_condenser.get_provider', side_effect=[prov1_success, prov2_fail]):
+        summary = await condense_context(mock_request, chunks, max_tokens=512)
+    assert "parallel success" == summary
+
+@pytest.mark.asyncio
+async def test_background_offload_integration(mock_request):
+    """Test background offload integration and cache storage"""
+    from main import background_condense
+    mock_request.app.state.summary_cache = {}
+    request_id = "test-bg"
+    chunks = ["long context"]
+    with patch('src.utils.context_condenser.condense_context', new_callable=AsyncMock(return_value="bg summary")):
+        await background_condense(request_id, mock_request, chunks)
+    cached = mock_request.app.state.summary_cache.get(request_id)
+    assert cached["summary"] == "bg summary"
+    assert "latency" in cached
+
+@pytest.mark.asyncio
+async def test_metric_recording_cache_hit(mock_request):
+    """Test metric recording for cache hit"""
+    from src.core.metrics import metrics_collector
+    original_hits = metrics_collector.summarization_metrics.cache_hits
+    mock_request.app.state.lru_cache = AsyncLRUCache(maxsize=1)
+    mock_request.app.state.lru_cache.set("hash", ("cached", time.time()))
+    mock_request.app.state.condensation_config.cache_ttl = 3600
+    chunks = ["test"]
+    await condense_context(mock_request, chunks, max_tokens=512)
+    assert metrics_collector.summarization_metrics.cache_hits == original_hits + 1
+
+@pytest.mark.asyncio
+async def test_metric_recording_cache_miss(mock_request, mock_provider):
+    """Test metric recording for cache miss with latency"""
+    from src.core.metrics import metrics_collector
+    original_misses = metrics_collector.summarization_metrics.cache_misses
+    original_latency = metrics_collector.summarization_metrics.total_latency
+    mock_request.app.state.lru_cache = AsyncLRUCache(maxsize=1)
+    chunks = ["new chunk"]
+    with patch('src.utils.context_condenser.get_provider', return_value=AsyncMock(return_value=mock_provider)):
+        await condense_context(mock_request, chunks, max_tokens=512)
+    assert metrics_collector.summarization_metrics.cache_misses == original_misses + 1
+    assert metrics_collector.summarization_metrics.total_latency > original_latency

@@ -11,6 +11,7 @@ from collections import OrderedDict
 from src.providers.base import get_provider
 from src.core.logging import ContextualLogger
 from src.core.unified_config import config_manager
+from src.core.metrics import metrics_collector
 
 logger = ContextualLogger(__name__)
 
@@ -84,6 +85,8 @@ async def condense_context(request: Request, chunks: List[str], max_tokens: int 
     """
     Usa o provider de maior prioridade para resumir mensagens longas.
     """
+    start_time = time.time()
+    
     # Dynamic config reload if enabled
     if hasattr(request.app.state, 'config_mtime') and condensation_config.dynamic_reload:
         try:
@@ -122,6 +125,7 @@ async def condense_context(request: Request, chunks: List[str], max_tokens: int 
         summary, timestamp = cached
         if time.time() - timestamp < condensation_config.cache_ttl:
             logger.debug(f"Cache hit for chunk hash: {chunk_hash}")
+            metrics_collector.record_summary(True, 0.0)
             return summary
 
     # Proactive truncation if content would be too long
@@ -226,6 +230,11 @@ async def condense_context(request: Request, chunks: List[str], max_tokens: int 
             raise ValueError(error_msg)
     
     summary = resp["choices"][0]["message"]["content"]
+    
+    # Record latency for cache miss
+    end_time = time.time()
+    latency = end_time - start_time
+    metrics_collector.record_summary(False, latency)
     
     # Store in cache
     lru_cache.set(chunk_hash, (summary, time.time()))
