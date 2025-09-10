@@ -765,3 +765,54 @@ async def test_rate_limit_exceeded_full():
             assert "error" in json_response
             assert json_response["error"]["type"] == "rate_limit_error"
             assert "Rate limit exceeded" in json_response["error"]["message"]
+@pytest.mark.asyncio
+async def test_chat_completions_context_condensation():
+    """Test automatic context condensation on context length exceeded error."""
+    from src.core.app_config import ProviderConfig
+    import json
+    config = ProviderConfig(
+        name="openai",
+        type="openai",
+        base_url="https://api.openai.com/v1",
+        api_key_env="OPENAI_API_KEY",
+        models=["gpt-3.5-turbo"],
+        enabled=True,
+        priority=1
+    )
+    with patch('src.api.endpoints.get_providers_for_model') as mock_get_providers:
+        mock_get_providers.return_value = [config]
+        
+        mock_provider = AsyncMock()
+        success_response = {
+            "id": "chatcmpl_test",
+            "choices": [{"message": {"content": "Response after condensation"}}],
+            "model": "gpt-3.5-turbo"
+        }
+        mock_provider.create_completion.side_effect = [
+            ValueError("context_length_exceeded"),
+            success_response
+        ]
+        
+        with patch('src.api.endpoints.get_provider') as mock_get_provider:
+            mock_get_provider.return_value = mock_provider
+            
+            with patch('main.condense_context') as mock_condense:
+                mock_condense.return_value = "Condensed summary of long context"
+                
+                async with AsyncClient(app=app, base_url="http://test") as ac:
+                    # Long message to trigger context error
+                    long_content = "a" * 10000
+                    data = {
+                        "model": "gpt-3.5-turbo",
+                        "messages": [{"role": "user", "content": long_content}],
+                        "stream": False  # Non-streaming to trigger condensation
+                    }
+                    headers = {"Authorization": "Bearer test_key"}
+                    response = await ac.post("/v1/chat/completions", json=data, headers=headers)
+                    assert response.status_code == 200
+                    json_response = response.json()
+                    assert "choices" in json_response
+                    assert "Condensed summary" in json_response["choices"][0]["message"]["content"]
+                    # Verify retry happened
+                    assert mock_provider.create_completion.call_count == 2
+                    mock_condense.assert_called_once()

@@ -344,6 +344,38 @@ console.log('Full response:', fullContent);
 ```
 
 This setup ensures efficient streaming with proper error handling and client compatibility.
+## Automatic Context Condensation
+
+The LLM Proxy API includes automatic context condensation for non-streaming chat completions. When a provider returns a context length exceeded error (detected by keywords like "context_length_exceeded" or "maximum context length" in the error message), the proxy automatically:
+
+1. Extracts the content from all messages in the conversation history.
+2. Uses the top-priority enabled provider to generate a concise summary (limited to 512 tokens by default) that preserves key entities and intents.
+3. Replaces the full message history with a new system message containing the summary followed by the original last message.
+4. Retries the request with the condensed context (streaming is disabled for the retry to ensure compatibility).
+
+This feature prevents interruptions from long conversation histories without requiring client-side handling. It only applies to non-streaming requests (`stream=false`); streaming requests raise the original error to maintain real-time behavior.
+
+### Example
+
+Send a request with an excessively long message to trigger the error:
+
+```bash
+curl -X POST http://localhost:8000/v1/chat/completions \
+  -H "Authorization: Bearer your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-3.5-turbo",
+    "messages": [{"role": "user", "content": "'$(printf 'a%.0s' {1..10000})'"}],
+    "stream": false,
+    "max_tokens": 50
+  }'
+```
+
+Expected behavior: The response will be a successful completion (200) using the condensed summary, with the provider's create_completion called twice (first failure, second success).
+
+### Testing
+
+The feature is tested in `tests/test_endpoints.py` with `test_chat_completions_context_condensation`, mocking a ValueError on the first call and verifying the retry and summary usage.
 
 ## Monitoring & Metrics
 

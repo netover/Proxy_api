@@ -21,6 +21,7 @@ from src.providers.base import ProviderConfig, ProviderError, InvalidRequestErro
 from src.core.app_config import ChatCompletionRequest, CompletionRequest, EmbeddingRequest
 from src.services.provider_loader import get_provider_factories
 from src.core.circuit_breaker import get_circuit_breaker
+from src.utils.context_condenser import condense_context
 from datetime import datetime
 
 
@@ -175,6 +176,9 @@ async def chat_completions(
     if not model:
         raise HTTPException(status_code=HTTPStatus.BAD_REQUEST, detail="Model is required")
 
+    # Serialize to dict for consistency
+    req = completion_request.dict(exclude_unset=True)
+
     # Find providers that support this model
     providers = get_providers_for_model(request, model)
         
@@ -196,12 +200,35 @@ async def chat_completions(
         
             # Wrap with circuit breaker
             circuit_breaker = get_circuit_breaker(f"provider_{provider_config.name}")
-        
-            async def make_completion():
-                return await provider.create_completion(completion_request)
-        
-            # Make the request
-            response = await circuit_breaker.execute(make_completion)
+
+            async def try_completion(req):
+                async def make_completion():
+                    return await provider.create_completion(req)
+                
+                try:
+                    # Make the request
+                    response = await circuit_breaker.execute(make_completion)
+                    return response
+                except Exception as e:
+                    msg = str(e).lower()
+                    # Detecta erro de contexto longo
+                    if ("context_length_exceeded" in msg or "maximum context length" in msg) and not req.get("stream", False):
+                        # Condensa e reenvia
+                        chunks = [m["content"] for m in req["messages"]]
+                        summary = await condense_context(request, chunks, max_tokens=512)
+                        req["messages"] = [
+                            {"role": "system", "content": f"Resumo: {summary}"},
+                            req["messages"][-1]
+                        ]
+                        logger.info("Contexto resumido automaticamente após erro", error=str(e))
+                        # Retry with condensed context (disable stream for retry)
+                        req["stream"] = False
+                        async def make_retry():
+                            return await provider.create_completion(req)
+                        return await circuit_breaker.execute(make_retry)
+                    raise e
+
+            response = await try_completion(req)
 
             logger.info("Request completed successfully",
                        provider=provider_config.name)
