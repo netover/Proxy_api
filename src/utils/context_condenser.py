@@ -13,6 +13,14 @@ from src.core.logging import ContextualLogger
 from src.core.unified_config import config_manager
 from src.core.metrics import metrics_collector
 
+# Optional Redis import for distributed caching in high-load environments
+try:
+    import redis.asyncio as redis  # type: ignore
+    REDIS_AVAILABLE = True
+except ImportError:
+    redis = None
+    REDIS_AVAILABLE = False
+
 logger = ContextualLogger(__name__)
 
 async def call_provider_with_timeout(provider, cfg, request_body):
@@ -26,39 +34,72 @@ async def call_provider_with_timeout(provider, cfg, request_body):
         raise e
 
 class AsyncLRUCache:
-    """Async-compatible LRU Cache with persistence support"""
-    def __init__(self, maxsize: int = 1000, persist_file: Optional[str] = None):
+    """Async-compatible LRU Cache with persistence support (file or Redis)"""
+    def __init__(self, maxsize: int = 1000, persist_file: Optional[str] = None, redis_url: Optional[str] = None):
         self.maxsize = maxsize
         self.cache = OrderedDict()
         self.persist_file = persist_file
-        if self.persist_file:
-            # Load cache asynchronously if persistence is enabled
-            asyncio.create_task(self.load())
+        self.redis_url = redis_url
+        self.redis_client = None
+
+        # Initialize Redis if URL provided and available
+        if self.redis_url and REDIS_AVAILABLE:
+            self.redis_client = redis.from_url(self.redis_url)
+            logger.info(f"Redis cache enabled with URL: {self.redis_url}")
+        elif self.redis_url and not REDIS_AVAILABLE:
+            logger.warning("Redis URL provided but redis package not available, falling back to in-memory cache")
 
     async def load(self):
-        """Load cache from file if persistence enabled"""
-        if not self.persist_file:
-            return
-        try:
-            with open(self.persist_file, 'r') as f:
-                data = json.load(f)
-                self.cache = OrderedDict(data)
-                logger.info(f"Loaded {len(self.cache)} items from {self.persist_file}")
-        except FileNotFoundError:
-            logger.info(f"No persistent cache file found: {self.persist_file}")
-        except Exception as e:
-            logger.error(f"Failed to load persistent cache: {e}")
+        """Load cache from file or Redis if persistence enabled"""
+        if self.redis_client:
+            # Load from Redis
+            try:
+                keys = await self.redis_client.keys("cache:*")
+                if keys:
+                    for key in keys:
+                        value = await self.redis_client.get(key)
+                        if value:
+                            cache_key = key.decode('utf-8').replace("cache:", "")
+                            data = json.loads(value.decode('utf-8'))
+                            self.cache[cache_key] = tuple(data)
+                    logger.info(f"Loaded {len(self.cache)} items from Redis")
+            except Exception as e:
+                logger.error(f"Failed to load Redis cache: {e}")
+        elif self.persist_file:
+            # Load from file
+            try:
+                with open(self.persist_file, 'r') as f:
+                    data = json.load(f)
+                    self.cache = OrderedDict(data)
+                    logger.info(f"Loaded {len(self.cache)} items from {self.persist_file}")
+            except FileNotFoundError:
+                logger.info(f"No persistent cache file found: {self.persist_file}")
+            except Exception as e:
+                logger.error(f"Failed to load persistent cache: {e}")
 
     async def save(self):
-        """Save cache to file if persistence enabled"""
-        if not self.persist_file or len(self.cache) == 0:
-            return
-        try:
-            with open(self.persist_file, 'w') as f:
-                json.dump(dict(self.cache), f)
-            logger.debug(f"Saved {len(self.cache)} items to {self.persist_file}")
-        except Exception as e:
-            logger.error(f"Failed to save persistent cache: {e}")
+        """Save cache to file or Redis if persistence enabled"""
+        if self.redis_client:
+            # Save to Redis
+            if len(self.cache) == 0:
+                return
+            try:
+                for key, value in self.cache.items():
+                    redis_key = f"cache:{key}"
+                    await self.redis_client.set(redis_key, json.dumps(value))
+                logger.debug(f"Saved {len(self.cache)} items to Redis")
+            except Exception as e:
+                logger.error(f"Failed to save Redis cache: {e}")
+        elif self.persist_file:
+            # Save to file
+            if len(self.cache) == 0:
+                return
+            try:
+                with open(self.persist_file, 'w') as f:
+                    json.dump(dict(self.cache), f)
+                logger.debug(f"Saved {len(self.cache)} items to {self.persist_file}")
+            except Exception as e:
+                logger.error(f"Failed to save persistent cache: {e}")
 
     def get(self, key: str):
         """Get item, move to end (MRU)"""
@@ -75,6 +116,9 @@ class AsyncLRUCache:
             if len(self.cache) >= self.maxsize:
                 oldest_key, _ = self.cache.popitem(last=False)
                 logger.debug(f"Evicted cache item: {oldest_key}")
+                # Also remove from Redis if using Redis
+                if self.redis_client:
+                    asyncio.create_task(self.redis_client.delete(f"cache:{oldest_key}"))
             self.cache[key] = value
         asyncio.create_task(self.save())  # Async save on set
 
@@ -83,14 +127,14 @@ class AsyncLRUCache:
         asyncio.create_task(self.save())
 
     async def initialize(self):
-        """Initialize cache by loading from file if persistence enabled"""
-        if self.persist_file:
-            await self.load()
+        """Initialize cache by loading from persistence if enabled"""
+        await self.load()
 
     async def shutdown(self):
-        """Shutdown cache and save to file if persistence enabled"""
-        if self.persist_file:
-            await self.save()
+        """Shutdown cache and save to file/Redis if persistence enabled"""
+        await self.save()
+        if self.redis_client:
+            await self.redis_client.close()
         logger.info(f"Cache shutdown, saved {len(self.cache)} items")
 
 async def condense_context(request: Request, chunks: List[str], max_tokens: int = 512) -> str:
