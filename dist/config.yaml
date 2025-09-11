@@ -1,41 +1,54 @@
+# Global application settings
+app_name: "LLM Proxy API"
+app_version: "2.0.0"
+debug: false
+host: "127.0.0.1"
+port: 8000
+api_keys:
+  - "your-api-key-here"
+api_key_header: "X-API-Key"
+cors_origins:
+  - "*"
+rate_limit_rpm: 1000
+rate_limit_window: 60
+request_timeout: 300
+circuit_breaker_threshold: 5
+circuit_breaker_timeout: 60
+log_level: "INFO"
+log_file: null
+config_file: "config.yaml"
+
+condensation:
+  max_tokens_default: 512
+  error_patterns:
+    - "context_length_exceeded"
+    - "maximum context length"
+    - "token limit exceeded"
+    - "input too long"
+  adaptive_factor: 0.5
+  cache_ttl: 300
+  dynamic_reload: true
+  parallel_providers: 1
+  cache_size: 1000
+  cache_persist: false
+  truncation_threshold: 4000
+  fallback_strategies:
+    - "truncate"
+    - "secondary_provider"
+
 providers:
-  - name: "openai"
+  - name: "openai_default"
     type: "openai"
-    module: "src.providers.dynamic_openai"
-    class: "DynamicOpenAIProvider"
-    api_key_env: "OPENAI_API_KEY"
     base_url: "https://api.openai.com/v1"
+    api_key_env: "OPENAI_API_KEY"
     models:
       - "gpt-4"
-      - "gpt-3.5-turbo"
-      - "text-davinci-003"
-      - "text-embedding-ada-002"
-    priority: 1
-
-  - name: "anthropic"
-    type: "anthropic"
-    module: "src.providers.dynamic_anthropic"
-    class: "DynamicAnthropicProvider"
-    api_key_env: "ANTHROPIC_API_KEY"
-    base_url: "https://api.anthropic.com"
-    models:
-      - "claude-3-sonnet-20240229"
-      - "claude-3-opus-20240229"
-    priority: 2
-
-  - name: "perplexity"
-    type: "perplexity"
-    module: "src.providers.dynamic_perplexity"
-    class: "DynamicPerplexityProvider"
-    api_key_env: "PERPLEXITY_API_KEY"
-    base_url: "https://api.perplexity.ai"
-    models:
-      - "sonar-pro"
-      - "sonar-small-online"
-      - "sonar-medium-online"
-      - "sonar-small-chat"
-      - "sonar-medium-chat"
-      - "mistral-7b"
-      - "codellama-34b"
-      - "llama-2-70b"
-    priority: 3
+    enabled: false
+    priority: 10
+    timeout: 30
+    max_retries: 3
+    retry_delay: 1.0
+    rate_limit: null
+    max_connections: 10
+    keepalive_timeout: 30
+    custom_headers: {}

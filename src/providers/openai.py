@@ -2,6 +2,7 @@ from typing import Dict, Any, Union, AsyncGenerator
 from src.core.provider_factory import BaseProvider
 from src.core.unified_config import ProviderConfig
 import json
+import httpx
 
 from src.core.exceptions import InvalidRequestError, AuthenticationError, RateLimitError, APIConnectionError
 
@@ -75,7 +76,7 @@ class OpenAIProvider(BaseProvider):
                             try:
                                 error_json = json.loads(error_data)
                                 raise InvalidRequestError(error_json['error']['message'], code=error_json['error']['type'])
-                            except:
+                            except (json.JSONDecodeError, KeyError):
                                 raise InvalidRequestError(f"OpenAI Invalid Request: HTTP {response.status_code}", code="invalid_request")
                         response.raise_for_status()
                         
@@ -171,7 +172,7 @@ class OpenAIProvider(BaseProvider):
                             try:
                                 error_json = json.loads(error_data)
                                 raise InvalidRequestError(error_json['error']['message'], code=error_json['error']['type'])
-                            except:
+                            except (json.JSONDecodeError, KeyError):
                                 raise InvalidRequestError(f"OpenAI Invalid Request: HTTP {response.status_code}", code="invalid_request")
                         response.raise_for_status()
                         

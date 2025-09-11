@@ -31,7 +31,8 @@ class AsyncLRUCache:
         self.maxsize = maxsize
         self.cache = OrderedDict()
         self.persist_file = persist_file
-        if self.persist_file and asyncio.iscoroutinefunction(self.load):
+        if self.persist_file:
+            # Load cache asynchronously if persistence is enabled
             asyncio.create_task(self.load())
 
     async def load(self):
@@ -81,12 +82,26 @@ class AsyncLRUCache:
         self.cache.clear()
         asyncio.create_task(self.save())
 
+    async def initialize(self):
+        """Initialize cache by loading from file if persistence enabled"""
+        if self.persist_file:
+            await self.load()
+
+    async def shutdown(self):
+        """Shutdown cache and save to file if persistence enabled"""
+        if self.persist_file:
+            await self.save()
+        logger.info(f"Cache shutdown, saved {len(self.cache)} items")
+
 async def condense_context(request: Request, chunks: List[str], max_tokens: int = 512) -> str:
     """
     Usa o provider de maior prioridade para resumir mensagens longas.
     """
     start_time = time.time()
     
+    # Get condensation config from app state
+    condensation_config = request.app.state.condensation_config
+
     # Dynamic config reload if enabled
     if hasattr(request.app.state, 'config_mtime') and condensation_config.dynamic_reload:
         try:
@@ -106,6 +121,9 @@ async def condense_context(request: Request, chunks: List[str], max_tokens: int 
     if not hasattr(request.app.state, 'lru_cache') or request.app.state.lru_cache is None:
         persist_file = 'cache.json' if condensation_config.cache_persist else None
         request.app.state.lru_cache = AsyncLRUCache(maxsize=condensation_config.cache_size, persist_file=persist_file)
+        # Initialize cache loading if persistence is enabled
+        if persist_file:
+            await request.app.state.lru_cache.initialize()
     lru_cache = request.app.state.lru_cache
     condensation_config = request.app.state.condensation_config
     
@@ -142,6 +160,16 @@ async def condense_context(request: Request, chunks: List[str], max_tokens: int 
     if not sorted_providers:
         raise ValueError("No enabled providers available for condensation")
     
+    # Prepare base request body for condensation
+    request_body = {
+        "model": "",  # Will be set per provider
+        "messages": [
+            {"role": "system", "content": f"Resuma mantendo entidades e intents, limitando a {use_max_tokens} tokens."},
+            {"role": "user", "content": content}
+        ],
+        "max_tokens": use_max_tokens
+    }
+
     resp = None
     if condensation_config.parallel_providers > 1:
         # Parallel execution
@@ -178,19 +206,8 @@ async def condense_context(request: Request, chunks: List[str], max_tokens: int 
         top_cfg = sorted_providers[0]
         provider = await get_provider(top_cfg)
 
-        # Monta prompt de resumo
-        content = "\n\n---\n\n".join(chunks)
-        request_body = {
-            "model": top_cfg.models[0],
-            "messages": [
-                {"role": "system", "content":
-                    f"Resuma mantendo entidades e intents, "
-                    f"limitando a {use_max_tokens} tokens."
-                },
-                {"role": "user", "content": content}
-            ],
-            "max_tokens": use_max_tokens
-        }
+        # Update request body for sequential execution
+        request_body["model"] = top_cfg.models[0]
 
         fallback_attempted = False
         for attempt in range(2):

@@ -86,48 +86,120 @@ def build_executable():
         f"--name={config['app_name'].replace(' ', '_')}",
         "--onefile",
         "--console",
-        # Core framework imports
+        # Core framework imports - COMPREHENSIVE UVICORN IMPORTS
+        "--hidden-import=uvicorn",
         "--hidden-import=uvicorn.logging",
+        "--hidden-import=uvicorn.loops",
         "--hidden-import=uvicorn.loops.auto",
+        "--hidden-import=uvicorn.loops.uvloop",
+        "--hidden-import=uvicorn.protocols",
+        "--hidden-import=uvicorn.protocols.http",
         "--hidden-import=uvicorn.protocols.http.auto",
         "--hidden-import=uvicorn.protocols.http.h11_impl",
         "--hidden-import=uvicorn.protocols.http.httptools_impl",
+        "--hidden-import=uvicorn.protocols.websockets",
         "--hidden-import=uvicorn.protocols.websockets.auto",
+        "--hidden-import=uvicorn.lifespan",
         "--hidden-import=uvicorn.lifespan.on",
         "--hidden-import=uvicorn.lifespan.off",
+        "--hidden-import=uvicorn.main",
+        "--hidden-import=uvicorn.config",
+        "--hidden-import=uvicorn.supervisors",
+        "--hidden-import=uvicorn.workers",
+
+        # FastAPI comprehensive imports
         "--hidden-import=fastapi",
         "--hidden-import=fastapi.routing",
         "--hidden-import=fastapi.applications",
         "--hidden-import=fastapi.middleware",
         "--hidden-import=fastapi.middleware.cors",
         "--hidden-import=fastapi.middleware.gzip",
+        "--hidden-import=fastapi.middleware.trustedhost",
+        "--hidden-import=fastapi.middleware.httpsredirect",
+        "--hidden-import=fastapi.security",
+        "--hidden-import=fastapi.security.api_key",
+        "--hidden-import=fastapi.security.http",
+        "--hidden-import=fastapi.security.oauth2",
+        "--hidden-import=fastapi.security.open_id_connect",
+        "--hidden-import=fastapi.openapi",
+        "--hidden-import=fastapi.openapi.docs",
+        "--hidden-import=fastapi.openapi.utils",
+        "--hidden-import=fastapi.dependencies",
+        "--hidden-import=fastapi.dependencies.utils",
+        "--hidden-import=fastapi.dependencies.models",
+        "--hidden-import=fastapi.encoders",
+        "--hidden-import=fastapi.exceptions",
+        "--hidden-import=fastapi.params",
+        "--hidden-import=fastapi.requests",
+        "--hidden-import=fastapi.responses",
+        "--hidden-import=fastapi.staticfiles",
+        "--hidden-import=fastapi.templating",
+        "--hidden-import=fastapi.testclient",
+        "--hidden-import=fastapi.utils",
 
-        # Data validation
+        # Data validation - COMPREHENSIVE PYDANTIC
         "--hidden-import=pydantic",
         "--hidden-import=pydantic.fields",
         "--hidden-import=pydantic.main",
         "--hidden-import=pydantic.types",
         "--hidden-import=pydantic_settings",
+        "--hidden-import=pydantic_settings.sources",
+        "--hidden-import=pydantic_core",
+        "--hidden-import=pydantic_core.core_schema",
 
-        # HTTP client
+        # HTTP client - COMPREHENSIVE HTTPX
         "--hidden-import=httpx",
         "--hidden-import=httpx._main",
         "--hidden-import=httpx._config",
         "--hidden-import=httpx._client",
         "--hidden-import=httpx._transports",
         "--hidden-import=httpx._utils",
+        "--hidden-import=httpx._exceptions",
+        "--hidden-import=httpx._models",
+        "--hidden-import=httpx._urls",
+        "--hidden-import=httpx._auth",
+        "--hidden-import=httpx._decoders",
+        "--hidden-import=httpx._multipart",
+        "--hidden-import=httpx._sync",
+        "--hidden-import=httpx._async",
+        "--hidden-import=httpx._api",
+
+        # Async libraries - CRITICAL FOR STREAMING
+        "--hidden-import=anyio",
+        "--hidden-import=anyio._core",
+        "--hidden-import=anyio._backends",
+        "--hidden-import=anyio._backends.asyncio",
+        "--hidden-import=anyio.abc",
+        "--hidden-import=anyio.streams",
+        "--hidden-import=anyio.to_thread",
+        "--hidden-import=anyio.from_thread",
 
         # Performance optimizations
         "--hidden-import=uvloop",  # Linux/macOS only
         "--hidden-import=orjson",
 
+        # Rate limiting - COMPREHENSIVE SLOWAPI
+        "--hidden-import=slowapi",
+        "--hidden-import=slowapi.middleware",
+        "--hidden-import=slowapi.util",
+        "--hidden-import=slowapi.errors",
+        "--hidden-import=slowapi.storage",
+        "--hidden-import=slowapi.storage.redis",
+        "--hidden-import=slowapi.storage.memcached",
+        "--hidden-import=slowapi.storage.memory",
+        "--hidden-import=slowapi.wrappers",
+
         # Configuration and utilities
         "--hidden-import=pyyaml",
-        "--hidden-import=slowapi",
+        "--hidden-import=json",
         "--hidden-import=jwt",
         "--hidden-import=pyasn1",
+        "--hidden-import=cryptography",
+        "--hidden-import=cryptography.hazmat",
+        "--hidden-import=cryptography.hazmat.primitives",
+        "--hidden-import=cryptography.hazmat.backends",
 
-        # Project modules
+        # Project modules - ALL CORE MODULES
         "--hidden-import=src.core.config",
         "--hidden-import=src.core.logging",
         "--hidden-import=src.core.app_config",
@@ -138,21 +210,41 @@ def build_executable():
         "--hidden-import=src.core.provider_factory",
         "--hidden-import=src.core.exceptions",
         "--hidden-import=src.core.rate_limiter",
+        "--hidden-import=src.core.smart_cache",
+        "--hidden-import=src.core.http_client",
+        "--hidden-import=src.core.memory_manager",
+        "--hidden-import=src.core.app_state",
+        "--hidden-import=src.services.provider_loader",
+        "--hidden-import=src.models.requests",
+        "--hidden-import=src.models.responses",
+        "--hidden-import=src.utils.context_condenser",
+        "--hidden-import=src.utils.helpers",
+        "--hidden-import=src.config.models",
+
+        # All provider modules
         "--hidden-import=src.providers.base",
         "--hidden-import=src.providers.openai",
         "--hidden-import=src.providers.anthropic",
+        "--hidden-import=src.providers.cohere",
+        "--hidden-import=src.providers.perplexity",
+        "--hidden-import=src.providers.grok",
+        "--hidden-import=src.providers.blackbox",
+        "--hidden-import=src.providers.openrouter",
+        "--hidden-import=src.providers.azure_openai",
         "--hidden-import=src.providers.dynamic_base",
         "--hidden-import=src.providers.dynamic_blackbox",
-        "--hidden-import=src.services.provider_loader",
-        "--hidden-import=src.models.requests",
 
-        # Collect all for complex packages
+        # Collect all for complex packages - ENHANCED
         "--collect-all=fastapi",
         "--collect-all=pydantic",
         "--collect-all=httpx",
         "--collect-all=uvicorn",
         "--collect-all=uvloop",
-        "--collect-all=orjson"
+        "--collect-all=orjson",
+        "--collect-all=anyio",
+        "--collect-all=slowapi",
+        "--collect-all=pyyaml",
+        "--collect-all=cryptography"
     ]
 
     # Add include files

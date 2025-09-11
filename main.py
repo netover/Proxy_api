@@ -29,6 +29,12 @@ from slowapi.errors import RateLimitExceeded
 # HTTP client
 import httpx
 
+# System monitoring
+try:
+    import psutil
+except ImportError:
+    psutil = None
+
 # Core imports
 from src.core.config import settings
 from src.core.logging import setup_logging, ContextualLogger
@@ -50,18 +56,6 @@ from src.core.http_client import get_http_client, initialize_http_client
 from src.core.smart_cache import get_response_cache, get_summary_cache, initialize_caches, shutdown_caches
 from src.core.memory_manager import get_memory_manager, initialize_memory_manager, shutdown_memory_manager
 
-from src.core.config import settings
-from src.core.logging import setup_logging, ContextualLogger
-from src.core.unified_config import config_manager
-from src.core.metrics import metrics_collector
-from src.core.auth import verify_api_key, APIKeyAuth
-from src.core.unified_config import ProviderConfig
-from src.core.exceptions import ProviderError, InvalidRequestError, AuthenticationError, RateLimitError, ServiceUnavailableError
-from src.models.requests import ChatCompletionRequest, TextCompletionRequest, EmbeddingRequest
-from src.services.provider_loader import get_provider_factories
-from src.core.circuit_breaker import get_circuit_breaker
-from src.utils.context_condenser import condense_context
-from datetime import datetime
 
 
 # Setup logging
@@ -109,12 +103,15 @@ async def handle_context_condensation(
         background_tasks.add_task(background_condense, request_id, request, full_chunks)
 
         if not req.get("stream", False):
-            return {
-                "status": "processing",
-                "request_id": request_id,
-                "message": "Long context detected; summarization in progress. Poll /summary/{request_id} for result.",
-                "estimated_time": "5-10 seconds"
-            }
+            return JSONResponse(
+                status_code=HTTPStatus.ACCEPTED,
+                content={
+                    "status": "processing",
+                    "request_id": request_id,
+                    "message": "Long context detected; summarization in progress. Poll /summary/{request_id} for result.",
+                    "estimated_time": "5-10 seconds"
+                }
+            )
 
         # For streaming, truncate and proceed
         truncate_len = config.truncation_threshold // 2
@@ -179,12 +176,15 @@ async def process_request_with_fallback(
                     chunks = [m["content"] for m in req.get("messages", [])]
                     background_tasks.add_task(background_condense, request_id, request, chunks)
 
-                    return {
-                        "status": "processing",
-                        "request_id": request_id,
-                        "message": f"Context error detected; summarization in progress. Poll /summary/{request_id} for result.",
-                        "estimated_time": "5-10 seconds"
-                    }
+                    return JSONResponse(
+                        status_code=HTTPStatus.ACCEPTED,
+                        content={
+                            "status": "processing",
+                            "request_id": request_id,
+                            "message": f"Context error detected; summarization in progress. Poll /summary/{request_id} for result.",
+                            "estimated_time": "5-10 seconds"
+                        }
+                    )
 
                 # Truncate for streaming
                 req["messages"] = req["messages"][-len(req["messages"])//2:]
@@ -224,6 +224,17 @@ async def lifespan(app: FastAPI):
         app.state.memory_manager = await get_memory_manager()
         logger.info("Memory manager initialized")
 
+        # Initialize context condensation cache with persistence
+        from src.utils.context_condenser import AsyncLRUCache
+        persist_file = 'cache.json' if config.settings.condensation.cache_persist else None
+        app.state.lru_cache = AsyncLRUCache(
+            maxsize=config.settings.condensation.cache_size,
+            persist_file=persist_file
+        )
+        if persist_file:
+            await app.state.lru_cache.initialize()
+        logger.info("Context condensation cache initialized")
+
         # Legacy cache support (for backward compatibility)
         app.state.cache = {}
         app.state.summary_cache = {}
@@ -231,6 +242,12 @@ async def lifespan(app: FastAPI):
         # Initialize authentication
         api_key_auth = APIKeyAuth(settings.proxy_api_keys)
         app.state.api_key_auth = api_key_auth
+
+        # Configure rate limiter
+        from src.core.rate_limiter import rate_limiter
+        rate_limiter.configure_from_config(config)
+        app.state.rate_limiter = rate_limiter
+        logger.info("Rate limiter configured and initialized")
 
         # Initialize providers
         app.state.provider_factories = get_provider_factories(config.providers)
@@ -271,6 +288,11 @@ async def lifespan(app: FastAPI):
         if hasattr(app.state, 'response_cache'):
             await shutdown_caches()
             logger.info("Caches shutdown")
+
+        # Shutdown context condensation cache
+        if hasattr(app.state, 'lru_cache') and app.state.lru_cache:
+            await app.state.lru_cache.shutdown()
+            logger.info("Context condensation cache shutdown")
 
         logger.info("All performance systems shutdown successfully")
 
@@ -326,6 +348,7 @@ app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 # API Routes
 @app.get("/")
+@limiter.limit(f"{settings.rate_limit_requests}/{settings.rate_limit_window}second")
 async def root():
     """Root endpoint with API information"""
     # Dynamically generate endpoints from app routes
@@ -344,13 +367,14 @@ async def root():
     }
 
 @app.get("/health")
+@limiter.limit(f"{settings.rate_limit_requests}/{settings.rate_limit_window}second")
 async def health_check(request: Request):
     """Comprehensive health check endpoint with performance metrics"""
     health_status = {
         "status": "healthy",
         "timestamp": time.time(),
         "version": settings.app_version,
-        "uptime": time.time() - getattr(request.app.state, 'start_time', time.time()),
+        "uptime_seconds": time.time() - getattr(request.app.state, 'start_time', time.time()),
         "checks": {}
     }
 
@@ -439,6 +463,7 @@ async def health_check(request: Request):
     return health_status
 
 @app.get("/metrics")
+@limiter.limit(f"{settings.rate_limit_requests}/{settings.rate_limit_window}second")
 async def get_metrics(request: Request):
     """Comprehensive metrics endpoint with performance data"""
     base_metrics = metrics_collector.get_all_stats()
@@ -492,16 +517,18 @@ async def get_metrics(request: Request):
         performance_metrics["circuit_breakers"]["error"] = str(e)
 
     # System metrics
-    try:
-        import psutil
-        performance_metrics["system"] = {
-            "cpu_percent": psutil.cpu_percent(interval=1),
-            "memory_percent": psutil.virtual_memory().percent,
-            "disk_usage_percent": psutil.disk_usage('/').percent,
-            "load_average": psutil.getloadavg() if hasattr(psutil, 'getloadavg') else None
-        }
-    except Exception as e:
-        performance_metrics["system"]["error"] = str(e)
+    if psutil:
+        try:
+            performance_metrics["system"] = {
+                "cpu_percent": psutil.cpu_percent(interval=1),
+                "memory_percent": psutil.virtual_memory().percent,
+                "disk_usage_percent": psutil.disk_usage('/').percent,
+                "load_average": psutil.getloadavg() if hasattr(psutil, 'getloadavg') else None
+            }
+        except Exception as e:
+            performance_metrics["system"] = {"error": str(e)}
+    else:
+        performance_metrics["system"] = {"error": "psutil not available"}
 
     # Combine all metrics
     return {
@@ -512,6 +539,7 @@ async def get_metrics(request: Request):
     }
 
 @app.get("/providers")
+@limiter.limit(f"{settings.rate_limit_requests}/{settings.rate_limit_window}second")
 async def list_providers():
     """List all providers and their capabilities"""
     return [
@@ -606,12 +634,15 @@ async def completions(
         background_tasks.add_task(background_condense, request_id, request, full_chunks)
 
         if not req.get("stream", False):
-            return {
-                "status": "processing",
-                "request_id": request_id,
-                "message": "Long prompt detected; summarization in progress. Poll /summary/{request_id} for result.",
-                "estimated_time": "5-10 seconds"
-            }
+            return JSONResponse(
+                status_code=HTTPStatus.ACCEPTED,
+                content={
+                    "status": "processing",
+                    "request_id": request_id,
+                    "message": "Long prompt detected; summarization in progress. Poll /summary/{request_id} for result.",
+                    "estimated_time": "5-10 seconds"
+                }
+            )
 
         # For streaming, truncate and proceed
         truncate_len = config.truncation_threshold // 2
@@ -728,6 +759,7 @@ async def background_condense(request_id: str, request: Request, chunks: List[st
             request.app.state.summary_cache[request_id] = error_data
 
 @app.get("/summary/{request_id}")
+@limiter.limit(f"{settings.rate_limit_requests}/{settings.rate_limit_window}second")
 async def get_summary_status(request_id: str, request: Request):
     """Poll for background summarization status with smart cache"""
     cache_key = f"summary_{request_id}"
@@ -774,6 +806,7 @@ async def get_summary_status(request_id: str, request: Request):
     }
 
 @app.get("/v1/models")
+@limiter.limit(f"{settings.rate_limit_requests}/{settings.rate_limit_window}second")
 async def list_models(request: Request) -> Dict[str, Any]:
     """
     OpenAI-compatible models endpoint with comprehensive model information.

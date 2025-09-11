@@ -19,6 +19,7 @@ slowapi>=0.1.9        # For rate limiting API requests
 anyio>=3.7.1          # Asynchronous networking library
 PyJWT>=2.8.0          # For JSON Web Tokens authentication
 pyasn1>=0.6.1         # Dependency of PyJWT
+psutil>=5.9.0         # System and process utilities for memory monitoring
 
 # Testing
 pytest>=8.4.2         # Test framework

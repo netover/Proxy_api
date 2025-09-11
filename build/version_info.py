@@ -6,8 +6,8 @@ VSVersionInfo(
   ffi=FixedFileInfo(
     # filevers and prodvers should be always a tuple with four items: (1, 2, 3, 4)
     # Set not needed items to zero 0.
-    filevers=(1, 0, 0, 0),
-    prodvers=(1, 0, 0, 0),
+    filevers=(2, 0, 0, 0),
+    prodvers=(2, 0, 0, 0),
     # Contains a bitmask that specifies the valid bits 'flags'r
     mask=0x3f,
     # Contains a bitmask that specifies the Boolean attributes of the file.
@@ -31,12 +31,12 @@ VSVersionInfo(
         u'040904B0',
         [StringStruct(u'CompanyName', u'Your Company'),
         StringStruct(u'FileDescription', u'High-performance LLM proxy with intelligent routing and fallback'),
-        StringStruct(u'FileVersion', u'1.0.0'),
+        StringStruct(u'FileVersion', u'2.0.0'),
         StringStruct(u'InternalName', u'llm-proxy-api'),
         StringStruct(u'LegalCopyright', u'© Your Company. All rights reserved.'),
         StringStruct(u'OriginalFilename', u'llm-proxy-api.exe'),
         StringStruct(u'ProductName', u'LLM Proxy API'),
-        StringStruct(u'ProductVersion', u'1.0.0')])
+        StringStruct(u'ProductVersion', u'2.0.0')])
       ]),
     VarFileInfo([VarStruct(u'Translation', [1033, 1200])])
   ]

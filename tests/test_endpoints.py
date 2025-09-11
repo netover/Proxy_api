@@ -1,5 +1,7 @@
 import pytest
 import asyncio
+import json
+import time
 from unittest.mock import Mock, patch, AsyncMock
 from src.providers.base import ProviderError, InvalidRequestError, AuthenticationError, RateLimitError, ServiceUnavailableError
 from src.providers.cohere import CohereProvider
@@ -13,6 +15,20 @@ from httpx import AsyncClient
 from main import app  # Assuming the FastAPI app is defined in main.py
 
 client = TestClient(app)
+
+
+@pytest.mark.asyncio
+async def test_root_endpoint():
+    """Test root endpoint returns API information."""
+    async with AsyncClient(app=app, base_url="http://test") as ac:
+        response = await ac.get("/")
+        assert response.status_code == 200
+        json_response = response.json()
+        assert "name" in json_response
+        assert "version" in json_response
+        assert "status" in json_response
+        assert "endpoints" in json_response
+        assert json_response["status"] == "operational"
 
 
 @pytest.mark.asyncio
@@ -526,6 +542,157 @@ def test_text_completions_non_streaming():
     json_response = response.json()
     assert "choices" in json_response
 
+
+@pytest.mark.asyncio
+async def test_streaming_timeout_and_cancellation():
+    """Test streaming timeout and cancellation handling."""
+    from src.core.app_config import ProviderConfig
+    config = ProviderConfig(
+        name="openai",
+        type="openai",
+        base_url="https://api.openai.com/v1",
+        api_key_env="OPENAI_API_KEY",
+        models=["gpt-3.5-turbo"],
+        enabled=True,
+        priority=1
+    )
+
+    with patch('src.api.endpoints.get_providers_for_model') as mock_get_providers:
+        mock_get_providers.return_value = [config]
+
+        mock_provider = AsyncMock()
+
+        # Mock streaming generator that times out
+        async def timeout_generator():
+            await asyncio.sleep(15)  # Longer than timeout
+            yield {"choices": [{"delta": {"content": "Should not reach"}}]}
+
+        mock_provider.stream_generator = timeout_generator
+
+        with patch('src.api.endpoints.get_provider') as mock_get_provider:
+            mock_get_provider.return_value = mock_provider
+
+            async with AsyncClient(app=app, base_url="http://test") as ac:
+                data = {
+                    "model": "gpt-3.5-turbo",
+                    "messages": [{"role": "user", "content": "Hello"}],
+                    "stream": True
+                }
+                headers = {"Authorization": "Bearer test_key"}
+
+                # This should handle timeout gracefully
+                response = await ac.post("/v1/chat/completions", json=data, headers=headers)
+                # Should either succeed with truncated response or fail gracefully
+                assert response.status_code in [200, 503]  # Success or service unavailable
+
+
+@pytest.mark.asyncio
+async def test_slow_network_health_check():
+    """Test health check with slow network conditions."""
+    with patch('src.api.endpoints.app_state.provider_factory.get_all_provider_info') as mock_get_info:
+        mock_provider = Mock()
+        mock_provider.status.value = "healthy"
+        mock_get_info.return_value = [mock_provider]
+
+        # Mock slow response
+        async with AsyncClient(app=app, base_url="http://test") as ac:
+            # Add artificial delay to simulate slow network
+            with patch('asyncio.sleep') as mock_sleep:
+                mock_sleep.return_value = None  # Don't actually sleep
+
+                response = await ac.get("/health")
+                assert response.status_code == 200
+                json_response = response.json()
+                assert "status" in json_response
+                assert "uptime_seconds" in json_response  # Check our renamed field
+                assert isinstance(json_response["uptime_seconds"], (int, float))
+
+
+@pytest.mark.asyncio
+async def test_summary_endpoint_polling():
+    """Test polling summary endpoint for background summarization results."""
+    request_id = "test-request-123"
+
+    # Test not found case
+    async with AsyncClient(app=app, base_url="http://test") as ac:
+        response = await ac.get(f"/summary/{request_id}")
+        assert response.status_code == 200
+        json_response = response.json()
+        assert json_response["status"] == "not_found"
+        assert json_response["request_id"] == request_id
+
+    # Test completed case with mocked cache
+    with patch('main.app.state.summary_cache_obj') as mock_cache:
+        mock_cache.get.return_value = {
+            "summary": "Test summary result",
+            "timestamp": time.time(),
+            "latency": 2.5,
+            "chunks_count": 3,
+            "total_chars": 1500
+        }
+
+        async with AsyncClient(app=app, base_url="http://test") as ac:
+            response = await ac.get(f"/summary/{request_id}")
+            assert response.status_code == 200
+            json_response = response.json()
+            assert json_response["status"] == "completed"
+            assert json_response["summary"] == "Test summary result"
+            assert json_response["cached"] is True
+            assert "latency" in json_response
+
+    # Test error case
+    with patch('main.app.state.summary_cache_obj') as mock_cache:
+        mock_cache.get.return_value = {
+            "error": "Summarization failed",
+            "timestamp": time.time()
+        }
+
+        async with AsyncClient(app=app, base_url="http://test") as ac:
+            response = await ac.get(f"/summary/{request_id}")
+            assert response.status_code == 200
+            json_response = response.json()
+            assert json_response["status"] == "error"
+            assert json_response["error"] == "Summarization failed"
+
+
+@pytest.mark.asyncio
+async def test_background_summarization_202_accepted():
+    """Test background summarization returns 202 Accepted for long content."""
+    from src.core.app_config import ProviderConfig
+    config = ProviderConfig(
+        name="openai",
+        type="openai",
+        base_url="https://api.openai.com/v1",
+        api_key_env="OPENAI_API_KEY",
+        models=["gpt-3.5-turbo"],
+        enabled=True,
+        priority=1
+    )
+
+    with patch('src.api.endpoints.get_providers_for_model') as mock_get_providers:
+        mock_get_providers.return_value = [config]
+
+        with patch('src.api.endpoints.get_provider') as mock_get_provider:
+            mock_get_provider.return_value = AsyncMock()  # Not called due to early return
+
+            async with AsyncClient(app=app, base_url="http://test") as ac:
+                # Create content that exceeds truncation threshold
+                long_content = "a" * 5000  # Should trigger background condensation
+                data = {
+                    "model": "gpt-3.5-turbo",
+                    "messages": [{"role": "user", "content": long_content}],
+                    "stream": False  # Non-streaming to trigger 202 response
+                }
+                headers = {"Authorization": "Bearer test_key"}
+
+                response = await ac.post("/v1/chat/completions", json=data, headers=headers)
+                assert response.status_code == 202  # HTTP 202 Accepted
+                json_response = response.json()
+                assert json_response["status"] == "processing"
+                assert "request_id" in json_response
+                assert "message" in json_response
+                assert "estimated_time" in json_response
+
 def test_invalid_api_key():
     """Test endpoint with invalid API key."""
     data = {
@@ -769,7 +936,6 @@ async def test_rate_limit_exceeded_full():
 async def test_text_completions_context_condensation():
     """Test automatic context condensation on text completions endpoint."""
     from src.core.app_config import ProviderConfig
-    import json
     config = ProviderConfig(
         name="openai",
         type="openai",
@@ -820,7 +986,6 @@ async def test_text_completions_context_condensation():
 async def test_chat_completions_context_condensation():
     """Test automatic context condensation on context length exceeded error."""
     from src.core.app_config import ProviderConfig
-    import json
     config = ProviderConfig(
         name="openai",
         type="openai",

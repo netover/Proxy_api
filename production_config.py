@@ -8,6 +8,12 @@ from pathlib import Path
 from typing import Dict, Any, List
 import logging
 
+# Optional logging dependency
+try:
+    import pythonjsonlogger
+except ImportError:
+    pythonjsonlogger = None
+
 # Production environment detection
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
 IS_PRODUCTION = ENVIRONMENT == "production"
@@ -162,12 +168,11 @@ def setup_production_logging():
 
     # Create formatters
     if config["json_format"]:
-        try:
-            import pythonjsonlogger.jsonlogger
+        if pythonjsonlogger:
             formatter = pythonjsonlogger.jsonlogger.JsonFormatter(
                 fmt='%(asctime)s %(name)s %(levelname)s %(message)s'
             )
-        except ImportError:
+        else:
             formatter = logging.Formatter(config["format"])
     else:
         formatter = logging.Formatter(config["format"])

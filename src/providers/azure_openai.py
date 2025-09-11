@@ -83,7 +83,7 @@ class AzureOpenAIProvider(BaseProvider):
                             try:
                                 error_json = json.loads(error_data)
                                 raise InvalidRequestError(error_json['error']['message'], code=error_json['error']['type'])
-                            except:
+                            except (json.JSONDecodeError, KeyError):
                                 raise InvalidRequestError(f"Azure OpenAI Invalid Request: HTTP {response.status_code}", code="invalid_request")
                         response.raise_for_status()
                         
@@ -202,7 +202,7 @@ class AzureOpenAIProvider(BaseProvider):
                             try:
                                 error_json = json.loads(error_data)
                                 raise InvalidRequestError(error_json['error']['message'], code=error_json['error']['type'])
-                            except:
+                            except (json.JSONDecodeError, KeyError):
                                 raise InvalidRequestError(f"Azure OpenAI Invalid Request: HTTP {response.status_code}", code="invalid_request")
                         response.raise_for_status()
                         

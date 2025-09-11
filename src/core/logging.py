@@ -3,6 +3,7 @@ import sys
 from pathlib import Path
 from logging.handlers import RotatingFileHandler
 import json
+import re
 from datetime import datetime, timezone
 from typing import Any, Dict
 
@@ -83,6 +84,36 @@ def setup_logging(log_level: str = "INFO", log_file: Path = None):
     
     return root_logger
 
+
+def mask_secrets(text: str) -> str:
+    """Mask sensitive information in log messages"""
+    if not isinstance(text, str):
+        return text
+
+    # Common API key patterns to mask
+    patterns = [
+        # OpenAI API keys: sk-... (keep first 3 and last 3 chars)
+        (r'\b(sk-[a-zA-Z0-9]{3})[a-zA-Z0-9]{30,}([a-zA-Z0-9]{3})\b', r'\1***\2'),
+        # Generic API keys with prefixes
+        (r'\b(api[_-]?key[_-]?[:=]\s*)[a-zA-Z0-9]{10,}\b', r'\1***MASKED***'),
+        (r'\b(token[_-]?[:=]\s*)[a-zA-Z0-9]{10,}\b', r'\1***MASKED***'),
+        (r'\b(secret[_-]?[:=]\s*)[a-zA-Z0-9]{10,}\b', r'\1***MASKED***'),
+        # Authorization headers
+        (r'\b(Bearer\s+)[a-zA-Z0-9]{10,}\b', r'\1***MASKED***'),
+        (r'\b(Authorization:\s*Bearer\s+)[a-zA-Z0-9]{10,}\b', r'\1***MASKED***'),
+        # Password patterns
+        (r'\b(password[_-]?[:=]\s*)[^\s]{3,}\b', r'\1***MASKED***'),
+        # Email addresses (mask username)
+        (r'\b([a-zA-Z0-9._%+-]+)@([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})\b', r'***@\2'),
+    ]
+
+    masked_text = text
+    for pattern, replacement in patterns:
+        masked_text = re.sub(pattern, replacement, masked_text, flags=re.IGNORECASE)
+
+    return masked_text
+
+
 class ContextualLogger:
     """Logger with request context"""
     
@@ -94,8 +125,21 @@ class ContextualLogger:
         self.context.update(kwargs)
     
     def _log_with_context(self, level: int, msg: str, extra_data: Dict[str, Any] = None):
-        extra = {"extra_data": {**self.context, **(extra_data or {})}}
-        self.logger.log(level, msg, extra=extra)
+        # Mask sensitive information in the message
+        masked_msg = mask_secrets(msg)
+
+        # Also mask sensitive information in extra_data values
+        masked_extra_data = extra_data or {}
+        if masked_extra_data:
+            masked_extra_data = {}
+            for key, value in (extra_data or {}).items():
+                if isinstance(value, str):
+                    masked_extra_data[key] = mask_secrets(value)
+                else:
+                    masked_extra_data[key] = value
+
+        extra = {"extra_data": {**self.context, **masked_extra_data}}
+        self.logger.log(level, masked_msg, extra=extra)
     
     def info(self, msg: str, **kwargs):
         self._log_with_context(logging.INFO, msg, kwargs)

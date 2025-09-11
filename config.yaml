@@ -25,16 +25,19 @@ condensation:
     - "maximum context length"
     - "token limit exceeded"
     - "input too long"
+  adaptive_enabled: true
   adaptive_factor: 0.5
   cache_ttl: 300
   dynamic_reload: true
   parallel_providers: 1
   cache_size: 1000
-  cache_persist: false
+  cache_persist: true
   truncation_threshold: 4000
   fallback_strategies:
     - "truncate"
     - "secondary_provider"
+    - "delay"
+  delay: 2.0
 
 providers:
   - name: "openai_default"
