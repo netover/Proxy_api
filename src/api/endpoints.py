@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Depends, Request, BackgroundTasks
 from fastapi.responses import StreamingResponse
-from typing import Dict, Any, List, Optional, Union
+from typing import Dict, Any, List, Optional, Union, AsyncGenerator
 import asyncio
 import json
 import time
@@ -207,6 +207,10 @@ class RequestRouter:
 
 # Global router instance
 request_router = RequestRouter()
+
+def create_router():
+    """Factory function to create and return the API router"""
+    return router
 
 # Optimized endpoints with reduced duplication
 @router.post("/v1/chat/completions")

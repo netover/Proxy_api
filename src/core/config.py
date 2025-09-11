@@ -2,6 +2,7 @@ import os
 import sys
 from pathlib import Path
 from typing import List, Optional
+from pydantic import field_validator
 from pydantic_settings import BaseSettings
 import yaml
 
@@ -24,22 +25,43 @@ class Settings(BaseSettings):
     api_key_header: str = "X-API-Key"
     allowed_origins: List[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
     proxy_api_keys: List[str] = []
-    
-    from pydantic import field_validator
-    
+
     @field_validator('proxy_api_keys', mode='before')
+    @classmethod
     def parse_proxy_keys(cls, v):
         """Parse proxy_api_keys from string to list if necessary.
-        Functionality: If env var is string (comma-separated or JSON), convert to list for validation.
-        Potential issues: Assumes comma if str; for JSON, use json.loads. Handles empty.
-        Optimizations: Make separator configurable or auto-detect."""
+
+        Handles multiple input formats:
+        - Comma-separated string: "key1,key2,key3"
+        - JSON array string: "['key1','key2','key3']"
+        - List: ['key1', 'key2', 'key3']
+        - Empty/None values are filtered out
+        """
         if isinstance(v, str):
+            v = v.strip()
+            if not v:  # Empty string
+                return []
             if v.startswith('[') and v.endswith(']'):
+                # JSON array format
                 import json
-                return json.loads(v)
+                try:
+                    parsed = json.loads(v)
+                    if isinstance(parsed, list):
+                        return [str(k).strip() for k in parsed if k and str(k).strip()]
+                    else:
+                        return [str(parsed).strip()] if parsed else []
+                except json.JSONDecodeError:
+                    # Fallback to comma-separated if JSON parsing fails
+                    return [k.strip() for k in v.split(',') if k.strip()]
             else:
+                # Comma-separated format
                 return [k.strip() for k in v.split(',') if k.strip()]
-        return v
+        elif isinstance(v, list):
+            # Already a list, clean it up
+            return [str(k).strip() for k in v if k and str(k).strip()]
+        else:
+            # Other types, convert to string and process
+            return cls.parse_proxy_keys(str(v)) if v else []
 
     # Rate Limiting
     rate_limit_requests: int = 100
@@ -68,12 +90,7 @@ from src.core.app_config import ProviderConfig
 # Initialize settings
 settings = Settings()
 
-# Fix for env var loading as string instead of list; split comma-separated string if needed.
-# Functionality: Ensures proxy_api_keys is always a list by splitting if it's a string from env.
-# Potential issue: Assumes comma separator; if JSON or other, fails. Optimization: Use json.loads if starts with [.
-if isinstance(settings.proxy_api_keys, str):
-    settings.proxy_api_keys = [k.strip() for k in settings.proxy_api_keys.split(',') if k.strip()]
-
+# Validate that proxy API keys are configured
 if not settings.proxy_api_keys:
     raise ValueError("Proxy API keys must be configured. At least one key is required for security.")
 

@@ -14,9 +14,37 @@
 </head>
 <body>
     <!-- Body: Main content wrapper. Functionality: Contains all UI elements. Issue: No role or lang repeat. Opt: Add onload for JS init. -->
-    <div class="container" role="main" aria-label="Configuration form container">  <!-- Add ARIA: role=main for screen readers, aria-label for description. -->
-        <!-- H1: Page heading. Functionality: Semantic title. Issue: None. Opt: Add id for skip links. -->
-        <h1>LLM Proxy Configuration</h1>
+    <div class="container" role="main" aria-label="LLM Proxy Dashboard and Configuration">  <!-- Add ARIA: role=main for screen readers, aria-label for description. -->
+        <!-- Navigation: Tabs for Dashboard and Configuration. Functionality: Allows switching views. Issue: No JS for tab switching. Opt: Add JS to show/hide sections. -->
+        <nav class="nav-tabs" role="navigation" aria-label="Main navigation">
+            <button id="dashboard-tab" class="tab-btn active" onclick="showTab('dashboard')">Dashboard</button>
+            <button id="config-tab" class="tab-btn" onclick="showTab('config')">Configuration</button>
+        </nav>
+
+        <!-- Dashboard Section -->
+        <div id="dashboard-section" class="tab-content active">
+            <h1>LLM Proxy Dashboard</h1>
+
+            <!-- Providers Status -->
+            <section class="dashboard-card neumorphic-card">
+                <h2>Providers Status</h2>
+                <div id="providers-status" class="status-list">
+                    <p>Loading providers...</p>
+                </div>
+            </section>
+
+            <!-- Recent Logs -->
+            <section class="dashboard-card neumorphic-card">
+                <h2>Recent Logs</h2>
+                <div id="recent-logs" class="logs-list">
+                    <p>Loading logs...</p>
+                </div>
+            </section>
+        </div>
+
+        <!-- Configuration Section -->
+        <div id="config-section" class="tab-content">
+            <h1>LLM Proxy Configuration</h1>
 
         <!-- Flash messages: Jinja block to display Flask flashed messages with categories (error/success). Functionality: User feedback from server validation/saves. Issue: No auto-dismiss; static display. Opt: Add JS for fade-out, ARIA live region for dynamic updates. -->
         {% with messages = get_flashed_messages(with_categories=true) %}
@@ -91,70 +119,133 @@
                 <button type="submit" class="neumorphic-btn" aria-label="Save configuration changes">Save Changes</button>  <!-- ARIA: aria-label for description. -->
             </div>
         </form>
+        </div>  <!-- End config-section -->
     </div>
-    <!-- Inline JS for client-side validation. Functionality: Validates form on submit, prevents if invalid, adds error classes/messages. Issue: No dynamic add support. Opt: Use vanilla JS for no deps, add for each provider. -->
+    <!-- Inline JS for tab switching, AJAX, and validation. -->
     <script>
         document.addEventListener('DOMContentLoaded', function() {
+            // Tab switching
+            window.showTab = function(tabName) {
+                // Hide all tabs
+                document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+                document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+                // Show selected tab
+                document.getElementById(tabName + '-section').classList.add('active');
+                document.getElementById(tabName + '-tab').classList.add('active');
+                // Load dashboard data if switching to dashboard
+                if (tabName === 'dashboard') {
+                    loadDashboardData();
+                }
+            };
+
+            // AJAX function
+            function fetchData(url, callback) {
+                fetch(url)
+                    .then(response => response.json())
+                    .then(data => callback(data))
+                    .catch(error => console.error('Error fetching data:', error));
+            }
+
+            // Load dashboard data
+            function loadDashboardData() {
+                // Load providers
+                fetchData('/api/dashboard/providers', function(data) {
+                    const container = document.getElementById('providers-status');
+                    if (data.providers && data.providers.length > 0) {
+                        container.innerHTML = data.providers.map(provider => `
+                            <div class="provider-item ${provider.status}">
+                                <strong>${provider.name}</strong> (${provider.type}) - ${provider.status}
+                                <br>Models: ${provider.models.join(', ')}
+                            </div>
+                        `).join('');
+                    } else {
+                        container.innerHTML = '<p>No providers configured.</p>';
+                    }
+                });
+
+                // Load logs
+                fetchData('/api/dashboard/logs', function(data) {
+                    const container = document.getElementById('recent-logs');
+                    if (data.logs && data.logs.length > 0) {
+                        container.innerHTML = data.logs.map(log => `
+                            <div class="log-item ${log.level.toLowerCase()}">
+                                <span class="log-time">${new Date(log.timestamp).toLocaleString()}</span>
+                                <span class="log-level">${log.level}</span>
+                                <span class="log-message">${log.message}</span>
+                            </div>
+                        `).join('');
+                    } else {
+                        container.innerHTML = '<p>No recent logs.</p>';
+                    }
+                });
+            }
+
+            // Load dashboard on page load
+            loadDashboardData();
+
+            // Form validation (existing)
             const form = document.querySelector('form[role="form"]');
-            form.addEventListener('submit', function(e) {
-                let valid = true;
-                // Validate port
-                const port = document.getElementById('port');
-                if (port.value && (isNaN(port.value) || port.value < 1 || port.value > 65535)) {
-                    port.classList.add('error');
-                    valid = false;
-                } else {
-                    port.classList.remove('error');
-                }
-                // Validate header pattern
-                const header = document.getElementById('api_key_header');
-                const headerPattern = /^[A-Za-z0-9_-]+$/;
-                if (header.value && !headerPattern.test(header.value)) {
-                    header.classList.add('error');
-                    valid = false;
-                } else {
-                    header.classList.remove('error');
-                }
-                // Validate providers (loop over name fields)
-                const names = form.querySelectorAll('input[name^="provider_name_"]');
-                names.forEach(function(nameInput) {
-                    if (!nameInput.value.trim()) {
-                        nameInput.classList.add('error');
+            if (form) {
+                form.addEventListener('submit', function(e) {
+                    let valid = true;
+                    // Validate port
+                    const port = document.getElementById('port');
+                    if (port && port.value && (isNaN(port.value) || port.value < 1 || port.value > 65535)) {
+                        port.classList.add('error');
                         valid = false;
-                    } else {
-                        nameInput.classList.remove('error');
+                    } else if (port) {
+                        port.classList.remove('error');
+                    }
+                    // Validate header pattern
+                    const header = document.getElementById('api_key_header');
+                    const headerPattern = /^[A-Za-z0-9_-]+$/;
+                    if (header && header.value && !headerPattern.test(header.value)) {
+                        header.classList.add('error');
+                        valid = false;
+                    } else if (header) {
+                        header.classList.remove('error');
+                    }
+                    // Validate providers (loop over name fields)
+                    const names = form.querySelectorAll('input[name^="provider_name_"]');
+                    names.forEach(function(nameInput) {
+                        if (!nameInput.value.trim()) {
+                            nameInput.classList.add('error');
+                            valid = false;
+                        } else {
+                            nameInput.classList.remove('error');
+                        }
+                    });
+                    const models = form.querySelectorAll('textarea[name^="models_"]');
+                    models.forEach(function(modelInput) {
+                        if (!modelInput.value.trim()) {
+                            modelInput.classList.add('error');
+                            valid = false;
+                        } else {
+                            modelInput.classList.remove('error');
+                        }
+                    });
+                    const priorities = form.querySelectorAll('input[name^="priority_"]');
+                    priorities.forEach(function(priInput) {
+                        const pri = parseInt(priInput.value);
+                        if (isNaN(pri) || pri < 0) {
+                            priInput.classList.add('error');
+                            valid = false;
+                        } else {
+                            priInput.classList.remove('error');
+                        }
+                    });
+                    if (!valid) {
+                        e.preventDefault();
+                        alert('Please fix the errors before submitting.');
                     }
                 });
-                const models = form.querySelectorAll('textarea[name^="models_"]');
-                models.forEach(function(modelInput) {
-                    if (!modelInput.value.trim()) {
-                        modelInput.classList.add('error');
-                        valid = false;
-                    } else {
-                        modelInput.classList.remove('error');
+                // Remove error on input
+                form.addEventListener('input', function(e) {
+                    if (e.target.classList.contains('error')) {
+                        e.target.classList.remove('error');
                     }
                 });
-                const priorities = form.querySelectorAll('input[name^="priority_"]');
-                priorities.forEach(function(priInput) {
-                    const pri = parseInt(priInput.value);
-                    if (isNaN(pri) || pri < 0) {
-                        priInput.classList.add('error');
-                        valid = false;
-                    } else {
-                        priInput.classList.remove('error');
-                    }
-                });
-                if (!valid) {
-                    e.preventDefault();
-                    alert('Please fix the errors before submitting.');  // Simple alert; opt: custom messages.
-                }
-            });
-            // Remove error on input
-            form.addEventListener('input', function(e) {
-                if (e.target.classList.contains('error')) {
-                    e.target.classList.remove('error');
-                }
-            });
+            }
         });
     </script>
 </body>

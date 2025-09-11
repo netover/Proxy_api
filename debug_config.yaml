@@ -1,0 +1,58 @@
+# Debugging Configuration for PyInstaller
+# Not directly used - kept for inspection purposes
+
+uvicorn_imports:
+  - uvicorn.logging
+  - uvicorn.loops.auto
+  - uvicorn.protocols.http.auto
+  - uvicorn.protocols.http.h11_impl
+  - uvicorn.protocols.http.httptools_impl
+  - uvicorn.protocols.websockets.auto
+  - uvicorn.lifespan.on
+  - uvicorn.lifespan.off
+
+known_fastapi_deps:
+  - fastapi
+  - fastapi.routing
+  - fastapi.applications
+  - fastapi.middleware
+  - fastapi.middleware.cors
+  - fastapi.middleware.gzip
+
+other_deps:
+  - pydantic
+  - pydantic.fields
+  - pydantic.main
+  - pydantic.types
+  - httpx
+  - httpx._main
+  - pyyaml
+  - structlog
+  - slowapi
+
+directories_to_collect:
+  - src.core.config
+  - src.core.logging
+  - src.core.app_config
+  - src.core.metrics
+  - src.core.auth
+  - src.core.circuit_breaker
+  - src.providers.base
+  - src.providers.openai
+  - src.providers.anthropic
+  - src.providers.blackbox
+  - src.providers.azure_openai
+  - src.providers.cohere
+  - src.providers.dynamic_anthropic
+  - src.providers.dynamic_base
+  - src.providers.dynamic_blackbox
+  - src.providers.dynamic_openai
+  - src.providers.dynamic_openrouter
+  - src.providers.dynamic_perplexity
+  - src.providers.grok
+  - src.providers.openrouter
+  - src.providers.perplexity
+  - src.services
+  - src.utils
+
+build_log_file_path: ./build/uvicorn-dependency_debug.log

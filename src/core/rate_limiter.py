@@ -6,10 +6,10 @@ logger = ContextualLogger(__name__)
 
 class RateLimiter:
     """Custom rate limiter using slowapi with unified config"""
-    
+
     def __init__(self):
         self.limiter = Limiter(key_func=get_remote_address)
-        self.limiter.storage = self.limiter.storage_class()
+        # Fix for slowapi compatibility - storage is handled internally
         self._default_limit = "100/minute"  # Default fallback
     
     def configure_limits(self, rpm: int):

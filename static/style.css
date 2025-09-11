@@ -1,171 +1,391 @@
-/* Overall CSS: Neumorphic design system with soft shadows for 3D UI. Functionality: Uses CSS vars for theme consistency, light theme default. Issue: No dark mode support; fixed colors not accessible in low contrast. Opt: Add prefers-color-scheme media for dark mode, calc for dynamic shadows, !important avoid if possible. Minify for prod. Add comments for each rule. */
+/* LLM Proxy API - Modern CSS Design System
+   Features: Neumorphic design, accessibility, responsive layout, dark mode support
+*/
+
+/* CSS Custom Properties for Theming */
 :root {
-    --background-color: #e0e5ec; /* Functionality: Base background for light neumorphic. Issue: Hard-coded; low contrast for dark env. Opt: Default light, override in dark mode. */
-    --text-color: #555; /* Functionality: Primary text color for readability on bg. Issue: Gray may be low contrast for large text. Opt: Use currentColor or WCAG compliant. */
-    --primary-color: #3d5af1; /* Functionality: Accent for interactive elements (btn text). Issue: Blue may not pass contrast on bg. Opt: Ensure AA/AAA compliance. */
-    --shadow-light: #ffffff; /* Functionality: Light part of neumorphic shadow for highlight. Issue: White on light bg subtle. Opt: Adjust opacity for better depth. */
-    --shadow-dark: #a3b1c6; /* Functionality: Dark part for shadow depth. Issue: Fixed; not adaptive. Opt: Use hsla for transparency. Potential failure: Overly subtle on similar bgs. */
+    /* Light theme colors */
+    --bg-primary: #e0e5ec;
+    --bg-secondary: #f8f9fa;
+    --text-primary: #2c3e50;
+    --text-secondary: #6c757d;
+    --text-muted: #adb5bd;
+    --accent-primary: #4a90e2;
+    --accent-secondary: #5cb85c;
+    --accent-danger: #d9534f;
+    --accent-warning: #f0ad4e;
+
+    /* Shadows for neumorphic effect */
+    --shadow-light: #ffffff;
+    --shadow-dark: #a3b1c6;
+    --shadow-inset-light: rgba(255, 255, 255, 0.8);
+    --shadow-inset-dark: rgba(163, 177, 198, 0.4);
+
+    /* Spacing and sizing */
+    --border-radius: 12px;
+    --border-radius-large: 20px;
+    --spacing-xs: 0.25rem;
+    --spacing-sm: 0.5rem;
+    --spacing-md: 1rem;
+    --spacing-lg: 1.5rem;
+    --spacing-xl: 2rem;
+    --spacing-xxl: 3rem;
+
+    /* Typography */
+    --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-size-xs: 0.75rem;
+    --font-size-sm: 0.875rem;
+    --font-size-base: 1rem;
+    --font-size-lg: 1.125rem;
+    --font-size-xl: 1.25rem;
+    --font-size-2xl: 1.5rem;
+    --font-size-3xl: 2rem;
+    --line-height-tight: 1.25;
+    --line-height-normal: 1.5;
+    --line-height-relaxed: 1.75;
+
+    /* Transitions */
+    --transition-fast: 150ms ease-in-out;
+    --transition-normal: 250ms ease-in-out;
+    --transition-slow: 350ms ease-in-out;
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bg-primary: #1a1a1a;
+        --bg-secondary: #2d2d2d;
+        --text-primary: #e0e0e0;
+        --text-secondary: #b0b0b0;
+        --text-muted: #808080;
+        --shadow-light: #2d2d2d;
+        --shadow-dark: #0f0f0f;
+        --shadow-inset-light: rgba(45, 45, 45, 0.8);
+        --shadow-inset-dark: rgba(15, 15, 15, 0.4);
+    }
+}
+
+/* Base Layout */
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
 }
 
 body {
-   background-color: var(--background-color); /* Functionality: Applies theme bg to whole page. Issue: No gradient for depth. Opt: Add subtle gradient. */
-   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; /* Functionality: Modern sans-serif stack for cross-browser. Issue: No fallback for system fonts. Opt: Add system-ui. */
-   color: var(--text-color); /* Functionality: Sets default text color. Issue: Inherited; overrides needed for links. Opt: Set line-height 1.5 for readability. */
-   display: flex; /* Functionality: Flexbox for vertical/horizontal centering. Issue: No min-height. Opt: Add min-height: 100vh. */
-   justify-content: center; /* Functionality: Centers container horizontally. */
-   align-items: flex-start; /* Functionality: Aligns to top for scrolling. Issue: On short content, top-aligned. Opt: center for middle if short. */
-   padding: 2rem; /* Functionality: Adds space around. Issue: Fixed; on mobile causes overflow/horizontal scroll. Potential failure: Touch devices hard to use. Opt: Use clamp or media. */
-   min-height: 100vh; /* Add: Full viewport height. */
-   margin: 0; /* Add: Reset default margin. */
+    margin: 0;
+    padding: 0;
+    min-height: 100vh;
+    font-family: var(--font-family);
+    font-size: var(--font-size-base);
+    line-height: var(--line-height-normal);
+    color: var(--text-primary);
+    background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding: clamp(var(--spacing-md), 5vw, var(--spacing-xxl));
+    transition: background-color var(--transition-normal);
 }
 
 .container {
-   width: 100%; /* Functionality: Full width base. Issue: No flex. Opt: Add flex-grow. */
-   max-width: 800px; /* Functionality: Limits width for readability on large screens. Issue: Fixed; on ultra-wide too narrow? Opt: min(90vw, 800px). */
-   margin: 0 auto; /* Add: Centers if padding allows. */
-   role: "main"; /* Wait, this is CSS, ARIA in HTML. */
+    width: min(90vw, 800px);
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xl);
 }
 
+/* Typography */
 h1 {
-   text-align: center; /* Functionality: Centers title. Issue: None. Opt: Add font-weight. */
-   color: var(--text-color); /* Fix: Use var instead of hard-coded #3b3f46 for theme consistency. */
-   text-shadow: 1px 1px 1px var(--shadow-light); /* Functionality: Subtle neumorphic highlight. Issue: Subtle; may not be visible. Opt: Multiple shadows for depth. */
-   margin-bottom: 2rem; /* Functionality: Space below. Issue: Fixed; responsive? Opt: rem consistent. */
-   font-size: clamp(1.5rem, 4vw, 2.5rem); /* Add: Responsive font size. */
+    font-size: clamp(var(--font-size-2xl), 5vw, var(--font-size-3xl));
+    font-weight: 700;
+    text-align: center;
+    color: var(--text-primary);
+    margin: 0 0 var(--spacing-xl) 0;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    line-height: var(--line-height-tight);
 }
 
+h2 {
+    font-size: var(--font-size-xl);
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0 0 var(--spacing-lg) 0;
+    line-height: var(--line-height-tight);
+}
+
+h3 {
+    font-size: var(--font-size-lg);
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0 0 var(--spacing-md) 0;
+    line-height: var(--line-height-tight);
+}
+
+/* Form Styles */
 form {
-    display: flex; /* Functionality: Flex for layout control. Issue: No wrap. Opt: Add wrap if needed. */
-    flex-direction: column; /* Functionality: Stacks sections vertically. */
-    gap: 2rem; /* Functionality: Consistent spacing between fieldsets. Issue: Fixed; large on mobile. Opt: Responsive gap. */
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xl);
+    margin: 0;
 }
 
 fieldset {
-   border: none; /* Functionality: Seamless neumorphic look. Issue: No visual separation. Opt: Use background or shadow for sections. */
-   padding: 0; /* Functionality: No extra space. */
-   margin: 0; /* Functionality: No margin. Opt: Add margin-bottom for sections. */
+    border: none;
+    padding: 0;
+    margin: 0;
+    background: transparent;
 }
 
 legend {
-   font-size: 1.5rem; /* Functionality: Larger for section title. Issue: Fixed; small on mobile. Opt: Responsive. */
-   font-weight: 600; /* Functionality: Bold for emphasis. */
-   margin-bottom: 1rem; /* Functionality: Space below. */
-   color: var(--text-color); /* Functionality: Theme consistent. */
+    font-size: var(--font-size-lg);
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: var(--spacing-lg);
+    padding: 0;
+    line-height: var(--line-height-tight);
 }
 
+/* Card Components */
 .neumorphic-card {
-   border-radius: 20px; /* Functionality: Rounded corners for soft look. Issue: Large radius; square on small. Opt: Responsive radius. */
-   background: var(--background-color); /* Functionality: Matches theme. */
-   box-shadow: 9px 9px 16px var(--shadow-dark), -9px -9px 16px var(--shadow-light); /* Functionality: Outset neumorphic raised effect. Issue: Performance heavy on scroll; large shadows blur. Opt: Use filter: blur for GPU. */
-   padding: 2rem; /* Functionality: Internal space. Issue: Fixed; cramped on mobile. Potential failure: Overflow on small screens. Opt: Use clamp(1rem, 5vw, 2rem). */
+    border-radius: var(--border-radius-large);
+    background: var(--bg-primary);
+    box-shadow:
+        8px 8px 16px var(--shadow-dark),
+        -8px -8px 16px var(--shadow-light);
+    padding: clamp(var(--spacing-lg), 5vw, var(--spacing-xxl));
+    margin-bottom: var(--spacing-lg);
+    transition: all var(--transition-normal);
+    position: relative;
+    overflow: hidden;
+}
+
+.neumorphic-card:hover {
+    transform: translateY(-2px);
+    box-shadow:
+        12px 12px 24px var(--shadow-dark),
+        -12px -12px 24px var(--shadow-light);
 }
 
 .neumorphic-card-inset {
-   border-radius: 15px; /* Functionality: Slightly smaller radius for inset. */
-   background: var(--background-color); /* Functionality: Same bg. */
-   box-shadow: inset 7px 7px 15px var(--shadow-dark), inset -7px -7px 15px var(--shadow-light); /* Functionality: Inset for sunken provider card. Issue: Deep inset may look too depressed. Opt: Adjust px for subtlety. */
-   padding: 1.5rem; /* Functionality: Less padding for items. */
-   margin-bottom: 1.5rem; /* Functionality: Space between cards. */
+    border-radius: var(--border-radius);
+    background: var(--bg-primary);
+    box-shadow:
+        inset 4px 4px 8px var(--shadow-inset-dark),
+        inset -4px -4px 8px var(--shadow-inset-light);
+    padding: var(--spacing-lg);
+    margin-bottom: var(--spacing-lg);
+    transition: all var(--transition-normal);
 }
 
+.neumorphic-card-inset:hover {
+    box-shadow:
+        inset 6px 6px 12px var(--shadow-inset-dark),
+        inset -6px -6px 12px var(--shadow-inset-light);
+}
+
+/* Form Controls */
 .form-group {
-   margin-bottom: 1rem; /* Functionality: Space between fields. Issue: Fixed. Opt: Gap instead. */
-   display: flex; /* Functionality: Flex for label/input stack. */
-   flex-direction: column; /* Functionality: Vertical stack. */
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-lg);
 }
 
 label {
-   margin-bottom: 0.5rem; /* Functionality: Space below label. */
-   font-weight: 500; /* Functionality: Semi-bold for clarity. Issue: Not bold enough. Opt: 600. */
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: var(--font-size-sm);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: var(--spacing-xs);
 }
 
 .neumorphic-input,
 .neumorphic-textarea {
-   border: none; /* Functionality: Seamless. */
-   outline: none; /* Functionality: No default focus outline. Issue: Accessibility bad; add custom focus. Opt: outline: 2px solid on :focus-visible. */
-   background: none; /* Functionality: Transparent for inset shadow. */
-   width: 100%; /* Functionality: Full width. */
-   padding: 12px 15px; /* Functionality: Comfortable input space. Issue: Fixed; small on mobile. Opt: Responsive. */
-   border-radius: 10px; /* Functionality: Rounded. */
-   box-shadow: inset 5px 5px 10px var(--shadow-dark), inset -5px -5px 10px var(--shadow-light); /* Functionality: Sunken neumorphic. Issue: Dark inset hard to read text. Opt: Lighter shadows. */
-   color: var(--text-color); /* Functionality: Theme text. */
-   font-size: 1rem; /* Functionality: Standard size. */
-   box-sizing: border-box; /* Functionality: Include padding in width. */
-   transition: box-shadow 0.3s ease; /* Add: Smooth focus change. */
+    border: none;
+    outline: none;
+    background: transparent;
+    width: 100%;
+    padding: var(--spacing-md) var(--spacing-lg);
+    border-radius: var(--border-radius);
+    box-shadow:
+        inset 3px 3px 6px var(--shadow-inset-dark),
+        inset -3px -3px 6px var(--shadow-inset-light);
+    color: var(--text-primary);
+    font-size: var(--font-size-base);
+    font-family: inherit;
+    box-sizing: border-box;
+    transition: all var(--transition-fast);
+    line-height: var(--line-height-normal);
 }
 
 .neumorphic-input:focus-visible,
 .neumorphic-textarea:focus-visible {
-   box-shadow: inset 5px 5px 10px var(--shadow-dark), inset -5px -5px 10px var(--shadow-light), 0 0 0 2px var(--primary-color); /* Add: Custom focus ring for accessibility. */
-   outline: none; /* Ensure no default. */
+    box-shadow:
+        inset 3px 3px 6px var(--shadow-inset-dark),
+        inset -3px -3px 6px var(--shadow-inset-light),
+        0 0 0 3px rgba(74, 144, 226, 0.3);
+    outline: 2px solid var(--accent-primary);
+    outline-offset: 2px;
 }
 
-/* Error class for JS validation. Functionality: Visual feedback for invalid fields. Issue: Not defined; JS adds. Opt: Red shadow for error. */
-.error {
-    box-shadow: inset 5px 5px 10px #ff4444, inset -5px -5px 10px #ff6666; /* Red inset for error. */
-    border: 1px solid #ff4444; /* Add border for visibility. */
+.neumorphic-input::placeholder,
+.neumorphic-textarea::placeholder {
+    color: var(--text-muted);
+    opacity: 0.7;
 }
 
 .neumorphic-textarea {
-   resize: vertical; /* Functionality: Allow height resize only. Issue: None. Opt: min-height for consistency. */
+    resize: vertical;
+    min-height: 100px;
+    line-height: var(--line-height-relaxed);
 }
 
+/* Validation States */
+.form-group.error .neumorphic-input,
+.form-group.error .neumorphic-textarea {
+    box-shadow:
+        inset 3px 3px 6px rgba(217, 83, 79, 0.3),
+        inset -3px -3px 6px rgba(217, 83, 79, 0.1);
+    border: 2px solid var(--accent-danger);
+}
+
+.form-group.success .neumorphic-input,
+.form-group.success .neumorphic-textarea {
+    box-shadow:
+        inset 3px 3px 6px rgba(92, 184, 92, 0.3),
+        inset -3px -3px 6px rgba(92, 184, 92, 0.1);
+    border: 2px solid var(--accent-secondary);
+}
+
+/* Form Actions */
 .form-actions {
-   text-align: center; /* Functionality: Centers button. */
-   margin-top: 1rem; /* Functionality: Space above. */
+    display: flex;
+    justify-content: center;
+    gap: var(--spacing-md);
+    margin-top: var(--spacing-xl);
+    flex-wrap: wrap;
 }
 
+/* Button Styles */
 .neumorphic-btn {
-   border: none; /* Functionality: Seamless. */
-   outline: none; /* Functionality: Custom focus. Issue: Accessibility. Opt: Focus ring. */
-   background: var(--background-color); /* Functionality: Theme bg. */
-   padding: 15px 30px; /* Functionality: Comfortable touch. Issue: Large on mobile. Opt: Responsive. */
-   border-radius: 10px; /* Functionality: Rounded. */
-   box-shadow: 7px 7px 15px var(--shadow-dark), -7px -7px 15px var(--shadow-light); /* Functionality: Raised button. */
-   color: var(--primary-color); /* Functionality: Accent text. */
-   font-size: 1.1rem; /* Functionality: Readable. */
-   font-weight: 600; /* Functionality: Bold. */
-   cursor: pointer; /* Functionality: Hand on hover. */
-   transition: all 0.3s ease-in-out; /* Functionality: Smooth interactions. */
+    border: none;
+    outline: none;
+    background: var(--bg-primary);
+    padding: var(--spacing-md) var(--spacing-xl);
+    border-radius: var(--border-radius);
+    box-shadow:
+        5px 5px 10px var(--shadow-dark),
+        -5px -5px 10px var(--shadow-light);
+    color: var(--accent-primary);
+    font-size: var(--font-size-base);
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    position: relative;
+    overflow: hidden;
+    min-height: 48px; /* Accessibility: minimum touch target */
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .neumorphic-btn:focus-visible {
-   box-shadow: 7px 7px 15px var(--shadow-dark), -7px -7px 15px var(--shadow-light), 0 0 0 2px var(--primary-color); /* Add: Focus ring. */
+    box-shadow:
+        5px 5px 10px var(--shadow-dark),
+        -5px -5px 10px var(--shadow-light),
+        0 0 0 3px rgba(74, 144, 226, 0.3);
+    outline: 2px solid var(--accent-primary);
+    outline-offset: 2px;
 }
 
 .neumorphic-btn:hover {
-   transform: translateY(-2px); /* Add: Lift on hover for interactivity. */
+    transform: translateY(-2px);
+    box-shadow:
+        7px 7px 14px var(--shadow-dark),
+        -7px -7px 14px var(--shadow-light);
+    color: var(--text-primary);
 }
 
 .neumorphic-btn:active {
-   transform: translateY(0); /* Add: Press down. */
+    transform: translateY(0);
+    box-shadow:
+        inset 3px 3px 6px var(--shadow-inset-dark),
+        inset -3px -3px 6px var(--shadow-inset-light);
 }
 
-.neumorphic-btn:hover {
-   color: #333; /* Functionality: Darker text on hover. Issue: Hard-coded. Opt: Use var(--text-color). */
+.neumorphic-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
 }
 
-.neumorphic-btn:active {
-   box-shadow: inset 7px 7px 15px var(--shadow-dark), inset -7px -7px 15px var(--shadow-light); /* Functionality: Sunken on click. */
-}
-
+/* Flash Messages */
 .flash {
-   padding: 1rem; /* Functionality: Internal space. */
-   margin-bottom: 1rem; /* Functionality: Space below. */
-   border-radius: 10px; /* Functionality: Rounded. */
-   text-align: center; /* Functionality: Centered text. */
+    padding: var(--spacing-md) var(--spacing-lg);
+    margin-bottom: var(--spacing-lg);
+    border-radius: var(--border-radius);
+    border: none;
+    font-weight: 500;
+    font-size: var(--font-size-sm);
+    line-height: var(--line-height-normal);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    animation: slideIn 0.3s ease-out;
+}
+
+.flash::before {
+    content: '';
+    width: 4px;
+    height: 100%;
+    border-radius: 2px;
+    flex-shrink: 0;
 }
 
 .flash.error {
-   background-color: #f8d7da; /* Functionality: Light red bg for error. Issue: Low contrast? Opt: Ensure WCAG. */
-   color: #721c24; /* Functionality: Dark red text. */
-   border: 1px solid #f5c6cb; /* Functionality: Border for outline. */
+    background: linear-gradient(135deg, #fee, #fdd);
+    color: #c53030;
+    border-left: 4px solid var(--accent-danger);
+}
+
+.flash.error::before {
+    background: var(--accent-danger);
 }
 
 .flash.success {
-   background-color: #d4edda; /* Functionality: Light green for success. */
-   color: #155724; /* Functionality: Dark green text. */
-   border: 1px solid #c3e6cb; /* Functionality: Green border. */
+    background: linear-gradient(135deg, #efe, #dfd);
+    color: #2f855a;
+    border-left: 4px solid var(--accent-secondary);
+}
+
+.flash.success::before {
+    background: var(--accent-secondary);
+}
+
+.flash.warning {
+    background: linear-gradient(135deg, #fff8e1, #fff3c4);
+    color: #b7791f;
+    border-left: 4px solid var(--accent-warning);
+}
+
+.flash.warning::before {
+    background: var(--accent-warning);
+}
+
+/* Animations */
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 /* Help text: Small gray for descriptions. Add for ARIA-describedby. */
@@ -175,33 +395,113 @@ label {
     margin-top: 0.25rem;
 }
 
-/* Responsive media queries: For mobile devices. Functionality: Adjust padding, widths for small screens. Issue: Basic; add more breakpoints. Opt: Use container queries if supported. */
-@media (max-width: 600px) {
+/* Responsive Design */
+@media (max-width: 768px) {
     body {
-        padding: 1rem; /* Reduce padding on mobile. */
+        padding: var(--spacing-md);
     }
+
     .container {
-        max-width: 100%; /* Full width on small. */
-        padding: 0 1rem; /* Add side padding. */
+        width: 100%;
+        gap: var(--spacing-lg);
     }
-    .neumorphic-card, .neumorphic-card-inset {
-        padding: 1rem; /* Reduce internal padding. */
+
+    .neumorphic-card,
+    .neumorphic-card-inset {
+        padding: var(--spacing-lg);
+        margin-bottom: var(--spacing-md);
     }
+
     h1 {
-        font-size: 1.5rem; /* Smaller title. */
+        font-size: var(--font-size-2xl);
+        margin-bottom: var(--spacing-lg);
     }
-    legend {
-        font-size: 1.25rem; /* Smaller section. */
+
+    .form-actions {
+        flex-direction: column;
+        align-items: stretch;
     }
-    .form-group {
-        margin-bottom: 0.75rem; /* Less space. */
-    }
+
     .neumorphic-btn {
-        padding: 12px 24px; /* Smaller button. */
-        font-size: 1rem; /* Smaller text. */
+        width: 100%;
+        padding: var(--spacing-lg);
+        font-size: var(--font-size-base);
     }
+
     .flash {
-        padding: 0.75rem; /* Smaller messages. */
+        padding: var(--spacing-md);
+        margin-bottom: var(--spacing-md);
+        font-size: var(--font-size-sm);
+    }
+}
+
+@media (max-width: 480px) {
+    body {
+        padding: var(--spacing-sm);
+    }
+
+    .neumorphic-card,
+    .neumorphic-card-inset {
+        padding: var(--spacing-md);
+        border-radius: calc(var(--border-radius) * 0.8);
+    }
+
+    .neumorphic-input,
+    .neumorphic-textarea {
+        padding: var(--spacing-sm) var(--spacing-md);
+        font-size: var(--font-size-sm);
+    }
+
+    h1 {
+        font-size: var(--font-size-xl);
+    }
+
+    legend {
+        font-size: var(--font-size-base);
+    }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+    :root {
+        --bg-primary: #ffffff;
+        --bg-secondary: #f8f8f8;
+        --text-primary: #000000;
+        --text-secondary: #333333;
+        --shadow-light: #cccccc;
+        --shadow-dark: #666666;
+    }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+/* Print styles */
+@media print {
+    body {
+        background: white !important;
+        color: black !important;
+    }
+
+    .neumorphic-card,
+    .neumorphic-card-inset {
+        box-shadow: none !important;
+        border: 1px solid #ccc !important;
+    }
+
+    .neumorphic-btn {
+        background: white !important;
+        color: black !important;
+        border: 1px solid black !important;
+        box-shadow: none !important;
     }
 }
 
@@ -219,6 +519,134 @@ label {
 :focus-visible {
     outline: 2px solid var(--primary-color);
     outline-offset: 2px;
+}
+
+/* Navigation Tabs */
+.nav-tabs {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 2rem;
+    gap: 1rem;
+}
+
+.tab-btn {
+    border: none;
+    outline: none;
+    background: var(--background-color);
+    padding: 12px 24px;
+    border-radius: 10px;
+    box-shadow: 5px 5px 10px var(--shadow-dark), -5px -5px 10px var(--shadow-light);
+    color: var(--text-color);
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.tab-btn.active {
+    box-shadow: inset 5px 5px 10px var(--shadow-dark), inset -5px -5px 10px var(--shadow-light);
+    color: var(--primary-color);
+}
+
+.tab-btn:hover {
+    transform: translateY(-1px);
+}
+
+.tab-btn:focus-visible {
+    box-shadow: 5px 5px 10px var(--shadow-dark), -5px -5px 10px var(--shadow-light), 0 0 0 2px var(--primary-color);
+}
+
+/* Tab Content */
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+/* Dashboard Cards */
+.dashboard-card {
+    margin-bottom: 2rem;
+}
+
+.dashboard-card h2 {
+    margin-top: 0;
+    margin-bottom: 1rem;
+    font-size: 1.25rem;
+    color: var(--text-color);
+}
+
+/* Status and Logs Lists */
+.status-list, .logs-list {
+    max-height: 300px;
+    overflow-y: auto;
+    padding: 0.5rem;
+    background: var(--background-color);
+    border-radius: 10px;
+    box-shadow: inset 3px 3px 6px var(--shadow-dark), inset -3px -3px 6px var(--shadow-light);
+}
+
+.provider-item, .log-item {
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+    border-radius: 8px;
+    background: var(--background-color);
+    box-shadow: 3px 3px 6px var(--shadow-dark), -3px -3px 6px var(--shadow-light);
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.provider-item.enabled {
+    border-left: 4px solid #28a745;
+}
+
+.provider-item.disabled {
+    border-left: 4px solid #dc3545;
+    opacity: 0.7;
+}
+
+.log-item {
+    font-family: monospace;
+    font-size: 0.875rem;
+}
+
+.log-time {
+    color: #666;
+    font-size: 0.75rem;
+}
+
+.log-level {
+    font-weight: bold;
+    padding: 0.125rem 0.25rem;
+    border-radius: 3px;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+}
+
+.log-level.INFO { background-color: #d1ecf1; color: #0c5460; }
+.log-level.ERROR { background-color: #f8d7da; color: #721c24; }
+.log-level.WARNING { background-color: #fff3cd; color: #856404; }
+.log-level.DEBUG { background-color: #e2e3e5; color: #383d41; }
+
+.log-message {
+    margin-left: 0.5rem;
+}
+
+/* Responsive for tabs */
+@media (max-width: 600px) {
+    .nav-tabs {
+        flex-direction: column;
+        align-items: center;
+    }
+    .tab-btn {
+        width: 100%;
+        max-width: 200px;
+    }
+    .status-list, .logs-list {
+        max-height: 200px;
+    }
 }
 
 /* Optimizations: Added media for responsive/mobile, dark mode, focus-visible for a11y, .error for JS, .help-text for forms. Minify CSS for prod using tool. Test contrast with WAVE or Lighthouse. Add animations if needed (e.g., flash fade-in @keyframes). */

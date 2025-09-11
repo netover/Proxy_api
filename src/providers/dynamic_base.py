@@ -1,9 +1,10 @@
 from abc import ABC, abstractmethod
-from typing import Dict, Any
+from typing import Dict, Any, Union
 from src.providers.base import Provider
 from src.core.app_config import ProviderConfig
 from src.core.logging import ContextualLogger
 import httpx
+import asyncio
 
 class DynamicProvider(Provider):
     """Base class for dynamically loaded AI providers"""
@@ -39,7 +40,7 @@ class DynamicProvider(Provider):
         max_retries: int = 3,
         stream: bool = False,
         **kwargs
-    ) -> Union[httpx.Response, httpx.AsyncResponse]:
+    ) -> httpx.Response:
         """Make HTTP request with retry logic (exponential backoff + jitter) and error handling"""
         import random
         base_delay = 1.0

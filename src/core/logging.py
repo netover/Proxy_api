@@ -42,6 +42,7 @@ def setup_logging(log_level: str = "INFO", log_file: Path = None):
     root_logger.setLevel(getattr(logging, log_level.upper()))
     
     # Console handler with colors - add only if not exists
+    console_handler = None
     if not any(isinstance(h, logging.StreamHandler) for h in root_logger.handlers):
         console_handler = logging.StreamHandler(sys.stdout)
         console_formatter = logging.Formatter(
@@ -50,13 +51,19 @@ def setup_logging(log_level: str = "INFO", log_file: Path = None):
         )
         console_handler.setFormatter(console_formatter)
         root_logger.addHandler(console_handler)
-    
+    else:
+        # Find existing console handler
+        for handler in root_logger.handlers:
+            if isinstance(handler, logging.StreamHandler):
+                console_handler = handler
+                break
+
     # Handle encoding issues on Windows
-    if sys.platform == "win32":
+    if sys.platform == "win32" and console_handler:
         import io
         console_handler.stream = io.TextIOWrapper(
-            sys.stdout.buffer, 
-            encoding='utf-8', 
+            sys.stdout.buffer,
+            encoding='utf-8',
             errors='replace'
         )
     

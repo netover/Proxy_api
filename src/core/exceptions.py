@@ -44,3 +44,8 @@ class NotImplementedError(ProviderError):
     """Raised when operation is not implemented by provider"""
     def __init__(self, message: str, code: str = "not_implemented_error"):
         super().__init__(message, code=code)
+
+class APIConnectionError(ProviderError):
+    """Raised for API connection errors"""
+    def __init__(self, message: str, code: str = "api_connection_error"):
+        super().__init__(message, code=code)

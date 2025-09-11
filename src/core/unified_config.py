@@ -20,7 +20,7 @@ class ProviderConfig(BaseModel):
     name: str = Field(..., min_length=1, max_length=50)
     type: ProviderType
     base_url: HttpUrl
-    api_key_env: str = Field(..., regex=r'^[A-Z_][A-Z0-9_]*$')
+    api_key_env: str = Field(..., pattern=r'^[A-Z_][A-Z0-9_]*$')
     models: List[str] = Field(..., min_items=1, max_items=100)
     
     # Performance settings
@@ -83,12 +83,12 @@ class GlobalSettings(BaseModel):
     debug: bool = Field(default=False)
     
     # Server
-    host: str = Field(default="127.0.0.1", regex=r'^[\w\.\-]+$')
+    host: str = Field(default="127.0.0.1", pattern=r'^[\w\.\-]+$')
     port: int = Field(default=8000, ge=1, le=65535)
     
     # Security
     api_keys: List[str] = Field(default_factory=list, min_items=1)
-    api_key_header: str = Field(default="X-API-Key", regex=r'^[A-Za-z0-9\-_]+$')
+    api_key_header: str = Field(default="X-API-Key", pattern=r'^[A-Za-z0-9\-_]+$')
     cors_origins: List[str] = Field(default=["*"])
     
     # Performance
@@ -101,7 +101,7 @@ class GlobalSettings(BaseModel):
     circuit_breaker_timeout: int = Field(default=60, ge=1, le=3600)
     
     # Paths
-    log_level: str = Field(default="INFO", regex=r'^(DEBUG|INFO|WARNING|ERROR|CRITICAL)$')
+    log_level: str = Field(default="INFO", pattern=r'^(DEBUG|INFO|WARNING|ERROR|CRITICAL)$')
     log_file: Optional[Path] = Field(default=None)
     config_file: Path = Field(default=Path("config.yaml"))
     condensation: CondensationSettings = Field(default_factory=CondensationSettings, description="Settings for context condensation optimizations")

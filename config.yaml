@@ -43,7 +43,7 @@ providers:
     api_key_env: "OPENAI_API_KEY"
     models:
       - "gpt-4"
-    enabled: true
+    enabled: false
     priority: 10
     timeout: 30
     max_retries: 3

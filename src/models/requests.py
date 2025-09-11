@@ -1,5 +1,5 @@
 from typing import Dict, Any, Union, Optional, List
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 
 class ChatCompletionRequest(BaseModel):
     """Pydantic model for chat completions request"""
@@ -21,14 +21,16 @@ class ChatCompletionRequest(BaseModel):
     response_format: Optional[Dict[str, Any]] = None
     seed: Optional[int] = None
 
-    @validator('messages')
+    @field_validator('messages')
+    @classmethod
     def validate_messages(cls, v):
         for msg in v:
             if 'role' not in msg or 'content' not in msg:
                 raise ValueError("Each message must have 'role' and 'content'")
         return v
 
-    @validator('logit_bias')
+    @field_validator('logit_bias')
+    @classmethod
     def validate_logit_bias(cls, v):
         if v:
             for k in v:
@@ -55,7 +57,8 @@ class TextCompletionRequest(BaseModel):
     logprobs: Optional[int] = Field(None, ge=0, le=20)
     echo: Optional[bool] = False
 
-    @validator('logit_bias')
+    @field_validator('logit_bias')
+    @classmethod
     def validate_logit_bias(cls, v):
         if v:
             for k in v:

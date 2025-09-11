@@ -24,34 +24,38 @@ async def lifespan(app: FastAPI):
     """Application lifespan management"""
     logger.info("Starting LLM Proxy API")
     app.state.start_time = int(time.time())
-    
-    # Load config from app_state
-    config = app_state.config_manager.load_config()
-    app.state.config = config
-    
+
     # Initialize app state first
     try:
         await app_state.initialize()
         app.state.app_state = app_state
+        logger.info("AppState initialized successfully")
+    except Exception as e:
+        logger.error(f"Failed to initialize AppState: {e}")
+        raise
+
+    # Load config from app_state after initialization
+    try:
         config = app_state.config_manager.load_config()
+        app.state.config = config
         logger.info(f"Loaded {len(config.providers)} providers dynamically")
     except Exception as e:
-        logger.error(f"Failed to load AppState: {e}")
+        logger.error(f"Failed to load config: {e}")
         raise
-    
+
     # Setup logging after config load
     setup_logging(
         log_level="DEBUG" if config.settings.debug else "INFO",
         log_file=config.settings.log_file
     )
-    
+
     # Initialize authentication
     if not config.settings.api_keys:
         logger.warning("No API keys configured. All authenticated requests will be rejected.")
     app.state.api_key_auth = APIKeyAuth(config.settings.api_keys)
-    
+
     yield
-    
+
     # Cleanup
     logger.info("Shutting down LLM Proxy API, closing provider clients...")
     await app_state.shutdown()
@@ -149,11 +153,26 @@ async def global_exception_handler(request: Request, exc: Exception):
 if __name__ == "__main__":
     # Setup logging with default
     setup_logging(log_level="INFO")
-    
-    uvicorn.run(
-        "main_dynamic:app",
-        host="127.0.0.1",
-        port=8000,
-        reload=False,
-        log_level="info"
-    )
+
+    # Check if running as bundled executable
+    import sys
+    is_bundled = getattr(sys, 'frozen', False)
+
+    if is_bundled:
+        # When bundled, use the app object directly
+        uvicorn.run(
+            app,
+            host="127.0.0.1",
+            port=8000,
+            reload=False,
+            log_level="info"
+        )
+    else:
+        # When running from source, use string import
+        uvicorn.run(
+            "main_dynamic:app",
+            host="127.0.0.1",
+            port=8000,
+            reload=False,
+            log_level="info"
+        )

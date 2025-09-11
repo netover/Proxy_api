@@ -149,6 +149,7 @@ def build_executable():
         "--noconfirm",
         f"--name={config['app_name'].replace(' ', '_')}",
         f"--version-file={version_file}",
+        # Core framework imports
         "--hidden-import=uvicorn.logging",
         "--hidden-import=uvicorn.loops.auto",
         "--hidden-import=uvicorn.protocols.http.auto",
@@ -163,28 +164,58 @@ def build_executable():
         "--hidden-import=fastapi.middleware",
         "--hidden-import=fastapi.middleware.cors",
         "--hidden-import=fastapi.middleware.gzip",
+
+        # Data validation
         "--hidden-import=pydantic",
         "--hidden-import=pydantic.fields",
         "--hidden-import=pydantic.main",
         "--hidden-import=pydantic.types",
+        "--hidden-import=pydantic_settings",
+
+        # HTTP client
         "--hidden-import=httpx",
         "--hidden-import=httpx._main",
+        "--hidden-import=httpx._config",
+        "--hidden-import=httpx._client",
+        "--hidden-import=httpx._transports",
+        "--hidden-import=httpx._utils",
+
+        # Performance optimizations
+        # uvloop not supported on Windows
+        "--hidden-import=orjson",
+
+        # Configuration and utilities
         "--hidden-import=pyyaml",
-        "--hidden-import=structlog",
         "--hidden-import=slowapi",
+        "--hidden-import=jwt",
+        "--hidden-import=pyasn1",
+
+        # Project modules
         "--hidden-import=src.core.config",
         "--hidden-import=src.core.logging",
         "--hidden-import=src.core.app_config",
         "--hidden-import=src.core.metrics",
         "--hidden-import=src.core.auth",
         "--hidden-import=src.core.circuit_breaker",
+        "--hidden-import=src.core.unified_config",
+        "--hidden-import=src.core.provider_factory",
+        "--hidden-import=src.core.exceptions",
+        "--hidden-import=src.core.rate_limiter",
         "--hidden-import=src.providers.base",
         "--hidden-import=src.providers.openai",
         "--hidden-import=src.providers.anthropic",
+        "--hidden-import=src.providers.dynamic_base",
+        "--hidden-import=src.providers.dynamic_blackbox",
+        "--hidden-import=src.services.provider_loader",
+        "--hidden-import=src.models.requests",
+
+        # Collect all for complex packages
         "--collect-all=fastapi",
         "--collect-all=pydantic",
         "--collect-all=httpx",
-        "--collect-all=uvicorn"
+        "--collect-all=uvicorn",
+        "--collect-all=uvloop",
+        "--collect-all=orjson"
     ]
 
     # Add console mode
