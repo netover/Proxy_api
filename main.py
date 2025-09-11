@@ -63,9 +63,12 @@ from src.core.exceptions import (
     RateLimitError, ServiceUnavailableError, NotImplementedError
 )
 from src.core.app_state import app_state
+from src.core.telemetry import telemetry, TracedSpan, traced
+from src.core.template_manager import template_manager
 from src.models.requests import ChatCompletionRequest, TextCompletionRequest, EmbeddingRequest
 from src.services.provider_loader import get_provider_factories
 from src.core.circuit_breaker import get_circuit_breaker
+from src.core.chaos_engineering import chaos_monkey
 from src.utils.context_condenser import condense_context
 from src.core.provider_factory import provider_factory
 
@@ -100,6 +103,7 @@ def safe_background_task(func):
     return wrapper
 
 # Utility Functions
+@traced("get_provider", attributes={"operation": "provider_initialization"})
 async def get_provider(provider_config: ProviderConfig) -> Any:
     """Get or create provider instance with caching"""
     # Use the centralized provider factory
@@ -124,6 +128,7 @@ def get_providers_for_model(request: Request, model: str) -> List[ProviderConfig
     return providers
 
 
+@traced("handle_context_condensation", attributes={"operation": "context_condensation"})
 async def handle_context_condensation(
     request: Request,
     background_tasks: BackgroundTasks,
@@ -134,10 +139,21 @@ async def handle_context_condensation(
     config = request.app.state.condensation_config
     total_content = sum(len(m["content"]) for m in req.get("messages", []))
 
+    # Add span attributes
+    from opentelemetry import trace
+    current_span = trace.get_current_span()
+    current_span.set_attribute("condensation.total_content", total_content)
+    current_span.set_attribute("condensation.threshold", config.truncation_threshold)
+    current_span.set_attribute("condensation.operation", operation)
+
     if total_content > config.truncation_threshold:
         request_id = str(uuid.uuid4())
         full_chunks = [m["content"] for m in req["messages"]]
         background_tasks.add_task(safe_background_task(background_condense), request_id, request, full_chunks)
+
+        current_span.set_attribute("condensation.triggered", True)
+        current_span.set_attribute("condensation.request_id", request_id)
+        current_span.set_attribute("condensation.chunks_count", len(full_chunks))
 
         if not req.get("stream", False):
             return JSONResponse(
@@ -155,6 +171,8 @@ async def handle_context_condensation(
         num_messages_to_keep = max(1, len(req["messages"]) * truncate_len // total_content)
         truncated_messages = req["messages"][-num_messages_to_keep:]
         req["messages"] = truncated_messages
+        current_span.set_attribute("condensation.truncated", True)
+        current_span.set_attribute("condensation.messages_kept", len(truncated_messages))
         logger.info(f"Proactive truncation for long context ({total_content} chars), background task added: {request_id}")
 
     return None
@@ -219,6 +237,7 @@ async def background_condense(request_id: str, request: Request, chunks: List[st
             request.app.state.summary_cache[request_id] = error_data
 
 
+@traced("process_request_with_fallback", attributes={"operation": "request_processing"})
 async def process_request_with_fallback(
     request: Request,
     req: Dict[str, Any],
@@ -230,39 +249,62 @@ async def process_request_with_fallback(
     last_exception = None
     config = request.app.state.condensation_config
 
-    for provider_config in providers:
+    # Add span attributes
+    from opentelemetry import trace
+    current_span = trace.get_current_span()
+    current_span.set_attribute("operation.type", operation)
+    current_span.set_attribute("providers.count", len(providers))
+    current_span.set_attribute("request.streaming", bool(req.get("stream", False)))
+    if "model" in req:
+        current_span.set_attribute("request.model", req["model"])
+
+    for idx, provider_config in enumerate(providers):
         try:
-            logger.info(f"Attempting {operation} with provider: {provider_config.name}")
+            with TracedSpan("provider.attempt", attributes={
+                "provider.name": provider_config.name,
+                "provider.priority": provider_config.priority,
+                "attempt.number": idx + 1
+            }) as provider_span:
+                logger.info(f"Attempting {operation} with provider: {provider_config.name}")
 
-            provider = await get_provider(provider_config)
-            if not provider:
-                continue
+                provider = await get_provider(provider_config)
+                if not provider:
+                    provider_span.set_attribute("provider.skipped", True)
+                    continue
 
-            circuit_breaker = get_circuit_breaker(f"provider_{provider_config.name}")
+                circuit_breaker = get_circuit_breaker(f"provider_{provider_config.name}")
+                provider_span.set_attribute("circuit_breaker.state", circuit_breaker.state)
 
-            # Choose appropriate method
-            if operation == "chat_completion":
-                method = provider.create_completion
-            elif operation == "text_completion":
-                method = provider.create_text_completion
-            elif operation == "embeddings":
-                method = provider.create_embeddings
-            else:
-                raise ValueError(f"Unknown operation: {operation}")
+                # Choose appropriate method
+                if operation == "chat_completion":
+                    method = provider.create_completion
+                elif operation == "text_completion":
+                    method = provider.create_text_completion
+                elif operation == "embeddings":
+                    method = provider.create_embeddings
+                else:
+                    raise ValueError(f"Unknown operation: {operation}")
 
-            # Execute with circuit breaker
-            response = await circuit_breaker.execute(lambda: method(req))
+                # Execute with circuit breaker
+                start_time = time.time()
+                response = await circuit_breaker.execute(lambda: method(req))
+                latency = time.time() - start_time
 
-            # Handle streaming responses
-            if hasattr(response, '__aiter__'):
-                return StreamingResponse(response, media_type="text/event-stream")
+                provider_span.set_attribute("provider.success", True)
+                provider_span.set_attribute("request.latency", latency)
+                provider_span.set_attribute("response.streaming", hasattr(response, '__aiter__'))
 
-            logger.info(f"{operation} successful", provider=provider_config.name)
-            return response
+                # Handle streaming responses
+                if hasattr(response, '__aiter__'):
+                    return StreamingResponse(response, media_type="text/event-stream")
+
+                logger.info(f"{operation} successful", provider=provider_config.name)
+                return response
 
         except Exception as e:
             last_exception = e
             logger.error(f"Provider {provider_config.name} failed: {e}")
+            current_span.set_attribute(f"provider.{provider_config.name}.error", str(e))
 
             # Handle context length errors
             msg = str(e)
@@ -289,6 +331,8 @@ async def process_request_with_fallback(
             continue
 
     # All providers failed
+    current_span.set_attribute("providers.failed", True)
+    current_span.set_attribute("final_error", str(last_exception))
     logger.error(f"All providers failed for {operation}", error=str(last_exception))
     raise ServiceUnavailableError("All providers are currently unavailable")
 
@@ -312,19 +356,32 @@ async def lifespan(app: FastAPI):
 
         # Initialize performance systems
         logger.info("Initializing performance optimization systems...")
-
+    
+        # Configure OpenTelemetry
+        telemetry.configure(settings)
+        telemetry.instrument_fastapi(app)
+        telemetry.instrument_httpx()
+        logger.info("OpenTelemetry configured successfully")
+    
         # Initialize HTTP client
-        app.state.http_client = await get_http_client()
-        logger.info("HTTP client initialized")
-
+        with TracedSpan("http_client.initialize") as span:
+            app.state.http_client = await get_http_client()
+            span.set_attribute("http.client.initialized", True)
+            logger.info("HTTP client initialized")
+    
         # Initialize caches
-        app.state.response_cache = await get_response_cache()
-        app.state.summary_cache_obj = await get_summary_cache()
-        logger.info("Smart caches initialized")
-
+        with TracedSpan("cache.initialize") as span:
+            app.state.response_cache = await get_response_cache()
+            app.state.summary_cache_obj = await get_summary_cache()
+            span.set_attribute("cache.response.initialized", True)
+            span.set_attribute("cache.summary.initialized", True)
+            logger.info("Smart caches initialized")
+    
         # Initialize memory manager
-        app.state.memory_manager = await get_memory_manager()
-        logger.info("Memory manager initialized")
+        with TracedSpan("memory_manager.initialize") as span:
+            app.state.memory_manager = await get_memory_manager()
+            span.set_attribute("memory_manager.initialized", True)
+            logger.info("Memory manager initialized")
 
         # Initialize context condensation cache with persistence
         from src.utils.context_condenser import AsyncLRUCache
@@ -352,6 +409,10 @@ async def lifespan(app: FastAPI):
         rate_limiter.configure_from_config(config)
         app.state.rate_limiter = rate_limiter
         logger.info("Rate limiter configured and initialized")
+
+        # Configure chaos engineering
+        chaos_monkey.configure(config.settings.get('chaos_engineering', {}))
+        logger.info("Chaos engineering configured")
 
         app.state.config_mtime = config_manager._last_modified
 

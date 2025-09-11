@@ -3,7 +3,7 @@ Authentication middleware for LLM Proxy API
 Provides API key and JWT token-based authentication
 """
 
-from fastapi import Request, HTTPException
+from fastapi import Request, HTTPException, Depends
 from typing import Any
 import hashlib
 import secrets

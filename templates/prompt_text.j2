@@ -1,0 +1,50 @@
+{% if task_description %}
+Task: {{ task_description }}
+{% endif %}
+
+{% if prompt %}
+{{ prompt }}
+{% endif %}
+
+{% if context %}
+Context:
+{{ context }}
+{% endif %}
+
+{% if examples %}
+Examples:
+{% for example in examples %}
+{{ example }}
+{% endfor %}
+{% endif %}
+
+{% if instructions %}
+Instructions:
+{{ instructions }}
+{% endif %}
+
+{% if constraints %}
+Constraints:
+{% for constraint in constraints %}
+- {{ constraint }}
+{% endfor %}
+{% endif %}
+
+{% if format %}
+Format:
+{{ format }}
+{% endif %}
+
+{% if style %}
+Style: {{ style }}
+{% endif %}
+
+{% if tone %}
+Tone: {{ tone }}
+{% endif %}
+
+{% if response_length %}
+Expected length: {{ response_length }}
+{% endif %}
+
+Response:

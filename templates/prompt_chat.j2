@@ -1,0 +1,31 @@
+{% if system_message %}
+System: {{ system_message }}
+{% endif %}
+
+{% for message in messages %}
+{% if message.role == 'user' %}
+User: {{ message.content }}
+{% elif message.role == 'assistant' %}
+Assistant: {{ message.content }}
+{% elif message.role == 'system' %}
+System: {{ message.content }}
+{% endif %}
+{% endfor %}
+
+{% if include_context and context %}
+Context:
+{{ context }}
+{% endif %}
+
+{% if include_examples and examples %}
+Examples:
+{% for example in examples %}
+{{ example.role }}: {{ example.content }}
+{% endfor %}
+{% endif %}
+
+{% if include_instructions and instructions %}
+Instructions: {{ instructions }}
+{% endif %}
+
+Response:
