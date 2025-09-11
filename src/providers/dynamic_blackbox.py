@@ -11,7 +11,7 @@ class DynamicBlackboxProvider(DynamicProvider):
     async def _health_check(self) -> Dict[str, Any]:
         """Check Blackbox API health"""
         try:
-            response = await self.make_request_with_retry(
+            response = await self.make_request(
                 "GET",
                 f"{self.base_url}/v1/models",
                 headers={"Authorization": f"Bearer {self.api_key}"}
@@ -29,7 +29,7 @@ class DynamicBlackboxProvider(DynamicProvider):
             if stream:
                 async def stream_generator():
                     try:
-                        response = await self.make_request_with_retry(
+                        response = await self.make_request(
                             "POST",
                             f"{self.base_url}/v1/chat/completions",
                             json=request,
@@ -63,7 +63,7 @@ class DynamicBlackboxProvider(DynamicProvider):
                 self.logger.info("Chat completion streaming successful", response_time=response_time)
                 return stream_generator()
             else:
-                response = await self.make_request_with_retry(
+                response = await self.make_request(
                     "POST",
                     f"{self.base_url}/v1/chat/completions",
                     json=request,

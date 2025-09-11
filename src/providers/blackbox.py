@@ -7,7 +7,7 @@ import json
 import time
 from typing import Dict, Any, Optional
 import httpx
-from src.core.app_config import ProviderConfig
+from src.core.unified_config import ProviderConfig
 from src.core.metrics import metrics_collector
 from src.core.logging import ContextualLogger
 from .base import Provider
@@ -22,11 +22,11 @@ class BlackboxProvider(Provider):
         self.base_url = config.base_url or "https://api.blackbox.ai"
         self.logger = ContextualLogger(f"provider.{config.name}")
 
-    async def _health_check(self) -> Dict[str, Any]:
+    async def _perform_health_check(self) -> Dict[str, Any]:
         """Check Blackbox API health"""
         try:
             # Try to get available models as health check
-            response = await self.make_request_with_retry(
+            response = await self.make_request(
                 "GET",
                 f"{self.base_url}/v1/models",
                 headers={
@@ -84,7 +84,7 @@ class BlackboxProvider(Provider):
                 "Authorization": f"Bearer {self.api_key}",
                 "Content-Type": "application/json"
             }
-            response = await self.make_request_with_retry(
+            response = await self.make_request(
                 "POST",
                 f"{self.base_url}{endpoint}",
                 json=blackbox_request,
@@ -171,7 +171,7 @@ class BlackboxProvider(Provider):
                 "Authorization": f"Bearer {self.api_key}",
                 "Content-Type": "application/json"
             }
-            response = await self.make_request_with_retry(
+            response = await self.make_request(
                 "POST",
                 f"{self.base_url}/v1/images/generations",
                 json=image_request,
@@ -242,7 +242,7 @@ class BlackboxProvider(Provider):
                 "Authorization": f"Bearer {self.api_key}",
                 "Content-Type": "application/json"
             }
-            response = await self.make_request_with_retry(
+            response = await self.make_request(
                 "POST",
                 f"{self.base_url}/v1/video/generations",
                 json=video_request,

@@ -9,7 +9,7 @@ import time
 import asyncio
 from typing import Dict, Any, Optional
 import httpx
-from src.core.app_config import ProviderConfig
+from src.core.unified_config import ProviderConfig
 from src.core.metrics import metrics_collector
 from src.core.logging import ContextualLogger
 from .base import Provider
@@ -28,11 +28,11 @@ class OpenRouterProvider(Provider):
         self._cache_ttl = 300  # 5 minutes
         self._lock = asyncio.Lock()
 
-    async def _health_check(self) -> Dict[str, Any]:
+    async def _perform_health_check(self) -> Dict[str, Any]:
         """Check OpenRouter API health"""
         try:
             # Try to get available models as health check
-            response = await self.make_request_with_retry(
+            response = await self.make_request(
                 "GET",
                 f"{self.base_url}/v1/models",
                 headers={
@@ -73,7 +73,7 @@ class OpenRouterProvider(Provider):
                     "Authorization": f"Bearer {self.api_key}",
                     "Content-Type": "application/json"
                 }
-                response = await self.make_request_with_retry(
+                response = await self.make_request(
                     "GET",
                     f"{self.base_url}/v1/models",
                     headers=headers
@@ -140,7 +140,7 @@ class OpenRouterProvider(Provider):
                 "HTTP-Referer": request.get("extra_body", {}).get("referer", ""),
                 "X-Title": request.get("extra_body", {}).get("title", "")
             }
-            response = await self.make_request_with_retry(
+            response = await self.make_request(
                 "POST",
                 f"{self.base_url}/v1/chat/completions",
                 json=openrouter_request,

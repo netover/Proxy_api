@@ -47,13 +47,15 @@ from src.core.exceptions import (
     ProviderError, InvalidRequestError, AuthenticationError,
     RateLimitError, ServiceUnavailableError, NotImplementedError
 )
+from src.core.app_state import app_state
 from src.models.requests import ChatCompletionRequest, TextCompletionRequest, EmbeddingRequest
 from src.services.provider_loader import get_provider_factories
 from src.core.circuit_breaker import get_circuit_breaker
 from src.utils.context_condenser import condense_context
+from src.core.provider_factory import provider_factory
 
 # Performance optimization imports
-from src.core.http_client import get_http_client, initialize_http_client
+from src.core.http_client import get_http_client
 from src.core.smart_cache import get_response_cache, get_summary_cache, initialize_caches, shutdown_caches
 from src.core.memory_manager import get_memory_manager, initialize_memory_manager, shutdown_memory_manager
 
@@ -71,17 +73,24 @@ limiter = Limiter(key_func=get_remote_address)
 
 
 # Utility Functions
-def get_provider(provider_config: ProviderConfig) -> Any:
+async def get_provider(provider_config: ProviderConfig) -> Any:
     """Get or create provider instance with caching"""
-    # This would be implemented with proper caching mechanism
-    # For now, return a mock implementation
-    return None
+    # Use the centralized provider factory
+    try:
+        provider = await provider_factory.get_provider(provider_config.name)
+        if provider is None:
+            # If not cached, create a new instance
+            provider = await provider_factory.create_provider(provider_config)
+        return provider
+    except Exception as e:
+        logger.error(f"Failed to get provider {provider_config.name}: {e}")
+        raise ProviderError(f"Failed to initialize provider {provider_config.name}")
 
 
 def get_providers_for_model(request: Request, model: str) -> List[ProviderConfig]:
     """Get sorted list of enabled providers that support the given model"""
     providers = [
-        provider for provider in request.app.config.providers
+        provider for provider in request.app.state.config.providers
         if provider.enabled and model in provider.models
     ]
     providers.sort(key=lambda p: p.priority)
@@ -124,6 +133,65 @@ async def handle_context_condensation(
     return None
 
 
+async def background_condense(request_id: str, request: Request, chunks: List[str]):
+    """Background task to compute full context summary and store in smart cache"""
+    try:
+        start_time = time.time()
+        summary = await condense_context_via_service(chunks)
+        latency = time.time() - start_time
+
+        # Store in smart cache with TTL
+        cache_data = {
+            "summary": summary,
+            "timestamp": time.time(),
+            "latency": latency,
+            "chunks_count": len(chunks),
+            "total_chars": sum(len(chunk) for chunk in chunks)
+        }
+
+        # Use smart cache for better performance
+        if hasattr(request.app.state, 'summary_cache_obj'):
+            await request.app.state.summary_cache_obj.set(
+                f"summary_{request_id}",
+                cache_data,
+                ttl=3600  # 1 hour TTL for summaries
+            )
+        else:
+            # Fallback to legacy cache
+            request.app.state.summary_cache[request_id] = cache_data
+
+        # Record metrics
+        metrics_collector.record_summary(False, latency)
+
+        logger.info(
+            "Background summary stored",
+            extra={
+                'request_id': request_id,
+                'latency': round(latency, 2),
+                'chunks_count': len(chunks),
+                'total_chars': sum(len(chunk) for chunk in chunks)
+            }
+        )
+
+    except Exception as e:
+        logger.error(
+            "Background condensation failed",
+            extra={'request_id': request_id, 'error': str(e)}
+        )
+
+        error_data = {"error": str(e), "timestamp": time.time()}
+
+        # Store error in cache
+        if hasattr(request.app.state, 'summary_cache_obj'):
+            await request.app.state.summary_cache_obj.set(
+                f"summary_{request_id}",
+                error_data,
+                ttl=300  # 5 minutes for errors
+            )
+        else:
+            request.app.state.summary_cache[request_id] = error_data
+
+
 async def process_request_with_fallback(
     request: Request,
     req: Dict[str, Any],
@@ -139,7 +207,7 @@ async def process_request_with_fallback(
         try:
             logger.info(f"Attempting {operation} with provider: {provider_config.name}")
 
-            provider = get_provider(provider_config)
+            provider = await get_provider(provider_config)
             if not provider:
                 continue
 
@@ -207,9 +275,12 @@ async def lifespan(app: FastAPI):
 
     # Initialize configuration
     try:
-        config = config_manager.load_config()
+        # Initialize app state with the new approach
+        await app_state.initialize()
+        
+        # Set config in app state for backward compatibility
+        config = app_state.config_manager.load_config()
         app.state.config = config
-        app.config = config
         app.state.condensation_config = config.settings.condensation
 
         # Initialize performance systems
@@ -255,10 +326,6 @@ async def lifespan(app: FastAPI):
         app.state.rate_limiter = rate_limiter
         logger.info("Rate limiter configured and initialized")
 
-        # Initialize providers
-        app.state.provider_factories = get_provider_factories(config.providers)
-        logger.info(f"Loaded {len(app.state.config.providers)} providers")
-
         app.state.config_mtime = config_manager._last_modified
 
         # Start web UI in background thread
@@ -286,6 +353,10 @@ async def lifespan(app: FastAPI):
     logger.info("Shutting down LLM Proxy API")
 
     try:
+        # Shutdown app state
+        await app_state.shutdown()
+        logger.info("App state shutdown complete")
+
         # Shutdown performance systems in reverse order
         if hasattr(app.state, 'memory_manager'):
             await shutdown_memory_manager()
@@ -589,7 +660,7 @@ async def get_metrics(request: Request):
 
 @app.get("/providers")
 @limiter.limit(f"{settings.rate_limit_requests}/{settings.rate_limit_window}second")
-async def list_providers():
+async def list_providers(request: Request):
     """List all providers and their capabilities"""
     return [
         {
@@ -599,7 +670,7 @@ async def list_providers():
             "enabled": provider.enabled,
             "priority": provider.priority
         }
-        for provider in app.config.providers
+        for provider in request.app.state.config.providers
     ]
 
 
@@ -883,7 +954,7 @@ async def list_models(request: Request) -> Dict[str, Any]:
     Returns all available models across all enabled providers with metadata.
     """
     models = []
-    for provider in request.app.config.providers:
+    for provider in request.app.state.config.providers:
         if provider.enabled:
             for model in provider.models:
                 models.append({

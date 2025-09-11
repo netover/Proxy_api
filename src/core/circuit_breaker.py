@@ -89,9 +89,9 @@ class ProductionCircuitBreaker:
         # Metrics
         self.metrics = CircuitBreakerMetrics()
 
-        # Adaptive threshold tracking
-        self.success_rate_window: list = []  # Track recent success rates
-        self.window_size = 100
+        # EMA variables
+        self.ema_success_rate: Optional[float] = None
+        self.ema_alpha = 0.1  # Smoothing factor for EMA
 
         logger.info(
             f"Circuit breaker initialized for {name}",
@@ -124,10 +124,11 @@ class ProductionCircuitBreaker:
         return successful / total
 
     def _update_success_rate(self, success: bool):
-        """Update success rate tracking"""
-        self.success_rate_window.append(success)
-        if len(self.success_rate_window) > self.window_size:
-            self.success_rate_window.pop(0)
+        """Update EMA success rate"""
+        if self.ema_success_rate is None:
+            self.ema_success_rate = 1.0 if success else 0.0
+        else:
+            self.ema_success_rate = (self.ema_alpha * success) + (1 - self.ema_alpha) * self.ema_success_rate
 
     def _adapt_thresholds(self):
         """Adapt failure threshold based on success rate"""

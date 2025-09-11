@@ -10,7 +10,7 @@ class DynamicAnthropicProvider(DynamicProvider):
     async def _health_check(self) -> Dict[str, Any]:
         """Check Anthropic health"""
         try:
-            response = await self.make_request_with_retry(
+            response = await self.make_request(
                 "GET",
                 f"{self.base_url}/v1/models",  # Adjusted for Anthropic API
                 headers={
@@ -35,7 +35,7 @@ class DynamicAnthropicProvider(DynamicProvider):
         """Helper to make requests to the Anthropic API and handle metrics."""
         start_time = time.time()
         try:
-            response = await self.make_request_with_retry(
+            response = await self.make_request(
                 "POST",
                 f"{self.base_url}/v1/messages",
                 headers={

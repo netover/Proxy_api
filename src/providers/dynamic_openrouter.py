@@ -9,7 +9,7 @@ class DynamicOpenRouterProvider(DynamicProvider):
     async def _health_check(self) -> Dict[str, Any]:
         """Check OpenRouter API health"""
         try:
-            response = await self.make_request_with_retry(
+            response = await self.make_request(
                 "GET",
                 f"{self.base_url}/v1/models",
                 headers={"Authorization": f"Bearer {self.api_key}"}
@@ -28,7 +28,7 @@ class DynamicOpenRouterProvider(DynamicProvider):
         try:
             # OpenRouter is OpenAI compatible, so we can pass the request mostly as-is.
             # It also supports extra headers for moderation and identification.
-            response = await self.make_request_with_retry(
+            response = await self.make_request(
                 "POST",
                 f"{self.base_url}/v1/chat/completions",
                 json=request,

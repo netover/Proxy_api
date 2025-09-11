@@ -8,7 +8,7 @@ import json
 import time
 from typing import Dict, Any
 import httpx
-from src.core.app_config import ProviderConfig
+from src.core.unified_config import ProviderConfig
 from src.core.metrics import metrics_collector
 from src.core.logging import ContextualLogger
 from .base import Provider
@@ -23,10 +23,10 @@ class PerplexityProvider(Provider):
         self.base_url = config.base_url or "https://api.perplexity.ai"
         self.logger = ContextualLogger(f"provider.{config.name}")
 
-    async def _health_check(self) -> Dict[str, Any]:
+    async def _perform_health_check(self) -> Dict[str, Any]:
         """Check Perplexity API health using /v1/models"""
         try:
-            response = await self.make_request_with_retry(
+            response = await self.make_request(
                 "GET",
                 f"{self.base_url}/v1/models",
                 headers={
@@ -110,7 +110,7 @@ class PerplexityProvider(Provider):
                 "x-perplexity-api-key": self.api_key,  # Use header as per docs
                 "Content-Type": "application/json"
             }
-            response = await self.make_request_with_retry(
+            response = await self.make_request(
                 "POST",
                 f"{self.base_url}/v1/ask",
                 json=ask_request,
