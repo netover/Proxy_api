@@ -68,12 +68,20 @@ class AsyncLRUCache:
         elif self.persist_file:
             # Load from file
             try:
-                with open(self.persist_file, 'r') as f:
+                with open(self.persist_file, 'r', encoding='utf-8', errors='ignore') as f:
                     data = json.load(f)
                     self.cache = OrderedDict(data)
                     logger.info(f"Loaded {len(self.cache)} items from {self.persist_file}")
             except FileNotFoundError:
                 logger.info(f"No persistent cache file found: {self.persist_file}")
+            except json.JSONDecodeError as e:
+                logger.error(f"Failed to parse cache file: {e}")
+                # Handle corrupted cache file
+                try:
+                    os.rename(self.persist_file, f"{self.persist_file}.corrupted")
+                    logger.info(f"Renamed corrupted cache file to {self.persist_file}.corrupted")
+                except Exception as rename_error:
+                    logger.error(f"Failed to rename corrupted cache file: {rename_error}")
             except Exception as e:
                 logger.error(f"Failed to load persistent cache: {e}")
 
@@ -95,8 +103,8 @@ class AsyncLRUCache:
             if len(self.cache) == 0:
                 return
             try:
-                with open(self.persist_file, 'w') as f:
-                    json.dump(dict(self.cache), f)
+                with open(self.persist_file, 'w', encoding='utf-8') as f:
+                    json.dump(dict(self.cache), f, ensure_ascii=False)
                 logger.debug(f"Saved {len(self.cache)} items to {self.persist_file}")
             except Exception as e:
                 logger.error(f"Failed to save persistent cache: {e}")
@@ -277,14 +285,21 @@ async def condense_context(request: Request, chunks: List[str], max_tokens: int 
                         request_body["max_tokens"] = use_max_tokens
                         logger.info("Applied truncate fallback")
                         fallback_applied = True
-                    if not fallback_applied and "secondary_provider" in condensation_config.fallback_strategies and len(sorted_providers) > 1:
-                        current_idx = sorted_providers.index(top_cfg)
-                        if current_idx + 1 < len(sorted_providers):
-                            top_cfg = sorted_providers[current_idx + 1]
-                            provider = await get_provider(top_cfg)
-                            request_body["model"] = top_cfg.models[0]
-                            logger.info(f"Applied secondary provider fallback: {top_cfg.name}")
-                            fallback_applied = True
+                    if not fallback_applied and "secondary_provider" in condensation_config.fallback_strategies:
+                        enabled_providers_count = len([p for p in sorted_providers if p.enabled])
+                        if enabled_providers_count > 1:
+                            current_idx = sorted_providers.index(top_cfg)
+                            if current_idx + 1 < len(sorted_providers):
+                                # Find next enabled provider
+                                for next_idx in range(current_idx + 1, len(sorted_providers)):
+                                    next_cfg = sorted_providers[next_idx]
+                                    if next_cfg.enabled:
+                                        top_cfg = next_cfg
+                                        provider = await get_provider(top_cfg)
+                                        request_body["model"] = top_cfg.models[0]
+                                        logger.info(f"Applied secondary provider fallback: {top_cfg.name}")
+                                        fallback_applied = True
+                                        break
                     if fallback_applied:
                         fallback_attempted = True
                         continue

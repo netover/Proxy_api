@@ -72,3 +72,31 @@ class EmbeddingRequest(BaseModel):
     input: Union[str, List[str]] = Field(..., min_length=1)
     user: Optional[str] = None
     encoding_format: Optional[str] = "float"
+
+class ImageGenerationRequest(BaseModel):
+    """Pydantic model for image generation request"""
+    model: str = Field(..., min_length=1)
+    prompt: str = Field(..., min_length=1)
+    n: Optional[int] = Field(1, ge=1, le=10)
+    size: Optional[str] = Field("1024x1024", pattern=r"^\d+x\d+$")
+    quality: Optional[str] = Field("standard", pattern=r"^(standard|hd)$")
+    style: Optional[str] = Field("vivid", pattern=r"^(vivid|natural)$")
+    response_format: Optional[str] = Field("url", pattern=r"^(url|b64_json)$")
+    user: Optional[str] = None
+
+    @field_validator('n')
+    @classmethod
+    def validate_n(cls, v):
+        if v is not None and not (1 <= v <= 10):
+            raise ValueError("n must be between 1 and 10")
+        return v
+
+    @field_validator('size')
+    @classmethod
+    def validate_size(cls, v):
+        if v is not None:
+            # Common image sizes
+            valid_sizes = {"256x256", "512x512", "1024x1024", "1792x1024", "1024x1792"}
+            if v not in valid_sizes:
+                raise ValueError(f"size must be one of: {', '.join(valid_sizes)}")
+        return v

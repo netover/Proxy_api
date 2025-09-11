@@ -15,7 +15,8 @@ from src.core.exceptions import InvalidRequestError, NotImplementedError, Servic
 from src.models.requests import (
     ChatCompletionRequest,
     TextCompletionRequest,
-    EmbeddingRequest
+    EmbeddingRequest,
+    ImageGenerationRequest
 )
 
 logger = ContextualLogger(__name__)
@@ -271,7 +272,7 @@ async def embeddings(
 @rate_limiter.limit("50/minute")
 async def image_generations(
     request: Request,
-    image_request: Dict[str, Any],
+    image_request: ImageGenerationRequest,
     background_tasks: BackgroundTasks,
     _: bool = Depends(verify_api_key)
 ):

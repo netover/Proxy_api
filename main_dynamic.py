@@ -27,9 +27,12 @@ async def lifespan(app: FastAPI):
 
     # Initialize app state first
     try:
-        await app_state.initialize()
+        await asyncio.wait_for(app_state.initialize(), timeout=30.0)
         app.state.app_state = app_state
         logger.info("AppState initialized successfully")
+    except asyncio.TimeoutError:
+        logger.error("AppState initialization timed out after 30 seconds")
+        raise
     except Exception as e:
         logger.error(f"Failed to initialize AppState: {e}")
         raise
