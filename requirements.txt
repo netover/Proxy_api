@@ -29,6 +29,9 @@ pytest-asyncio>=0.21.0 # Async testing support
 Flask>=3.0.0          # Security updates, modern features
 python-dotenv>=0.19   # Environment file management
 
+# Optional Dependencies (NEW)
+redis>=5.0.0          # Redis support for distributed caching (optional)
+
 # Development Tools (NEW)
 black>=24.0.0         # Code formatting
 isort>=5.13.0         # Import sorting

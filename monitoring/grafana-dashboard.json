@@ -1,0 +1,104 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "LLM Proxy Services Dashboard",
+    "tags": ["llm-proxy", "microservices"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Service Health Status",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "up{job=~\"llm-proxy|context-service|health-worker\"}",
+            "legendFormat": "{{job}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "mappings": [
+              {
+                "options": {
+                  "0": {
+                    "text": "DOWN",
+                    "color": "red"
+                  },
+                  "1": {
+                    "text": "UP",
+                    "color": "green"
+                  }
+                },
+                "type": "value"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": 2,
+        "title": "HTTP Request Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(http_requests_total{job=~\"llm-proxy|context-service|health-worker\"}[5m])",
+            "legendFormat": "{{job}} - {{method}} {{status}}"
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Response Time",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job=~\"llm-proxy|context-service|health-worker\"}[5m]))",
+            "legendFormat": "{{job}} - 95th percentile"
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Memory Usage",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "process_resident_memory_bytes{job=~\"llm-proxy|context-service|health-worker\"} / 1024 / 1024",
+            "legendFormat": "{{job}} - Memory (MB)"
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "CPU Usage",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(process_cpu_user_seconds_total{job=~\"llm-proxy|context-service|health-worker\"}[5m]) * 100",
+            "legendFormat": "{{job}} - CPU %"
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Context Condensation Cache",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "context_cache_size",
+            "legendFormat": "Cache entries"
+          },
+          {
+            "expr": "context_cache_hit_rate",
+            "legendFormat": "Hit rate %"
+          }
+        ]
+      }
+    ],
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "refresh": "30s"
+  }
+}

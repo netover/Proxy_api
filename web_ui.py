@@ -9,6 +9,9 @@ import json
 import yaml
 import shlex
 import secrets
+import shutil
+import tempfile
+import time
 from pathlib import Path
 from typing import Dict, Any, Optional
 
@@ -22,6 +25,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 # Core imports
 from src.core.config import settings
 from src.core.logging import ContextualLogger
+from src.services.logging import iterate_logs
 
 # Constants
 VALID_PROVIDERS = {'openai', 'anthropic', 'perplexity', 'grok', 'blackbox', 'openrouter', 'cohere'}
@@ -112,8 +116,6 @@ def load_env() -> Dict[str, str]:
 
 def save_config_and_env(form_data) -> bool:
     """Save configuration and environment variables atomically."""
-    import tempfile
-    import shutil
 
     try:
         providers = []
@@ -451,21 +453,7 @@ def api_dashboard_logs():
     """Get recent log entries for dashboard."""
     try:
         log_file = Path('logs/proxy_api.log')
-        if not log_file.exists():
-            return {'logs': []}
-
-        with open(log_file, 'r', encoding='utf-8') as f:
-            lines = f.readlines()[-20:]  # Last 20 lines
-
-        logs = []
-        for line in lines:
-            try:
-                log_entry = json.loads(line.strip())
-                logs.append(log_entry)
-            except json.JSONDecodeError:
-                # Skip malformed lines
-                continue
-
+        logs = list(iterate_logs(log_file, max_lines=20))
         return {'logs': logs}
     except Exception as e:
         logger.error(f"Error fetching logs: {e}")

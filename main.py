@@ -7,6 +7,7 @@ import asyncio
 import uvicorn
 import re
 import json
+import os
 from contextlib import asynccontextmanager
 from typing import Dict, Any, List, Optional, Union
 import time
@@ -201,6 +202,9 @@ async def lifespan(app: FastAPI):
     """Application lifespan management with performance optimizations"""
     logger.info("Starting LLM Proxy API with performance optimizations")
 
+    # Set start time for uptime tracking
+    app.state.start_time = time.time()
+
     # Initialize configuration
     try:
         config = config_manager.load_config()
@@ -227,9 +231,11 @@ async def lifespan(app: FastAPI):
         # Initialize context condensation cache with persistence
         from src.utils.context_condenser import AsyncLRUCache
         persist_file = 'cache.json' if config.settings.condensation.cache_persist else None
+        redis_url = getattr(config.settings.condensation, 'cache_redis_url', None)
         app.state.lru_cache = AsyncLRUCache(
             maxsize=config.settings.condensation.cache_size,
-            persist_file=persist_file
+            persist_file=persist_file,
+            redis_url=redis_url
         )
         if persist_file:
             await app.state.lru_cache.initialize()
@@ -370,24 +376,67 @@ async def root():
 @limiter.limit(f"{settings.rate_limit_requests}/{settings.rate_limit_window}second")
 async def health_check(request: Request):
     """Comprehensive health check endpoint with performance metrics"""
+    start_time = getattr(request.app.state, 'start_time', time.time())
+    uptime_seconds = time.time() - start_time
+
     health_status = {
         "status": "healthy",
         "timestamp": time.time(),
         "version": settings.app_version,
-        "uptime_seconds": time.time() - getattr(request.app.state, 'start_time', time.time()),
+        "uptime": {
+            "seconds": int(uptime_seconds),
+            "formatted": f"{int(uptime_seconds // 3600)}h {int((uptime_seconds % 3600) // 60)}m {int(uptime_seconds % 60)}s"
+        },
         "checks": {}
     }
 
-    # Provider health
+    # Provider health from health worker service
     try:
-        enabled_providers = sum(1 for p in request.app.config.providers if p.enabled)
-        health_status["checks"]["providers"] = {
-            "status": "healthy" if enabled_providers > 0 else "unhealthy",
-            "total": len(request.app.config.providers),
-            "enabled": enabled_providers
-        }
+        health_worker_url = os.getenv("HEALTH_WORKER_URL", "http://localhost:8002")
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.get(f"{health_worker_url}/status")
+            if response.status_code == 200:
+                health_data = response.json()
+                health_status["checks"]["providers"] = {
+                    "status": "healthy" if health_data["healthy_providers"] > 0 else "unhealthy",
+                    "total": health_data["total_providers"],
+                    "healthy": health_data["healthy_providers"],
+                    "unhealthy": health_data["unhealthy_providers"],
+                    "details": health_data["providers"]
+                }
+            else:
+                health_status["checks"]["providers"] = {
+                    "status": "error",
+                    "error": f"Health worker returned HTTP {response.status_code}"
+                }
     except Exception as e:
-        health_status["checks"]["providers"] = {"status": "error", "error": str(e)}
+        health_status["checks"]["providers"] = {
+            "status": "error",
+            "error": f"Failed to connect to health worker: {str(e)}"
+        }
+
+    # Context service health
+    try:
+        context_service_url = os.getenv("CONTEXT_SERVICE_URL", "http://localhost:8001")
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.get(f"{context_service_url}/health")
+            if response.status_code == 200:
+                health_status["checks"]["context_service"] = {
+                    "status": "healthy",
+                    "url": context_service_url
+                }
+            else:
+                health_status["checks"]["context_service"] = {
+                    "status": "unhealthy",
+                    "error": f"HTTP {response.status_code}",
+                    "url": context_service_url
+                }
+    except Exception as e:
+        health_status["checks"]["context_service"] = {
+            "status": "error",
+            "error": f"Failed to connect: {str(e)}",
+            "url": os.getenv("CONTEXT_SERVICE_URL", "http://localhost:8001")
+        }
 
     # Memory health
     try:
@@ -452,7 +501,7 @@ async def health_check(request: Request):
         health_status["checks"]["circuit_breakers"] = {"status": "error", "error": str(e)}
 
     # Overall status determination
-    critical_checks = ['providers', 'memory']
+    critical_checks = ['providers', 'memory', 'context_service']
     if any(health_status["checks"].get(check, {}).get("status") in ["unhealthy", "critical", "error"]
            for check in critical_checks):
         health_status["status"] = "unhealthy"
@@ -700,11 +749,31 @@ async def embeddings(
         request, req, providers, "embeddings", BackgroundTasks()
     )
 
+async def condense_context_via_service(chunks: List[str], max_tokens: int = 512) -> str:
+    """Call the context condensation service via HTTP"""
+    context_service_url = os.getenv("CONTEXT_SERVICE_URL", "http://localhost:8001")
+
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                f"{context_service_url}/condense",
+                json={"chunks": chunks, "max_tokens": max_tokens}
+            )
+            response.raise_for_status()
+            result = response.json()
+            return result["summary"]
+    except httpx.RequestError as e:
+        logger.error(f"Failed to call context service: {e}")
+        raise ServiceUnavailableError("Context condensation service is unavailable")
+    except httpx.HTTPStatusError as e:
+        logger.error(f"Context service error: {e.response.status_code} - {e.response.text}")
+        raise ServiceUnavailableError("Context condensation service returned an error")
+
 async def background_condense(request_id: str, request: Request, chunks: List[str]):
     """Background task to compute full context summary and store in smart cache"""
     try:
         start_time = time.time()
-        summary = await condense_context(request, chunks)
+        summary = await condense_context_via_service(chunks)
         latency = time.time() - start_time
 
         # Store in smart cache with TTL

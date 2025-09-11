@@ -80,6 +80,18 @@ class Settings(BaseSettings):
     config_file: Path = BASE_DIR / "config.yaml"
     log_file: Path = BASE_DIR / "logs/proxy_api.log"
 
+    # Export Dataset Settings
+    export_default_log_file: Path = BASE_DIR / "logs/proxy_api.log"
+    export_default_output_dir: Path = BASE_DIR / "exports"
+    export_default_output_file: str = "dataset.jsonl"
+    export_max_records: Optional[int] = None
+    export_successful_only: bool = False
+    export_export_all: bool = False
+    export_start_date: Optional[str] = None
+    export_end_date: Optional[str] = None
+    export_model_filter: Optional[str] = None
+    export_log_level: str = "INFO"
+
     class Config:
         env_prefix = "PROXY_API_"
         case_sensitive = False

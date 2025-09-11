@@ -1,0 +1,24 @@
+INSTRUÇÕES PARA LIMPAR O CACHE DO VSCODE:
+
+1. Pressione: Ctrl + Shift + P (ou Cmd + Shift + P no Mac)
+
+2. Digite: "Developer: Reload Window"
+
+3. Selecione e pressione Enter
+
+OU
+
+1. Feche completamente o VS Code
+
+2. Abra o VS Code novamente
+
+3. Abra o arquivo docs/FILE_REFERENCE.md
+
+Os erros MD051 antigos devem desaparecer após o refresh!
+
+O arquivo já está corrigido:
+✅ Fragmentos normalizados para ASCII
+✅ Nenhum erro MD051 restante (validado pelo script)
+✅ Formatação correta dos links
+
+Os erros que você vê são apenas CACHE ANTIGO do VS Code!

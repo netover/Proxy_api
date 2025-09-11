@@ -3,7 +3,7 @@ from PyInstaller.utils.hooks import collect_all
 
 datas = [('config.yaml', 'config.yaml'), ('logs', 'logs'), ('templates', 'templates'), ('static', 'static')]
 binaries = []
-hiddenimports = ['uvicorn', 'fastapi', 'flask', 'src', 'src.core', 'src.core.config', 'src.core.logging', 'src.core.app_config', 'src.core.auth', 'src.core.app_state', 'src.api', 'src.api.endpoints', 'src.models', 'src.models.requests', 'src.providers', 'src.providers.base', 'src.providers.openai', 'src.providers.anthropic', 'src.services', 'src.services.provider_loader']
+hiddenimports = ['uvicorn', 'fastapi', 'flask', 'httpx', 'anyio', 'slowapi', 'psutil', 'pythonjsonlogger', 'redis', 'src', 'src.core', 'src.core.config', 'src.core.logging', 'src.core.app_config', 'src.core.auth', 'src.core.app_state', 'src.api', 'src.api.endpoints', 'src.models', 'src.models.requests', 'src.providers', 'src.providers.base', 'src.providers.openai', 'src.providers.anthropic', 'src.providers.azure_openai', 'src.providers.blackbox', 'src.providers.cohere', 'src.providers.grok', 'src.providers.openrouter', 'src.providers.perplexity', 'src.services', 'src.services.provider_loader', 'src.utils', 'src.utils.context_condenser']
 tmp_ret = collect_all('uvicorn')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 tmp_ret = collect_all('fastapi')

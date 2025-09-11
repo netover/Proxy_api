@@ -32,6 +32,7 @@ condensation:
   parallel_providers: 1
   cache_size: 1000
   cache_persist: true
+  cache_redis_url: null  # Redis URL for distributed caching (optional)
   truncation_threshold: 4000
   fallback_strategies:
     - "truncate"

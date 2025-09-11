@@ -1,0 +1,36 @@
+[Unit]
+Description=LLM Proxy API Main Service
+After=network.target context-service.service health-worker.service
+Wants=context-service.service health-worker.service
+Requires=context-service.service health-worker.service
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/path/to/ProxyAPI
+Environment=PATH=/path/to/venv/bin
+Environment=CONTEXT_SERVICE_URL=http://localhost:8001
+Environment=HEALTH_WORKER_URL=http://localhost:8002
+Environment=HOST=0.0.0.0
+Environment=PORT=8000
+ExecStart=/path/to/venv/bin/python main.py
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=llm-proxy
+
+# Security settings
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ReadWritePaths=/path/to/ProxyAPI
+ProtectHome=yes
+
+# Resource limits
+MemoryLimit=1G
+CPUQuota=75%
+
+[Install]
+WantedBy=multi-user.target

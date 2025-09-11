@@ -1,0 +1,33 @@
+[Unit]
+Description=LLM Proxy Health Worker Service
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/path/to/ProxyAPI/health_worker
+Environment=PATH=/path/to/venv/bin
+Environment=HEALTH_WORKER_URL=http://localhost:8002
+Environment=HEALTH_CHECK_INTERVAL=60
+ExecStart=/path/to/venv/bin/uvicorn app:app --host 0.0.0.0 --port 8002 --workers 1
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=health-worker
+
+# Security settings
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ReadWritePaths=/path/to/ProxyAPI/health_worker
+ProtectHome=yes
+
+# Resource limits
+MemoryLimit=256M
+CPUQuota=25%
+
+[Install]
+WantedBy=multi-user.target

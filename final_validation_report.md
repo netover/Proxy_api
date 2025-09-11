@@ -1,0 +1,348 @@
+# Markdown Validation Report
+
+## Summary
+
+- **Total Files**: 6
+- **Valid Files**: 0
+- **Invalid Files**: 6
+- **Total Issues**: 298
+- **Fixable Issues**: 115
+
+## Issues by Type
+
+- **emphasis_as_heading**: 181
+- **header_spacing**: 42
+- **code_block_language**: 32
+- **bare_urls**: 39
+- **header_format**: 2
+- **link_fragments**: 2
+
+## File Details
+
+### ❌ docs\export_dataset.md
+- **Lines**: 118
+- **Issues**: 6
+**Issues Found:**
+- 🟡 Line 15: Emphasis used instead of a heading
+- 🟡 Line 16: Emphasis used instead of a heading
+- 🟡 Line 17: Emphasis used instead of a heading
+- 🟡 Line 18: Emphasis used instead of a heading
+- 🟡 Line 19: Emphasis used instead of a heading
+- 🟡 Line 20: Emphasis used instead of a heading
+
+### ❌ docs\FILE_REFERENCE.md
+- **Lines**: 684
+- **Issues**: 106
+**Issues Found:**
+- ℹ️ Line 545: Consider adding blank line before header
+- 🟡 Line 227: Code block should specify language
+- 🟡 Line 519: Code block should specify language
+- 🟡 Line 544: Code block should specify language
+- 🟡 Line 84: Bare URL used: https://api.openai.com/v1...
+- 🟡 Line 130: Bare URL used: https://api.openai.com...
+- 🟡 Line 20: Emphasis used instead of a heading
+- 🟡 Line 22: Emphasis used instead of a heading
+- 🟡 Line 36: Emphasis used instead of a heading
+- 🟡 Line 38: Emphasis used instead of a heading
+- 🟡 Line 47: Emphasis used instead of a heading
+- 🟡 Line 49: Emphasis used instead of a heading
+- 🟡 Line 62: Emphasis used instead of a heading
+- 🟡 Line 64: Emphasis used instead of a heading
+- 🟡 Line 95: Emphasis used instead of a heading
+- 🟡 Line 97: Emphasis used instead of a heading
+- 🟡 Line 120: Emphasis used instead of a heading
+- 🟡 Line 122: Emphasis used instead of a heading
+- 🟡 Line 138: Emphasis used instead of a heading
+- 🟡 Line 140: Emphasis used instead of a heading
+- 🟡 Line 142: Emphasis used instead of a heading
+- 🟡 Line 149: Emphasis used instead of a heading
+- 🟡 Line 151: Emphasis used instead of a heading
+- 🟡 Line 154: Emphasis used instead of a heading
+- 🟡 Line 156: Emphasis used instead of a heading
+- 🟡 Line 159: Emphasis used instead of a heading
+- 🟡 Line 165: Emphasis used instead of a heading
+- 🟡 Line 167: Emphasis used instead of a heading
+- 🟡 Line 170: Emphasis used instead of a heading
+- 🟡 Line 178: Emphasis used instead of a heading
+- 🟡 Line 186: Emphasis used instead of a heading
+- 🟡 Line 194: Emphasis used instead of a heading
+- 🟡 Line 201: Emphasis used instead of a heading
+- 🟡 Line 203: Emphasis used instead of a heading
+- 🟡 Line 211: Emphasis used instead of a heading
+- 🟡 Line 213: Emphasis used instead of a heading
+- 🟡 Line 232: Emphasis used instead of a heading
+- 🟡 Line 234: Emphasis used instead of a heading
+- 🟡 Line 245: Emphasis used instead of a heading
+- 🟡 Line 253: Emphasis used instead of a heading
+- 🟡 Line 261: Emphasis used instead of a heading
+- 🟡 Line 268: Emphasis used instead of a heading
+- 🟡 Line 275: Emphasis used instead of a heading
+- 🟡 Line 282: Emphasis used instead of a heading
+- 🟡 Line 289: Emphasis used instead of a heading
+- 🟡 Line 300: Emphasis used instead of a heading
+- 🟡 Line 302: Emphasis used instead of a heading
+- 🟡 Line 305: Emphasis used instead of a heading
+- 🟡 Line 313: Emphasis used instead of a heading
+- 🟡 Line 321: Emphasis used instead of a heading
+- 🟡 Line 329: Emphasis used instead of a heading
+- 🟡 Line 331: Emphasis used instead of a heading
+- 🟡 Line 334: Emphasis used instead of a heading
+- 🟡 Line 342: Emphasis used instead of a heading
+- 🟡 Line 353: Emphasis used instead of a heading
+- 🟡 Line 355: Emphasis used instead of a heading
+- 🟡 Line 358: Emphasis used instead of a heading
+- 🟡 Line 366: Emphasis used instead of a heading
+- 🟡 Line 374: Emphasis used instead of a heading
+- 🟡 Line 381: Emphasis used instead of a heading
+- 🟡 Line 390: Emphasis used instead of a heading
+- 🟡 Line 410: Emphasis used instead of a heading
+- 🟡 Line 412: Emphasis used instead of a heading
+- 🟡 Line 415: Emphasis used instead of a heading
+- 🟡 Line 423: Emphasis used instead of a heading
+- 🟡 Line 431: Emphasis used instead of a heading
+- 🟡 Line 440: Emphasis used instead of a heading
+- 🟡 Line 452: Emphasis used instead of a heading
+- 🟡 Line 454: Emphasis used instead of a heading
+- 🟡 Line 457: Emphasis used instead of a heading
+- 🟡 Line 464: Emphasis used instead of a heading
+- 🟡 Line 471: Emphasis used instead of a heading
+- 🟡 Line 478: Emphasis used instead of a heading
+- 🟡 Line 480: Emphasis used instead of a heading
+- 🟡 Line 489: Emphasis used instead of a heading
+- 🟡 Line 491: Emphasis used instead of a heading
+- 🟡 Line 500: Emphasis used instead of a heading
+- 🟡 Line 502: Emphasis used instead of a heading
+- 🟡 Line 514: Emphasis used instead of a heading
+- 🟡 Line 516: Emphasis used instead of a heading
+- 🟡 Line 533: Emphasis used instead of a heading
+- 🟡 Line 535: Emphasis used instead of a heading
+- 🟡 Line 538: Emphasis used instead of a heading
+- 🟡 Line 540: Emphasis used instead of a heading
+- 🟡 Line 569: Emphasis used instead of a heading
+- 🟡 Line 571: Emphasis used instead of a heading
+- 🟡 Line 573: Emphasis used instead of a heading
+- 🟡 Line 576: Emphasis used instead of a heading
+- 🟡 Line 578: Emphasis used instead of a heading
+- 🟡 Line 585: Emphasis used instead of a heading
+- 🟡 Line 587: Emphasis used instead of a heading
+- 🟡 Line 595: Emphasis used instead of a heading
+- 🟡 Line 597: Emphasis used instead of a heading
+- 🟡 Line 605: Emphasis used instead of a heading
+- 🟡 Line 607: Emphasis used instead of a heading
+- 🟡 Line 615: Emphasis used instead of a heading
+- 🟡 Line 617: Emphasis used instead of a heading
+- 🟡 Line 631: Emphasis used instead of a heading
+- 🟡 Line 633: Emphasis used instead of a heading
+- 🟡 Line 649: Emphasis used instead of a heading
+- 🟡 Line 651: Emphasis used instead of a heading
+- 🟡 Line 654: Emphasis used instead of a heading
+- 🟡 Line 656: Emphasis used instead of a heading
+- 🟡 Line 669: Emphasis used instead of a heading
+- 🟡 Line 671: Emphasis used instead of a heading
+- 🟡 Line 675: Emphasis used instead of a heading
+
+### ❌ docs\MARKDOWN_VALIDATOR.md
+- **Lines**: 526
+- **Issues**: 42
+**Issues Found:**
+- ℹ️ Line 71: Consider adding blank line before header
+- ℹ️ Line 81: Consider adding blank line before header
+- 🟡 Line 177: Header should have space after #
+- 🟡 Line 178: Header should have space after #
+- ℹ️ Line 181: Consider adding blank line before header
+- ℹ️ Line 374: Consider adding blank line before header
+- ℹ️ Line 411: Consider adding blank line before header
+- ℹ️ Line 454: Consider adding blank line before header
+- ℹ️ Line 464: Consider adding blank line before header
+- ℹ️ Line 475: Consider adding blank line before header
+- 🟡 Line 24: Code block should specify language
+- 🟡 Line 191: Code block should specify language
+- 🟡 Line 196: Code block should specify language
+- 🟡 Line 208: Code block should specify language
+- 🟡 Line 221: Code block should specify language
+- 🟡 Line 252: Code block should specify language
+- 🟡 Line 291: Code block should specify language
+- 🟡 Line 308: Code block should specify language
+- 🟡 Line 324: Code block should specify language
+- 🟡 Line 349: Code block should specify language
+- 🟡 Line 369: Code block should specify language
+- 🟡 Line 379: Code block should specify language
+- 🟡 Line 406: Code block should specify language
+- 🟡 Line 433: Code block should specify language
+- 🟡 Line 449: Code block should specify language
+- 🟡 Line 459: Code block should specify language
+- 🟡 Line 470: Code block should specify language
+- 🟡 Line 13: Emphasis used instead of a heading
+- 🟡 Line 136: Emphasis used instead of a heading
+- 🟡 Line 137: Emphasis used instead of a heading
+- 🟡 Line 138: Emphasis used instead of a heading
+- 🟡 Line 139: Emphasis used instead of a heading
+- 🟡 Line 334: Emphasis used instead of a heading
+- 🟡 Line 509: Emphasis used instead of a heading
+- 🟡 Line 510: Emphasis used instead of a heading
+- 🟡 Line 511: Emphasis used instead of a heading
+- 🟡 Line 512: Emphasis used instead of a heading
+- 🟡 Line 516: Emphasis used instead of a heading
+- 🟡 Line 517: Emphasis used instead of a heading
+- 🟡 Line 518: Emphasis used instead of a heading
+- 🟡 Line 519: Emphasis used instead of a heading
+- 🟡 Line 520: Emphasis used instead of a heading
+
+### ❌ docs\PROJECT_DOCUMENTATION.md
+- **Lines**: 1029
+- **Issues**: 77
+**Issues Found:**
+- ℹ️ Line 125: Consider adding blank line before header
+- ℹ️ Line 136: Consider adding blank line before header
+- ℹ️ Line 154: Consider adding blank line before header
+- ℹ️ Line 190: Consider adding blank line before header
+- ℹ️ Line 393: Consider adding blank line before header
+- ℹ️ Line 483: Consider adding blank line before header
+- ℹ️ Line 705: Consider adding blank line before header
+- ℹ️ Line 734: Consider adding blank line before header
+- ℹ️ Line 759: Consider adding blank line before header
+- ℹ️ Line 821: Consider adding blank line before header
+- ℹ️ Line 846: Consider adding blank line before header
+- ℹ️ Line 865: Consider adding blank line before header
+- ℹ️ Line 901: Consider adding blank line before header
+- ℹ️ Line 916: Consider adding blank line before header
+- ℹ️ Line 926: Consider adding blank line before header
+- ℹ️ Line 940: Consider adding blank line before header
+- ℹ️ Line 954: Consider adding blank line before header
+- ℹ️ Line 969: Consider adding blank line before header
+- ℹ️ Line 981: Consider adding blank line before header
+- 🟡 Line 48: Code block should specify language
+- 🟡 Line 374: Code block should specify language
+- 🟡 Line 380: Code block should specify language
+- 🟡 Line 630: Code block should specify language
+- 🟡 Line 840: Code block should specify language
+- 🟡 Line 859: Code block should specify language
+- 🟡 Line 879: Code block should specify language
+- 🟡 Line 894: Code block should specify language
+- 🟡 Line 910: Code block should specify language
+- 🟡 Line 108: Bare URL used: https://github.com/your-org/llm-proxy-api.git...
+- 🟡 Line 191: Bare URL used: http://localhost:8000/health...
+- 🟡 Line 194: Bare URL used: http://localhost:8000/v1/chat/completions...
+- 🟡 Line 214: Bare URL used: http://localhost:8000...
+- 🟡 Line 445: Bare URL used: https://api.openai.com/v1...
+- 🟡 Line 466: Bare URL used: https://api.openai.com...
+- 🟡 Line 471: Bare URL used: https://api.anthropic.com...
+- 🟡 Line 706: Bare URL used: https://github.com/your-org/llm-proxy-api.git...
+- 🟡 Line 768: Bare URL used: https://api.example.com...
+- 🟡 Line 822: Bare URL used: http://localhost:8000/providers...
+- 🟡 Line 825: Bare URL used: http://localhost:8000/check...
+- 🟡 Line 828: Bare URL used: http://localhost:8000/metrics...
+- 🟡 Line 850: Bare URL used: http://localhost:8000/v1/models...
+- 🟡 Line 866: Bare URL used: http://localhost:8000/health...
+- 🟡 Line 870: Bare URL used: http://localhost:8000/check...
+- 🟡 Line 873: Bare URL used: http://localhost:8000/providers...
+- 🟡 Line 941: Bare URL used: http://localhost:8000/metrics...
+- 🟡 Line 944: Bare URL used: http://localhost:8000/metrics...
+- 🟡 Line 948: Bare URL used: http://localhost:8000/metrics...
+- 🟡 Line 982: Bare URL used: http://localhost:8000/cache/clear...
+- 🟡 Line 25: Emphasis used instead of a heading
+- 🟡 Line 26: Emphasis used instead of a heading
+- 🟡 Line 27: Emphasis used instead of a heading
+- 🟡 Line 28: Emphasis used instead of a heading
+- 🟡 Line 29: Emphasis used instead of a heading
+- 🟡 Line 30: Emphasis used instead of a heading
+- 🟡 Line 31: Emphasis used instead of a heading
+- 🟡 Line 32: Emphasis used instead of a heading
+- 🟡 Line 36: Emphasis used instead of a heading
+- 🟡 Line 37: Emphasis used instead of a heading
+- 🟡 Line 38: Emphasis used instead of a heading
+- 🟡 Line 39: Emphasis used instead of a heading
+- 🟡 Line 40: Emphasis used instead of a heading
+- 🟡 Line 71: Emphasis used instead of a heading
+- 🟡 Line 72: Emphasis used instead of a heading
+- 🟡 Line 73: Emphasis used instead of a heading
+- 🟡 Line 74: Emphasis used instead of a heading
+- 🟡 Line 75: Emphasis used instead of a heading
+- 🟡 Line 76: Emphasis used instead of a heading
+- 🟡 Line 77: Emphasis used instead of a heading
+- 🟡 Line 99: Emphasis used instead of a heading
+- 🟡 Line 100: Emphasis used instead of a heading
+- 🟡 Line 101: Emphasis used instead of a heading
+- 🟡 Line 739: Emphasis used instead of a heading
+- 🟡 Line 798: Emphasis used instead of a heading
+- 🟡 Line 1015: Emphasis used instead of a heading
+- 🟡 Line 1016: Emphasis used instead of a heading
+- 🟡 Line 1017: Emphasis used instead of a heading
+- 🟡 Line 1023: Emphasis used instead of a heading
+
+### ❌ docs\QUICK_START.md
+- **Lines**: 339
+- **Issues**: 36
+**Issues Found:**
+- ℹ️ Line 33: Consider adding blank line before header
+- ℹ️ Line 42: Consider adding blank line before header
+- ℹ️ Line 53: Consider adding blank line before header
+- ℹ️ Line 72: Consider adding blank line before header
+- ℹ️ Line 95: Consider adding blank line before header
+- ℹ️ Line 115: Consider adding blank line before header
+- ℹ️ Line 193: Consider adding blank line before header
+- ℹ️ Line 230: Consider adding blank line before header
+- ℹ️ Line 240: Consider adding blank line before header
+- ℹ️ Line 252: Consider adding blank line before header
+- ℹ️ Line 269: Consider adding blank line before header
+- ℹ️ Line 287: Consider adding blank line before header
+- ℹ️ Line 298: Consider adding blank line before header
+- ℹ️ Line 309: Consider adding blank line before header
+- 🟡 Line 58: Code block should specify language
+- 🟡 Line 16: Bare URL used: https://github.com/your-org/llm-proxy-api.git...
+- 🟡 Line 42: Bare URL used: https://platform.openai.com/api-keys)...
+- 🟡 Line 62: Bare URL used: http://127.0.0.1:8000...
+- 🟡 Line 73: Bare URL used: http://localhost:8000/health...
+- 🟡 Line 96: Bare URL used: http://localhost:8000/v1/chat/completions...
+- 🟡 Line 129: Bare URL used: https://api.openai.com/v1...
+- 🟡 Line 149: Bare URL used: http://localhost:8000...
+- 🟡 Line 173: Bare URL used: http://localhost:8000/v1/chat/completions',...
+- 🟡 Line 194: Bare URL used: http://localhost:8000/v1/chat/completions...
+- 🟡 Line 204: Bare URL used: http://localhost:8000/v1/models...
+- 🟡 Line 208: Bare URL used: http://localhost:8000/health...
+- 🟡 Line 221: Bare URL used: http://localhost:8000/providers...
+- 🟡 Line 224: Bare URL used: http://localhost:8000/check...
+- 🟡 Line 242: Bare URL used: http://localhost:8000/metrics...
+- 🟡 Line 291: Bare URL used: http://localhost:8000/health...
+- 🟡 Line 299: Bare URL used: http://localhost:8000/health...
+- 🟡 Line 302: Bare URL used: http://localhost:8000/check...
+- 🟡 Line 324: Emphasis used instead of a heading
+- 🟡 Line 325: Emphasis used instead of a heading
+- 🟡 Line 326: Emphasis used instead of a heading
+- 🟡 Line 334: Emphasis used instead of a heading
+
+### ❌ docs\README.md
+- **Lines**: 185
+- **Issues**: 31
+**Issues Found:**
+- 🟡 Line 45: Code block should specify language
+- 🟡 Line 88: Code block should specify language
+- 🟡 Line 132: Link fragment '' should be valid
+- 🟡 Line 134: Link fragment '' should be valid
+- 🟡 Line 12: Emphasis used instead of a heading
+- 🟡 Line 27: Emphasis used instead of a heading
+- 🟡 Line 35: Emphasis used instead of a heading
+- 🟡 Line 70: Emphasis used instead of a heading
+- 🟡 Line 71: Emphasis used instead of a heading
+- 🟡 Line 72: Emphasis used instead of a heading
+- 🟡 Line 73: Emphasis used instead of a heading
+- 🟡 Line 74: Emphasis used instead of a heading
+- 🟡 Line 75: Emphasis used instead of a heading
+- 🟡 Line 76: Emphasis used instead of a heading
+- 🟡 Line 80: Emphasis used instead of a heading
+- 🟡 Line 81: Emphasis used instead of a heading
+- 🟡 Line 82: Emphasis used instead of a heading
+- 🟡 Line 83: Emphasis used instead of a heading
+- 🟡 Line 84: Emphasis used instead of a heading
+- 🟡 Line 131: Emphasis used instead of a heading
+- 🟡 Line 132: Emphasis used instead of a heading
+- 🟡 Line 133: Emphasis used instead of a heading
+- 🟡 Line 134: Emphasis used instead of a heading
+- 🟡 Line 143: Emphasis used instead of a heading
+- 🟡 Line 144: Emphasis used instead of a heading
+- 🟡 Line 145: Emphasis used instead of a heading
+- 🟡 Line 175: Emphasis used instead of a heading
+- 🟡 Line 176: Emphasis used instead of a heading
+- 🟡 Line 177: Emphasis used instead of a heading
+- 🟡 Line 178: Emphasis used instead of a heading
+- 🟡 Line 179: Emphasis used instead of a heading

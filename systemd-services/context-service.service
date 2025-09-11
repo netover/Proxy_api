@@ -1,0 +1,33 @@
+[Unit]
+Description=LLM Proxy Context Condensation Service
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/path/to/ProxyAPI/context_service
+Environment=PATH=/path/to/venv/bin
+Environment=CONTEXT_SERVICE_URL=http://localhost:8001
+Environment=HEALTH_CHECK_INTERVAL=60
+ExecStart=/path/to/venv/bin/uvicorn app:app --host 0.0.0.0 --port 8001 --workers 2
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=context-service
+
+# Security settings
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ReadWritePaths=/path/to/ProxyAPI/context_service
+ProtectHome=yes
+
+# Resource limits
+MemoryLimit=512M
+CPUQuota=50%
+
+[Install]
+WantedBy=multi-user.target
