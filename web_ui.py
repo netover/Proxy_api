@@ -26,6 +26,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from src.core.config import settings
 from src.core.logging import ContextualLogger
 from src.services.logging import iterate_logs
+from src.core.model_discovery import ModelDiscoveryService, ProviderConfig
 
 # Constants
 VALID_PROVIDERS = {'openai', 'anthropic', 'perplexity', 'grok', 'blackbox', 'openrouter', 'cohere'}
@@ -123,17 +124,27 @@ def save_config_and_env(form_data) -> bool:
 
         # Parse providers from form data
         i = 0
+        forced_provider = None
         while f'provider_name_{i}' in form_data:
             provider_data = _parse_provider_from_form(form_data, i)
             if not provider_data:
                 return False
             providers.append(provider_data)
 
+            # Check if this is the forced provider
+            if form_data.get('forced_provider') == provider_data['name']:
+                forced_provider = provider_data['name']
+
             # Collect environment updates
             if provider_data.get('api_key_value'):
                 env_updates[provider_data['api_key_env']] = provider_data['api_key_value']
 
             i += 1
+
+        # Ensure only one provider is forced
+        if forced_provider:
+            for provider in providers:
+                provider['forced'] = (provider['name'] == forced_provider)
 
         if not providers:
             flash("At least one provider is required", "error")
@@ -211,8 +222,9 @@ def _parse_provider_from_form(form_data, index: int) -> Optional[Dict[str, Any]]
             'api_key_value': api_key_value,
             'base_url': base_url,
             'models': models,
-            'priority': priority,
-            'enabled': True
+            'enabled': form_data.get(f'enabled_{index}', 'false') == 'true',
+            'forced': form_data.get(f'forced_{index}', 'false') == 'true',
+            'priority': priority
         }
 
     except Exception as e:
@@ -302,7 +314,7 @@ def require_api_key():
     # Exempt static files and public routes
     if request.endpoint and (
         request.endpoint.startswith('static') or
-        request.endpoint in ['index', 'login', 'health']
+        request.endpoint in ['index', 'login', 'health', 'api_discover_models', 'api_validate_model']
     ):
         return None
 
@@ -441,6 +453,7 @@ def api_dashboard_providers():
         # Add status information
         for provider in providers:
             provider['status'] = 'enabled' if provider.get('enabled', True) else 'disabled'
+            provider['forced'] = provider.get('forced', False)
 
         return {'providers': providers}
     except Exception as e:
@@ -458,6 +471,109 @@ def api_dashboard_logs():
     except Exception as e:
         logger.error(f"Error fetching logs: {e}")
         return {'logs': [], 'error': str(e)}, 500
+
+
+# --- Model Discovery API Routes ---
+
+@app.route('/api/models/discover/<int:provider_index>')
+def api_discover_models(provider_index):
+    """Discover available models for a specific provider."""
+    try:
+        config = load_config()
+        providers = config.get('providers', [])
+        
+        if provider_index >= len(providers):
+            return {'models': [], 'error': 'Provider index out of range'}, 400
+        
+        provider = providers[provider_index]
+        env_vars = load_env()
+        
+        # Get API key from environment
+        api_key_env = provider.get('api_key_env', '')
+        api_key = env_vars.get(api_key_env, '')
+        
+        if not api_key:
+            return {'models': [], 'error': f'API key not found for {api_key_env}'}, 400
+        
+        # Create provider config
+        provider_config = ProviderConfig(
+            name=provider['name'],
+            base_url=provider.get('base_url', 'https://api.openai.com'),
+            api_key=api_key
+        )
+        
+        # Discover models
+        import asyncio
+        async def discover():
+            service = ModelDiscoveryService()
+            try:
+                models = await service.discover_models(provider_config)
+                return [model.to_dict() for model in models]
+            finally:
+                await service.close()
+        
+        models = asyncio.run(discover())
+        
+        return {
+            'models': models,
+            'provider_name': provider['name'],
+            'provider_type': provider['type'],
+            'count': len(models)
+        }
+        
+    except Exception as e:
+        logger.error(f"Error discovering models: {e}")
+        return {'models': [], 'error': str(e)}, 500
+
+
+@app.route('/api/models/validate/<int:provider_index>/<path:model_id>')
+def api_validate_model(provider_index, model_id):
+    """Validate if a specific model exists for a provider."""
+    try:
+        config = load_config()
+        providers = config.get('providers', [])
+        
+        if provider_index >= len(providers):
+            return {'valid': False, 'error': 'Provider index out of range'}, 400
+        
+        provider = providers[provider_index]
+        env_vars = load_env()
+        
+        # Get API key from environment
+        api_key_env = provider.get('api_key_env', '')
+        api_key = env_vars.get(api_key_env, '')
+        
+        if not api_key:
+            return {'valid': False, 'error': f'API key not found for {api_key_env}'}, 400
+        
+        # Create provider config
+        provider_config = ProviderConfig(
+            name=provider['name'],
+            base_url=provider.get('base_url', 'https://api.openai.com'),
+            api_key=api_key
+        )
+        
+        # Validate model
+        import asyncio
+        async def validate():
+            service = ModelDiscoveryService()
+            try:
+                is_valid = await service.validate_model(provider_config, model_id)
+                return is_valid
+            finally:
+                await service.close()
+        
+        is_valid = asyncio.run(validate())
+        
+        return {
+            'valid': is_valid,
+            'model_id': model_id,
+            'provider_name': provider['name']
+        }
+        
+    except Exception as e:
+        logger.error(f"Error validating model: {e}")
+        return {'valid': False, 'error': str(e)}, 500
 
 
 # --- Error Handlers ---

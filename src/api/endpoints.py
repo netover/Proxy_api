@@ -18,6 +18,7 @@ from src.models.requests import (
     EmbeddingRequest,
     ImageGenerationRequest
 )
+from src.api.model_endpoints import router as model_router
 
 logger = ContextualLogger(__name__)
 router = APIRouter()
@@ -51,6 +52,16 @@ class RequestRouter:
                 param="model",
                 code="model_not_found"
             )
+        
+        # Check for forced provider
+        config = app_state.config_manager.load_config()
+        forced_provider = config.get_forced_provider()
+        
+        if forced_provider and forced_provider.name in [p.name for p in providers]:
+            # Use forced provider exclusively
+            forced_instance = next(p for p in providers if p.name == forced_provider.name)
+            providers = [forced_instance]
+            logger.info(f"Using forced provider: {forced_provider.name}")
         
         # Track attempts for metrics
         attempt_info = []
@@ -302,7 +313,9 @@ async def list_models(request: Request):
                     "created": int(time.time()),
                     "owned_by": provider.name,
                     "provider_type": provider.type.value,
-                    "status": provider.status.value
+                    "status": provider.status.value,
+                    "enabled": provider.enabled,
+                    "forced": provider.forced
                 })
     
     return {
@@ -338,12 +351,17 @@ async def health_check(request: Request):
                 "type": p.type.value,
                 "status": p.status.value,
                 "models": len(p.models),
+                "enabled": p.enabled,
+                "forced": p.forced,
                 "last_check": p.last_health_check,
                 "error_count": p.error_count
             }
             for p in provider_info
         ]
     }
+
+# Include model management endpoints
+router.include_router(model_router)
 
 @router.get("/metrics")
 async def get_metrics(
@@ -363,6 +381,8 @@ async def get_metrics(
                 "status": provider.status.value,
                 "models": provider.models,
                 "priority": provider.priority,
+                "enabled": provider.enabled,
+                "forced": provider.forced,
                 "last_health_check": provider.last_health_check,
                 "error_count": provider.error_count
             })
@@ -394,6 +414,8 @@ async def list_providers(
                 "status": p.status.value,
                 "models": p.models,
                 "priority": p.priority,
+                "enabled": p.enabled,
+                "forced": p.forced,
                 "last_health_check": p.last_health_check,
                 "error_count": p.error_count,
                 "last_error": p.last_error

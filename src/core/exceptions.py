@@ -49,3 +49,15 @@ class APIConnectionError(ProviderError):
     """Raised for API connection errors"""
     def __init__(self, message: str, code: str = "api_connection_error"):
         super().__init__(message, code=code)
+
+class ValidationError(Exception):
+    """Raised for validation errors in data processing"""
+    def __init__(self, message: str):
+        self.message = message
+        super().__init__(self.message)
+
+class ConfigurationError(Exception):
+    """Raised for configuration-related errors"""
+    def __init__(self, message: str):
+        self.message = message
+        super().__init__(self.message)

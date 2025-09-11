@@ -99,4 +99,62 @@ class ImageGenerationRequest(BaseModel):
             valid_sizes = {"256x256", "512x512", "1024x1024", "1792x1024", "1024x1792"}
             if v not in valid_sizes:
                 raise ValueError(f"size must be one of: {', '.join(valid_sizes)}")
-        return v
+
+# Model Management Request/Response Models
+
+class ModelSelectionRequest(BaseModel):
+    """Request model for updating model selection configuration"""
+    selected_model: str = Field(..., min_length=1, description="The model ID to select as primary")
+    editable: bool = Field(True, description="Whether the model selection can be edited by users")
+    priority: Optional[int] = Field(None, ge=1, le=10, description="Priority level for this model (1-10)")
+    max_tokens: Optional[int] = Field(None, ge=1, description="Maximum tokens override for this model")
+    temperature: Optional[float] = Field(None, ge=0.0, le=2.0, description="Temperature override for this model")
+    
+    @field_validator('selected_model')
+    @classmethod
+    def validate_model_id(cls, v):
+        if not v.strip():
+            raise ValueError("Model ID cannot be empty or whitespace")
+        return v.strip()
+
+class ModelInfoExtended(BaseModel):
+    """Extended model information including provider-specific details"""
+    id: str = Field(..., description="Unique model identifier")
+    object: str = Field("model", description="Object type, always 'model'")
+    created: int = Field(..., description="Unix timestamp of model creation")
+    owned_by: str = Field(..., description="Organization that owns the model")
+    provider: str = Field(..., description="Provider name (e.g., 'openai', 'anthropic')")
+    status: str = Field("active", description="Model status: active, deprecated, or discontinued")
+    capabilities: List[str] = Field(default_factory=list, description="List of supported capabilities")
+    context_window: Optional[int] = Field(None, description="Maximum context window size")
+    max_tokens: Optional[int] = Field(None, description="Maximum output tokens")
+    pricing: Optional[Dict[str, float]] = Field(None, description="Pricing information per 1K tokens")
+    description: Optional[str] = Field(None, description="Human-readable description")
+    version: Optional[str] = Field(None, description="Model version identifier")
+    last_updated: Optional[int] = Field(None, description="Last update timestamp")
+
+class ModelListResponse(BaseModel):
+    """Response model for listing models"""
+    object: str = Field("list", description="Object type, always 'list'")
+    data: List[ModelInfoExtended] = Field(..., description="List of model information objects")
+    provider: str = Field(..., description="Provider name for these models")
+    total: int = Field(..., description="Total number of models")
+    cached: bool = Field(True, description="Whether this data came from cache")
+    last_refresh: Optional[int] = Field(None, description="Last cache refresh timestamp")
+
+class ModelDetailResponse(BaseModel):
+    """Response model for detailed model information"""
+    object: str = Field("model", description="Object type, always 'model'")
+    data: ModelInfoExtended = Field(..., description="Detailed model information")
+    provider: str = Field(..., description="Provider name")
+    cached: bool = Field(True, description="Whether this data came from cache")
+    last_refresh: Optional[int] = Field(None, description="Last cache refresh timestamp")
+
+class RefreshResponse(BaseModel):
+    """Response model for cache refresh operations"""
+    success: bool = Field(..., description="Whether the refresh was successful")
+    provider: str = Field(..., description="Provider name")
+    models_refreshed: int = Field(..., description="Number of models refreshed")
+    cache_cleared: bool = Field(..., description="Whether cache was cleared")
+    duration_ms: float = Field(..., description="Duration of refresh operation in milliseconds")
+    timestamp: int = Field(..., description="Unix timestamp of refresh completion")

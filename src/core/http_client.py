@@ -250,6 +250,9 @@ class OptimizedHTTPClient:
         }
 
 
+# Backward compatibility alias
+HTTPClient = OptimizedHTTPClient
+
 # Global client instance for reuse
 _http_client: Optional[OptimizedHTTPClient] = None
 

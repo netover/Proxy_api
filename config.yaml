@@ -81,6 +81,7 @@ providers:
       - "gpt-4"
       - "gpt-4-turbo"
     enabled: true
+    forced: false
     priority: 1
     timeout: 30
     max_retries: 3
@@ -94,6 +95,7 @@ providers:
       - "claude-3-sonnet"
       - "claude-3-opus"
     enabled: true
+    forced: false
     priority: 2
     timeout: 30
     max_retries: 3
@@ -107,6 +109,7 @@ providers:
       - "gpt-35-turbo"
       - "gpt-4"
     enabled: true
+    forced: false
     priority: 3
     timeout: 30
     max_retries: 3

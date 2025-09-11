@@ -11,6 +11,8 @@
     <title>LLM Proxy Configuration</title>
     <!-- CSS link: Loads style.css from static folder via Flask url_for for path resolution. Functionality: Applies neumorphic styling. Issue: If /static not served or auth applied, 404 or blocked. Opt: Inline critical CSS for performance, add preload. -->
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <!-- Model Discovery JavaScript -->
+    <script src="{{ url_for('static', filename='js/model_discovery.js') }}" defer></script>
 </head>
 <body>
     <!-- Body: Main content wrapper. Functionality: Contains all UI elements. Issue: No role or lang repeat. Opt: Add onload for JS init. -->
@@ -91,24 +93,54 @@
                             <input type="password" id="key-{{ loop.index0 }}" name="api_key_value_{{ loop.index0 }}" value="" class="neumorphic-input" placeholder="Enter API Key" autocomplete="new-password">  <!-- Add autocomplete for security. -->
                             <input type="hidden" name="api_key_env_{{ loop.index0 }}" value="{{ provider.api_key_env }}">
                         </div>
-                        <!-- Enabled checkbox: New for opt-in. Functionality: Allows toggling provider enabled. Default checked if provider.enabled or True. Issue: Backend must handle 'enabled_i' as bool. Opt: Sync with config. -->
                         <div class="form-group">
-                            <label for="enabled-{{ loop.index0 }}">Enabled</label>
-                            <input type="checkbox" id="enabled-{{ loop.index0 }}" name="enabled_{{ loop.index0 }}" value="true" checked="{{ 'checked' if (provider.enabled if provider.enabled is defined else True) else '' }}" class="neumorphic-input">
+                            <label for="enabled-{{ loop.index0 }}">
+                                <input type="checkbox" id="enabled-{{ loop.index0 }}" name="enabled_{{ loop.index0 }}" value="true" {% if provider.enabled|default(true) %}checked{% endif %} class="neumorphic-input">
+                                Enabled
+                            </label>
+                            <span class="tooltip" title="Enable or disable this provider">ℹ️</span>
                         </div>
                         <div class="form-group">
-                            <label for="models-{{ loop.index0 }}">Models (comma-separated) <span aria-hidden="true">*</span></label>
-                            <textarea id="models-{{ loop.index0 }}" name="models_{{ loop.index0 }}" class="neumorphic-textarea" rows="3" aria-required="true" required>{{ provider.models | join(', ') }}</textarea>
+                            <label>
+                                <input type="radio" name="forced_provider" value="{{ provider.name }}" {% if provider.forced|default(false) %}checked{% endif %} class="neumorphic-input">
+                                Force this provider
+                            </label>
+                            <span class="tooltip" title="Force all requests to use this provider exclusively, bypassing normal priority and health checks">ℹ️</span>
+                        </div>
+                        <div class="form-group">
+                            <label for="models-{{ loop.index0 }}">Models <span aria-hidden="true">*</span></label>
+                            <div class="model-selection-container">
+                                <div class="model-controls">
+                                    <select id="models-dropdown-{{ loop.index0 }}" class="neumorphic-input model-dropdown" data-provider-index="{{ loop.index0 }}">
+                                        <option value="">Select from discovered models...</option>
+                                    </select>
+                                    <button type="button" class="neumorphic-btn model-refresh-btn" data-provider-index="{{ loop.index0 }}" title="Refresh available models">
+                                        🔄 Refresh
+                                    </button>
+                                </div>
+                                <div class="model-input-toggle">
+                                    <label>
+                                        <input type="checkbox" class="manual-input-toggle" data-provider-index="{{ loop.index0 }}">
+                                        Manual input
+                                    </label>
+                                </div>
+                                <textarea id="models-{{ loop.index0 }}" name="models_{{ loop.index0 }}" class="neumorphic-textarea model-textarea" rows="3" aria-required="true" required>{{ provider.models | join(', ') }}</textarea>
+                                <div class="model-validation-feedback" id="validation-{{ loop.index0 }}"></div>
+                                <div class="model-loading" id="loading-{{ loop.index0 }}" style="display: none;">
+                                    <div class="loading-spinner"></div>
+                                    <span>Loading models...</span>
+                                </div>
+                            </div>
                         </div>
                         <div class="form-group">
                             <label for="priority-{{ loop.index0 }}">Priority <span aria-hidden="true">*</span></label>
-                            <input type="number" id="priority-{{ loop.index0 }}" name="priority_{{ loop.index0 }}" value="{{ provider.priority }}" class="neumorphic-input" aria-required="true" min="0" required>  <!-- ARIA, min for validation. -->
+                            <input type="number" id="priority-{{ loop.index0 }}" name="priority_{{ loop.index0 }}" value="{{ provider.priority }}" class="neumorphic-input" aria-required="true" min="0" required>
                         </div>
-                        <!-- Hidden fields: Preserve backend data. Functionality: Sent with form for save. Issue: Type hidden; if change type, module/class not updated. Opt: JS to update hidden on type select (add select). -->
-                        <input type="hidden" name="module_{{ loop.index0 }}" value="{{ provider.module }}">
-                        <input type="hidden" name="class_{{ loop.index0 }}" value="{{ provider.class }}">
+                        <!-- Hidden fields: Preserve backend data -->
+                        <input type="hidden" name="module_{{ loop.index0 }}" value="{{ provider.module|default('') }}">
+                        <input type="hidden" name="class_{{ loop.index0 }}" value="{{ provider.class|default('') }}">
                         <input type="hidden" name="type_{{ loop.index0 }}" value="{{ provider.type }}">
-                        <input type="hidden" name="base_url_{{ loop.index0 }}" value="{{ provider.base_url }}">
+                        <input type="hidden" name="base_url_{{ loop.index0 }}" value="{{ provider.base_url|default('') }}">
                     </div>
                     {% endfor %}
                 </div>
@@ -153,8 +185,9 @@
                     const container = document.getElementById('providers-status');
                     if (data.providers && data.providers.length > 0) {
                         container.innerHTML = data.providers.map(provider => `
-                            <div class="provider-item ${provider.status}">
+                            <div class="provider-item ${provider.status}" data-forced="${provider.forced}">
                                 <strong>${provider.name}</strong> (${provider.type}) - ${provider.status}
+                                ${provider.forced ? '<span style="color: #4a90e2;"> [FORCED]</span>' : ''}
                                 <br>Models: ${provider.models.join(', ')}
                             </div>
                         `).join('');
@@ -239,6 +272,30 @@
                         alert('Please fix the errors before submitting.');
                     }
                 });
+
+                // Handle forced provider radio buttons
+                form.addEventListener('change', function(e) {
+                    if (e.target.name === 'forced_provider') {
+                        // Uncheck all other forced checkboxes when one is selected
+                        const forcedRadios = form.querySelectorAll('input[name="forced_provider"]');
+                        forcedRadios.forEach(radio => {
+                            if (radio !== e.target) {
+                                radio.checked = false;
+                            }
+                        });
+                    }
+                    
+                    // Handle enabled/disabled state
+                    if (e.target.name && e.target.name.startsWith('enabled_')) {
+                        const index = e.target.name.replace('enabled_', '');
+                        const forcedRadio = form.querySelector(`input[name="forced_provider"][value="${document.getElementById('name-' + index).value}"]`);
+                        if (forcedRadio && !e.target.checked) {
+                            // If disabling a provider, also uncheck its forced radio
+                            forcedRadio.checked = false;
+                        }
+                    }
+                });
+                
                 // Remove error on input
                 form.addEventListener('input', function(e) {
                     if (e.target.classList.contains('error')) {

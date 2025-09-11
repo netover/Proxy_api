@@ -1,9 +1,10 @@
 from typing import Dict, List, Any, Optional, Union
-from pydantic import BaseModel, Field, field_validator, HttpUrl
+from pydantic import BaseModel, Field, field_validator, HttpUrl, validator
 from pathlib import Path
 import yaml
 import os
 from enum import Enum
+from .model_config import model_config_manager, ModelSelection
 
 class ProviderType(str, Enum):
     OPENAI = "openai"
@@ -25,6 +26,7 @@ class ProviderConfig(BaseModel):
     
     # Performance settings
     enabled: bool = Field(default=True)
+    forced: bool = Field(default=False)
     priority: int = Field(default=100, ge=1, le=1000)
     timeout: int = Field(default=30, ge=1, le=300)
     max_retries: int = Field(default=3, ge=0, le=10)
@@ -37,7 +39,7 @@ class ProviderConfig(BaseModel):
     
     # Headers
     custom_headers: Dict[str, str] = Field(default_factory=dict)
-    
+
     @field_validator('models')
     @classmethod
     def validate_models(cls, v):
@@ -51,6 +53,13 @@ class ProviderConfig(BaseModel):
         for key in v.keys():
             if not key.replace('-', '').replace('_', '').isalnum():
                 raise ValueError(f"Invalid header name: {key}")
+        return v
+    
+    @validator('forced', pre=True, always=True)
+    def validate_forced_consistency(cls, v, values):
+        """Ensure forced providers are also enabled"""
+        if v and not values.get('enabled', True):
+            raise ValueError('Forced providers must be enabled')
         return v
 
 class CondensationSettings(BaseModel):
@@ -75,6 +84,21 @@ class CondensationSettings(BaseModel):
         if invalid:
             raise ValueError(f"Invalid fallback strategies: {invalid}. Must be one of {valid_strategies}")
         return v
+
+class CacheSettings(BaseModel):
+    """Model discovery cache settings"""
+    cache_enabled: bool = Field(default=True, description="Enable model discovery caching")
+    cache_ttl: int = Field(default=300, ge=60, le=3600, description="Cache TTL in seconds (default: 5 minutes)")
+    cache_persist: bool = Field(default=False, description="Enable disk persistence for cache")
+    cache_dir: Optional[Path] = Field(default=None, description="Directory for cache persistence")
+    
+    @field_validator('cache_dir')
+    @classmethod
+    def validate_cache_dir(cls, v):
+        if v is not None and not v.is_absolute():
+            return Path.cwd() / v
+        return v
+
 class GlobalSettings(BaseModel):
     """Global application settings"""
     # App info
@@ -105,6 +129,7 @@ class GlobalSettings(BaseModel):
     log_file: Optional[Path] = Field(default=None)
     config_file: Path = Field(default=Path("config.yaml"))
     condensation: CondensationSettings = Field(default_factory=CondensationSettings, description="Settings for context condensation optimizations")
+    cache: CacheSettings = Field(default_factory=CacheSettings, description="Settings for model discovery caching")
     
     class Config:
         env_prefix = "PROXY_API_"
@@ -129,6 +154,11 @@ class ProxyConfig(BaseModel):
         if len(enabled_priorities) != len(set(enabled_priorities)):
             raise ValueError("Enabled provider priorities must be unique")
         
+        # Check for multiple forced providers
+        forced_providers = [p.name for p in v if p.forced]
+        if len(forced_providers) > 1:
+            raise ValueError(f"Only one provider can be forced. Found: {forced_providers}")
+        
         # Validate API keys exist with prefix
         missing_keys = []
         for provider in v:
@@ -139,6 +169,11 @@ class ProxyConfig(BaseModel):
             raise ValueError(f"Missing required environment variables: {missing_keys}")
         
         return v
+    
+    def get_forced_provider(self) -> Optional[ProviderConfig]:
+        """Get the forced provider if one exists and is enabled"""
+        forced_providers = [p for p in self.providers if p.forced and p.enabled]
+        return forced_providers[0] if forced_providers else None
 
 class ConfigManager:
     """Centralized configuration manager with caching and validation"""
@@ -208,13 +243,36 @@ class ConfigManager:
     
     def save_config(self, config: ProxyConfig) -> None:
         """Save configuration to file"""
+        # Create a serializable dictionary using built-in serialization
         config_dict = {
             **config.settings.dict(exclude={'providers'}),
-            'providers': [p.dict() for p in config.providers]
+            'providers': []
         }
         
+        # Convert providers to serializable format
+        for provider in config.providers:
+            provider_dict = provider.dict()
+            # Convert HttpUrl to string
+            if 'base_url' in provider_dict:
+                provider_dict['base_url'] = str(provider_dict['base_url'])
+            # Convert enum to string
+            if 'type' in provider_dict:
+                provider_dict['type'] = str(provider_dict['type'])
+            # Convert Path to string
+            if 'config_file' in provider_dict and provider_dict['config_file']:
+                provider_dict['config_file'] = str(provider_dict['config_file'])
+            if 'log_file' in provider_dict and provider_dict['log_file']:
+                provider_dict['log_file'] = str(provider_dict['log_file'])
+            config_dict['providers'].append(provider_dict)
+        
+        # Handle settings paths and enums
+        if 'config_file' in config_dict and config_dict['config_file']:
+            config_dict['config_file'] = str(config_dict['config_file'])
+        if 'log_file' in config_dict and config_dict['log_file']:
+            config_dict['log_file'] = str(config_dict['log_file'])
+        
         with open(self.config_path, 'w', encoding='utf-8') as f:
-            yaml.safe_dump(config_dict, f, default_flow_style=False, 
+            yaml.safe_dump(config_dict, f, default_flow_style=False,
                           allow_unicode=True, indent=2)
         
         # Update cache
@@ -226,6 +284,12 @@ class ConfigManager:
         if not self._config:
             self.load_config()
         
+        # Check for forced provider first
+        forced_provider = self.get_forced_provider()
+        if forced_provider and model in forced_provider.models:
+            return [forced_provider]
+        
+        # Fall back to normal priority-based selection
         providers = [
             p for p in self._config.providers
             if p.enabled and model in p.models
@@ -239,6 +303,111 @@ class ConfigManager:
             self.load_config()
         
         return next((p for p in self._config.providers if p.name == name), None)
+    
+    def set_forced_provider(self, provider_name: str) -> None:
+        """Set a provider as forced, unsetting others"""
+        if not self._config:
+            self.load_config()
+        
+        # Unset all forced providers
+        for provider in self._config.providers:
+            provider.forced = False
+        
+        # Set the specified provider as forced
+        target_provider = self.get_provider_by_name(provider_name)
+        if target_provider:
+            if not target_provider.enabled:
+                raise ValueError("Cannot force a disabled provider")
+            target_provider.forced = True
+            self.save_config(self._config)
+    
+    def toggle_provider_enabled(self, provider_name: str, enabled: bool) -> None:
+        """Toggle provider enabled status"""
+        if not self._config:
+            self.load_config()
+        
+        provider = self.get_provider_by_name(provider_name)
+        if provider:
+            provider.enabled = enabled
+            # If disabling a forced provider, also unset forced
+            if not enabled and provider.forced:
+                provider.forced = False
+            self.save_config(self._config)
+    
+    def get_model_selection(self, provider_name: str) -> Optional[str]:
+        """Get the selected model for a provider"""
+        selection = model_config_manager.get_model_selection(provider_name)
+        return selection.model_name if selection else None
+    
+    def set_model_selection(self, provider_name: str, model_name: str, editable: bool = True) -> None:
+        """Set the model selection for a provider"""
+        if not self._config:
+            self.load_config()
+        
+        # Validate that the provider exists and supports the model
+        provider = self.get_provider_by_name(provider_name)
+        if not provider:
+            raise ValueError(f"Provider '{provider_name}' not found")
+        
+        if model_name not in provider.models:
+            raise ValueError(f"Model '{model_name}' not supported by provider '{provider_name}'")
+        
+        model_config_manager.set_model_selection(provider_name, model_name, editable)
+    
+    def update_model_selection(self, provider_name: str, model_name: str) -> bool:
+        """Update an existing model selection if it's editable"""
+        if not self._config:
+            self.load_config()
+        
+        # Validate that the provider exists and supports the model
+        provider = self.get_provider_by_name(provider_name)
+        if not provider:
+            return False
+        
+        if model_name not in provider.models:
+            return False
+        
+        result = model_config_manager.update_model_selection(provider_name, model_name)
+        return result is not None
+    
+    def remove_model_selection(self, provider_name: str) -> bool:
+        """Remove the model selection for a provider"""
+        return model_config_manager.remove_model_selection(provider_name)
+    
+    def get_all_model_selections(self) -> Dict[str, str]:
+        """Get all model selections as a simple mapping"""
+        return model_config_manager.get_selected_models()
+    
+    def get_model_selection_details(self) -> Dict[str, Any]:
+        """Get detailed model selections including metadata"""
+        selections = model_config_manager.get_all_selections()
+        return {
+            provider_name: {
+                "model_name": selection.model_name,
+                "editable": selection.editable,
+                "last_updated": selection.last_updated.isoformat()
+            }
+            for provider_name, selection in selections.items()
+        }
+    
+    def validate_model_selection(self, provider_name: str, model_name: str) -> bool:
+        """Validate if a model selection is valid for a provider"""
+        if not self._config:
+            self.load_config()
+        
+        provider = self.get_provider_by_name(provider_name)
+        if not provider:
+            return False
+        
+        return model_name in provider.models
+    
+    def get_available_models(self, provider_name: str) -> List[str]:
+        """Get available models for a provider"""
+        if not self._config:
+            self.load_config()
+        
+        provider = self.get_provider_by_name(provider_name)
+        return provider.models if provider else []
 
 # Global instance
 config_manager = ConfigManager()

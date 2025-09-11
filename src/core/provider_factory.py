@@ -15,6 +15,7 @@ import random
 from src.core.unified_config import ProviderConfig, ProviderType, config_manager
 from src.core.metrics import metrics_collector
 from src.core.logging import ContextualLogger
+from src.models.model_info import ModelInfo
 
 logger = ContextualLogger(__name__)
 
@@ -32,6 +33,8 @@ class ProviderInfo:
     status: ProviderStatus
     models: List[str]
     priority: int
+    enabled: bool
+    forced: bool
     last_health_check: float
     error_count: int
     last_error: Optional[str] = None
@@ -110,6 +113,8 @@ class BaseProvider(ABC):
             status=self._status,
             models=self.models,
             priority=self.priority,
+            enabled=self.config.enabled,
+            forced=self.config.forced,
             last_health_check=self._last_health_check,
             error_count=self._error_count,
             last_error=self._last_error
@@ -429,11 +434,23 @@ class ProviderFactory:
                 await asyncio.sleep(60)  # Wait before retrying
     
     async def get_providers_for_model(self, model: str) -> List[BaseProvider]:
-        """Get healthy providers that support the model, sorted by priority"""
-        providers = []
+        """Get providers that support the model, with forced provider priority"""
+        from src.core.unified_config import config_manager
         
+        config = config_manager.load_config()
+        
+        # Check for forced provider first
+        forced_provider = config.get_forced_provider()
+        if forced_provider:
+            forced_instance = self._providers.get(forced_provider.name)
+            if forced_instance and model in forced_instance.models:
+                # Return only the forced provider
+                return [forced_instance]
+        
+        # Fall back to normal selection
+        providers = []
         for provider in self._providers.values():
-            if (model in provider.models and 
+            if (model in provider.models and
                 provider.status in [ProviderStatus.HEALTHY, ProviderStatus.DEGRADED]):
                 providers.append(provider)
         
@@ -443,6 +460,100 @@ class ProviderFactory:
     async def get_all_provider_info(self) -> List[ProviderInfo]:
         """Get information about all providers"""
         return [provider.info for provider in self._providers.values()]
+    
+    def is_discovery_enabled(self, provider_name: str) -> bool:
+        """
+        Check if a provider supports model discovery.
+        
+        Args:
+            provider_name: Name of the provider to check
+            
+        Returns:
+            True if the provider supports discovery, False otherwise
+        """
+        provider = self._providers.get(provider_name)
+        if not provider:
+            return False
+        
+        # Check if provider has discovery methods
+        return (
+            hasattr(provider, 'list_models') and
+            hasattr(provider, 'retrieve_model') and
+            callable(getattr(provider, 'list_models', None)) and
+            callable(getattr(provider, 'retrieve_model', None))
+        )
+    
+    async def discover_models(self, provider_name: str) -> List[ModelInfo]:
+        """
+        Discover models for a specific provider.
+        
+        Args:
+            provider_name: Name of the provider to discover models for
+            
+        Returns:
+            List of ModelInfo objects for available models
+            
+        Raises:
+            ValueError: If provider doesn't exist or doesn't support discovery
+        """
+        provider = self._providers.get(provider_name)
+        if not provider:
+            raise ValueError(f"Provider '{provider_name}' not found")
+        
+        if not self.is_discovery_enabled(provider_name):
+            raise ValueError(f"Provider '{provider_name}' doesn't support model discovery")
+        
+        try:
+            models = await provider.list_models()
+            logger.info(f"Discovered {len(models)} models from {provider_name}")
+            return models
+        except Exception as e:
+            logger.error(f"Failed to discover models for {provider_name}: {e}")
+            raise
+    
+    async def retrieve_model(self, provider_name: str, model_id: str) -> Optional[ModelInfo]:
+        """
+        Retrieve model information from a specific provider.
+        
+        Args:
+            provider_name: Name of the provider
+            model_id: ID of the model to retrieve
+            
+        Returns:
+            ModelInfo object if found, None otherwise
+            
+        Raises:
+            ValueError: If provider doesn't exist or doesn't support discovery
+        """
+        provider = self._providers.get(provider_name)
+        if not provider:
+            raise ValueError(f"Provider '{provider_name}' not found")
+        
+        if not self.is_discovery_enabled(provider_name):
+            raise ValueError(f"Provider '{provider_name}' doesn't support model discovery")
+        
+        try:
+            model_info = await provider.retrieve_model(model_id)
+            if model_info:
+                logger.info(f"Retrieved model '{model_id}' from {provider_name}")
+            else:
+                logger.warning(f"Model '{model_id}' not found in {provider_name}")
+            return model_info
+        except Exception as e:
+            logger.error(f"Failed to retrieve model {model_id} from {provider_name}: {e}")
+            raise
+    
+    async def get_discovery_enabled_providers(self) -> List[str]:
+        """
+        Get list of providers that support model discovery.
+        
+        Returns:
+            List of provider names that support discovery
+        """
+        return [
+            name for name, provider in self._providers.items()
+            if self.is_discovery_enabled(name)
+        ]
     
     async def shutdown(self) -> None:
         """Shutdown all providers and cleanup resources"""

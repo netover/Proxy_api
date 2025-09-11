@@ -650,3 +650,214 @@ label {
 }
 
 /* Optimizations: Added media for responsive/mobile, dark mode, focus-visible for a11y, .error for JS, .help-text for forms. Minify CSS for prod using tool. Test contrast with WAVE or Lighthouse. Add animations if needed (e.g., flash fade-in @keyframes). */
+
+/* Tooltip styles */
+.tooltip {
+    cursor: help;
+    margin-left: 0.5rem;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    position: relative;
+}
+
+.tooltip:hover::after {
+    content: attr(title);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--text-primary);
+    color: var(--bg-primary);
+    padding: 0.5rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    white-space: nowrap;
+    z-index: 1000;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* Radio button and checkbox styles */
+input[type="radio"],
+input[type="checkbox"] {
+    margin-right: 0.5rem;
+    accent-color: var(--accent-primary);
+}
+
+/* Provider controls layout */
+.provider-controls {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+}
+
+.provider-controls label {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    font-weight: 500;
+    text-transform: none;
+    letter-spacing: normal;
+}
+
+.provider-controls label:hover {
+    color: var(--accent-primary);
+}
+
+/* Forced provider highlight */
+.provider-card[data-forced="true"] {
+    border-left: 4px solid var(--accent-primary);
+}
+
+/* Disabled provider styling */
+.provider-card[data-enabled="false"] {
+    opacity: 0.6;
+    filter: grayscale(0.5);
+}
+
+/* Responsive adjustments for controls */
+@media (max-width: 768px) {
+    .provider-controls {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+}
+
+/* Model Discovery Styles */
+.model-selection-container {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+}
+
+.model-controls {
+    display: flex;
+    gap: var(--spacing-md);
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.model-controls .neumorphic-input {
+    flex: 1;
+    min-width: 200px;
+}
+
+.model-controls .neumorphic-btn {
+    padding: var(--spacing-sm) var(--spacing-md);
+    font-size: var(--font-size-sm);
+    min-height: 40px;
+}
+
+.model-input-toggle {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.model-input-toggle label {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    cursor: pointer;
+    font-weight: 500;
+    text-transform: none;
+    letter-spacing: normal;
+}
+
+.model-validation-feedback {
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: var(--border-radius);
+    font-size: var(--font-size-sm);
+    line-height: var(--line-height-normal);
+    transition: all var(--transition-fast);
+    min-height: 20px;
+}
+
+.model-validation-feedback.success {
+    background: linear-gradient(135deg, rgba(92, 184, 92, 0.1), rgba(92, 184, 92, 0.05));
+    color: var(--accent-secondary);
+    border-left: 3px solid var(--accent-secondary);
+}
+
+.model-validation-feedback.error {
+    background: linear-gradient(135deg, rgba(217, 83, 79, 0.1), rgba(217, 83, 79, 0.05));
+    color: var(--accent-danger);
+    border-left: 3px solid var(--accent-danger);
+}
+
+.model-validation-feedback.warning {
+    background: linear-gradient(135deg, rgba(240, 173, 78, 0.1), rgba(240, 173, 78, 0.05));
+    color: var(--accent-warning);
+    border-left: 3px solid var(--accent-warning);
+}
+
+.model-loading {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm);
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+}
+
+.loading-spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--text-muted);
+    border-top: 2px solid var(--accent-primary);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.model-dropdown {
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.model-dropdown option {
+    padding: var(--spacing-sm);
+    font-size: var(--font-size-sm);
+}
+
+.model-dropdown option:hover {
+    background-color: var(--bg-secondary);
+}
+
+/* Responsive model controls */
+@media (max-width: 768px) {
+    .model-controls {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .model-controls .neumorphic-input,
+    .model-controls .neumorphic-btn {
+        width: 100%;
+    }
+    
+    .model-input-toggle {
+        justify-content: center;
+    }
+}
+
+@media (max-width: 480px) {
+    .model-selection-container {
+        gap: var(--spacing-sm);
+    }
+    
+    .model-validation-feedback {
+        font-size: var(--font-size-xs);
+        padding: var(--spacing-xs) var(--spacing-sm);
+    }
+    
+    .model-loading {
+        font-size: var(--font-size-xs);
+    }
+}
