@@ -142,8 +142,36 @@ async def update_provider_config() -> None:
                             "last_check": None,
                             "models": provider["models"]
                         }
+
+        # Clean up disabled providers to prevent memory leaks - CRITICAL FIX
+        await cleanup_removed_providers()
+
     except Exception as e:
         logger.error(f"Provider discovery update failed: {e}")
+
+async def cleanup_removed_providers() -> None:
+    """Clean up status tracking for disabled providers to prevent memory leaks"""
+    try:
+        active_providers = {p["name"] for p in load_provider_config()}
+        removed_providers = []
+
+        async with status_lock:
+            for name in list(provider_status.keys()):
+                if name not in active_providers:
+                    del provider_status[name]
+                    removed_providers.append(name)
+
+                    # Also remove from circuit breakers and cache
+                    if name in circuit_breakers:
+                        del circuit_breakers[name]
+                    if name in health_check_cache:
+                        del health_check_cache[name]
+
+        if removed_providers:
+            logger.info(f"Cleaned up {len(removed_providers)} disabled providers: {', '.join(removed_providers)}")
+
+    except Exception as e:
+        logger.error(f"Failed to cleanup removed providers: {e}")
 
 # Structured logging setup
 try:

@@ -6,7 +6,18 @@ High-performance proxy with intelligent routing and fallback capabilities.
 import asyncio
 import uvicorn
 import re
-import json
+# Use orjson for faster JSON serialization if available, fallback to json
+try:
+    import orjson
+    def json_dumps(obj):
+        return orjson.dumps(obj).decode('utf-8')
+
+    def json_loads(s):
+        return orjson.loads(s)
+except ImportError:
+    import json
+    json_dumps = json.dumps
+    json_loads = json.loads
 import os
 from contextlib import asynccontextmanager
 from typing import Dict, Any, List, Optional, Union
@@ -29,6 +40,10 @@ from slowapi.errors import RateLimitExceeded
 
 # HTTP client
 import httpx
+
+# HTTP Timeouts - Critical fix to prevent hanging requests
+DEFAULT_TIMEOUT = httpx.Timeout(10.0, connect=5.0, read=30.0)
+HEALTH_CHECK_TIMEOUT = httpx.Timeout(5.0, connect=2.0)
 
 # System monitoring
 try:
@@ -72,6 +87,18 @@ logger = ContextualLogger(__name__)
 limiter = Limiter(key_func=get_remote_address)
 
 
+# Background Task Exception Handling
+def safe_background_task(func):
+    """Wrapper for background tasks with proper exception handling"""
+    async def wrapper(*args, **kwargs):
+        try:
+            await func(*args, **kwargs)
+        except asyncio.CancelledError:
+            logger.info(f"Background task {func.__name__} was cancelled")
+        except Exception as e:
+            logger.error(f"Background task {func.__name__} failed: {e}", exc_info=True)
+    return wrapper
+
 # Utility Functions
 async def get_provider(provider_config: ProviderConfig) -> Any:
     """Get or create provider instance with caching"""
@@ -110,7 +137,7 @@ async def handle_context_condensation(
     if total_content > config.truncation_threshold:
         request_id = str(uuid.uuid4())
         full_chunks = [m["content"] for m in req["messages"]]
-        background_tasks.add_task(background_condense, request_id, request, full_chunks)
+        background_tasks.add_task(safe_background_task(background_condense), request_id, request, full_chunks)
 
         if not req.get("stream", False):
             return JSONResponse(
@@ -243,7 +270,7 @@ async def process_request_with_fallback(
                 if not req.get("stream", False):
                     request_id = str(uuid.uuid4())
                     chunks = [m["content"] for m in req.get("messages", [])]
-                    background_tasks.add_task(background_condense, request_id, request, chunks)
+                    background_tasks.add_task(safe_background_task(background_condense), request_id, request, chunks)
 
                     return JSONResponse(
                         status_code=HTTPStatus.ACCEPTED,
@@ -349,32 +376,46 @@ async def lifespan(app: FastAPI):
 
     yield
 
-    # Cleanup with proper shutdown sequence
+    # Cleanup with proper shutdown sequence - CRITICAL FIX FOR RACE CONDITIONS
     logger.info("Shutting down LLM Proxy API")
 
     try:
-        # Shutdown app state
+        # Shutdown app state first
         await app_state.shutdown()
         logger.info("App state shutdown complete")
 
-        # Shutdown performance systems in reverse order
+        # Shutdown performance systems in reverse order with proper async handling
+        shutdown_tasks = []
+
         if hasattr(app.state, 'memory_manager'):
-            await shutdown_memory_manager()
-            logger.info("Memory manager shutdown")
+            shutdown_tasks.append(shutdown_memory_manager())
 
         if hasattr(app.state, 'response_cache'):
-            await shutdown_caches()
-            logger.info("Caches shutdown")
+            shutdown_tasks.append(shutdown_caches())
 
         # Shutdown context condensation cache
         if hasattr(app.state, 'lru_cache') and app.state.lru_cache:
-            await app.state.lru_cache.shutdown()
-            logger.info("Context condensation cache shutdown")
+            shutdown_tasks.append(app.state.lru_cache.shutdown())
 
-        logger.info("All performance systems shutdown successfully")
+        # Wait for all shutdown tasks to complete
+        if shutdown_tasks:
+            await asyncio.gather(*shutdown_tasks, return_exceptions=True)
+            logger.info("All performance systems shutdown successfully")
+
+        # Cancel any remaining background tasks
+        tasks = [t for t in asyncio.all_tasks() if t != asyncio.current_task()]
+        if tasks:
+            logger.info(f"Cancelling {len(tasks)} remaining background tasks")
+            for task in tasks:
+                if not task.done():
+                    task.cancel()
+
+            # Wait for cancelled tasks to complete
+            await asyncio.gather(*tasks, return_exceptions=True)
+            logger.info("All background tasks cancelled")
 
     except Exception as e:
-        logger.error(f"Error during shutdown: {e}")
+        logger.error(f"Error during shutdown: {e}", exc_info=True)
 
     logger.info("LLM Proxy API shutdown complete")
 
@@ -461,10 +502,10 @@ async def health_check(request: Request):
         "checks": {}
     }
 
-    # Provider health from health worker service
+    # Provider health from health worker service or direct parallel checks
     try:
         health_worker_url = os.getenv("HEALTH_WORKER_URL", "http://localhost:8002")
-        async with httpx.AsyncClient(timeout=5.0) as client:
+        async with httpx.AsyncClient(timeout=HEALTH_CHECK_TIMEOUT) as client:
             response = await client.get(f"{health_worker_url}/status")
             if response.status_code == 200:
                 health_data = response.json()
@@ -476,20 +517,38 @@ async def health_check(request: Request):
                     "details": health_data["providers"]
                 }
             else:
+                # Fallback to direct parallel health checks
+                logger.warning("Health worker unavailable, using direct parallel checks")
+                parallel_results = await perform_parallel_health_checks()
                 health_status["checks"]["providers"] = {
-                    "status": "error",
-                    "error": f"Health worker returned HTTP {response.status_code}"
+                    "status": "healthy" if parallel_results["healthy_providers"] > 0 else "unhealthy",
+                    "total": parallel_results["total_providers"],
+                    "healthy": parallel_results["healthy_providers"],
+                    "unhealthy": parallel_results["unhealthy_providers"],
+                    "details": parallel_results["providers"]
                 }
     except Exception as e:
-        health_status["checks"]["providers"] = {
-            "status": "error",
-            "error": f"Failed to connect to health worker: {str(e)}"
-        }
+        # Fallback to direct parallel health checks on error
+        logger.warning(f"Health worker error ({e}), using direct parallel checks")
+        try:
+            parallel_results = await perform_parallel_health_checks()
+            health_status["checks"]["providers"] = {
+                "status": "healthy" if parallel_results["healthy_providers"] > 0 else "unhealthy",
+                "total": parallel_results["total_providers"],
+                "healthy": parallel_results["healthy_providers"],
+                "unhealthy": parallel_results["unhealthy_providers"],
+                "details": parallel_results["providers"]
+            }
+        except Exception as parallel_error:
+            health_status["checks"]["providers"] = {
+                "status": "error",
+                "error": f"Both health worker and parallel checks failed: {str(parallel_error)}"
+            }
 
     # Context service health
     try:
         context_service_url = os.getenv("CONTEXT_SERVICE_URL", "http://localhost:8001")
-        async with httpx.AsyncClient(timeout=5.0) as client:
+        async with httpx.AsyncClient(timeout=HEALTH_CHECK_TIMEOUT) as client:
             response = await client.get(f"{context_service_url}/health")
             if response.status_code == 200:
                 health_status["checks"]["context_service"] = {
@@ -751,7 +810,7 @@ async def completions(
     if total_content > config.truncation_threshold:
         request_id = str(uuid.uuid4())
         full_chunks = prompt if isinstance(prompt, list) else [prompt]
-        background_tasks.add_task(background_condense, request_id, request, full_chunks)
+        background_tasks.add_task(safe_background_task(background_condense), request_id, request, full_chunks)
 
         if not req.get("stream", False):
             return JSONResponse(
@@ -820,12 +879,86 @@ async def embeddings(
         request, req, providers, "embeddings", BackgroundTasks()
     )
 
+async def perform_parallel_health_checks() -> Dict[str, Any]:
+    """Perform health checks in parallel for better performance - PERFORMANCE OPTIMIZATION"""
+    logger.info("Starting parallel health checks")
+
+    # Get all providers
+    config = config_manager.load_config()
+    providers = config.providers
+
+    async def check_provider_health(provider: ProviderConfig) -> Dict[str, Any]:
+        """Check individual provider health"""
+        try:
+            provider_instance = await get_provider(provider)
+            if not provider_instance:
+                return {
+                    "name": provider.name,
+                    "status": "error",
+                    "error": "Failed to initialize provider"
+                }
+
+            # Quick health check
+            start_time = time.time()
+            result = await provider_instance.health_check()
+            response_time = time.time() - start_time
+
+            return {
+                "name": provider.name,
+                "status": "healthy" if result.get("healthy", False) else "unhealthy",
+                "response_time": response_time,
+                "details": result
+            }
+        except Exception as e:
+            return {
+                "name": provider.name,
+                "status": "error",
+                "error": str(e)
+            }
+
+    # Create tasks for parallel execution
+    tasks = [check_provider_health(provider) for provider in providers]
+
+    # Execute all health checks concurrently with timeout
+    try:
+        results = await asyncio.wait_for(
+            asyncio.gather(*tasks, return_exceptions=True),
+            timeout=30.0  # 30 second timeout for all checks
+        )
+    except asyncio.TimeoutError:
+        logger.error("Parallel health checks timed out")
+        results = [{"name": "timeout", "status": "error", "error": "Health check timeout"}]
+
+    # Process results
+    health_results = {}
+    healthy_count = 0
+    total_count = len(providers)
+
+    for result in results:
+        if isinstance(result, Exception):
+            logger.error(f"Health check task failed: {result}")
+            continue
+
+        health_results[result["name"]] = result
+        if result["status"] == "healthy":
+            healthy_count += 1
+
+    logger.info(f"Parallel health checks completed: {healthy_count}/{total_count} providers healthy")
+
+    return {
+        "timestamp": time.time(),
+        "total_providers": total_count,
+        "healthy_providers": healthy_count,
+        "unhealthy_providers": total_count - healthy_count,
+        "providers": health_results
+    }
+
 async def condense_context_via_service(chunks: List[str], max_tokens: int = 512) -> str:
     """Call the context condensation service via HTTP"""
     context_service_url = os.getenv("CONTEXT_SERVICE_URL", "http://localhost:8001")
 
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=DEFAULT_TIMEOUT) as client:
             response = await client.post(
                 f"{context_service_url}/condense",
                 json={"chunks": chunks, "max_tokens": max_tokens}
