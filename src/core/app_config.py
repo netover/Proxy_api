@@ -5,6 +5,11 @@ import sys
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Tuple
 from pydantic import BaseModel, field_validator, Field, HttpUrl
+from .optimized_config import load_full_config, config_loader
+from .logging import ContextualLogger
+import asyncio
+
+logger = ContextualLogger(__name__)
 
 def get_config_paths() -> Tuple[Path, Path, Path, Path]:
     """Returns paths for bundled and external config files (YAML and JSON)"""
@@ -59,9 +64,9 @@ def create_default_config(config_path: Path) -> Dict[str, Any]:
             else:
                 yaml.safe_dump(default_config, f, default_flow_style=False, sort_keys=False)
 
-        print(f"✅ Created default config file: {config_path}")
+        logger.info("Created default config file", config_path=str(config_path))
     except Exception as e:
-        print(f"❌ Failed to create default config file: {e}")
+        logger.error("Failed to create default config file", error=str(e), config_path=str(config_path))
 
     return default_config
 
@@ -79,6 +84,11 @@ class ProviderConfig(BaseModel):
     retry_attempts: int = Field(3, ge=0, le=10, description="Number of retry attempts")
     retry_delay: float = Field(1.0, ge=0.1, le=60.0, description="Delay between retries in seconds")
     headers: Optional[Dict[str, str]] = Field(None, description="Additional headers to send")
+
+    # HTTP Connection Pool Configuration
+    max_keepalive_connections: int = Field(100, ge=1, le=1000, description="Maximum keepalive connections")
+    max_connections: int = Field(1000, ge=1, le=10000, description="Maximum total connections")
+    keepalive_expiry: float = Field(30.0, ge=1.0, le=300.0, description="Keepalive expiry in seconds")
 
     @field_validator('type')
     @classmethod
@@ -129,9 +139,48 @@ class AppConfig(BaseModel):
         return v
 
 def load_config() -> AppConfig:
-    """Load config with fallback: external -> bundled -> default (supports YAML and JSON)"""
+    """Load config with optimized loading and fallback: external -> bundled -> default"""
     bundle_yaml, bundle_json, external_yaml, external_json = get_config_paths()
 
+    async def _load_optimized():
+        """Try to load using optimized loader first"""
+        try:
+            # Use optimized loader for external config
+            if external_yaml.exists():
+                config_loader.config_path = external_yaml
+                config_data = await load_full_config()
+                logger.info("Loaded external config (optimized)", config_path=str(external_yaml))
+                return AppConfig(**config_data)
+            elif external_json.exists():
+                config_loader.config_path = external_json
+                config_data = await load_full_config()
+                logger.info("Loaded external config (optimized)", config_path=str(external_json))
+                return AppConfig(**config_data)
+        except Exception as e:
+            logger.warning("Optimized loader failed for external config", error=str(e))
+
+        return None
+
+    # Try optimized loading first
+    try:
+        # Check if there's already a running event loop
+        try:
+            loop = asyncio.get_running_loop()
+            # If we get here, there's a running loop, so we can't use run_until_complete
+            # Fall back to sync loading
+            logger.warning("Event loop already running, using sync fallback")
+            raise RuntimeError("Event loop already running")
+        except RuntimeError:
+            # No running loop, we can create one
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            optimized_config = loop.run_until_complete(_load_optimized())
+            if optimized_config:
+                return optimized_config
+    except Exception as e:
+        logger.warning("Async optimized loading failed", error=str(e))
+
+    # Fallback to original synchronous loading
     # Helper function to try loading a config file with both YAML and JSON
     def try_load_config(yaml_path: Path, json_path: Path, description: str) -> Optional[AppConfig]:
         # Try YAML first
@@ -139,20 +188,20 @@ def load_config() -> AppConfig:
             try:
                 with open(yaml_path, 'r', encoding='utf-8') as f:
                     config_data = yaml.safe_load(f)
-                print(f"✅ Loaded {description} config (YAML): {yaml_path}")
+                logger.info(f"Loaded {description} config (YAML)", config_path=str(yaml_path))
                 return AppConfig(**config_data)
             except Exception as e:
-                print(f"⚠️  Error reading {description} YAML config: {e}")
+                logger.warning(f"Error reading {description} YAML config", error=str(e), config_path=str(yaml_path))
 
         # Try JSON as fallback
         if json_path.exists():
             try:
                 with open(json_path, 'r', encoding='utf-8') as f:
                     config_data = json.load(f)
-                print(f"✅ Loaded {description} config (JSON): {json_path}")
+                logger.info(f"Loaded {description} config (JSON)", config_path=str(json_path))
                 return AppConfig(**config_data)
             except Exception as e:
-                print(f"⚠️  Error reading {description} JSON config: {e}")
+                logger.warning(f"Error reading {description} JSON config", error=str(e), config_path=str(json_path))
 
         return None
 
@@ -168,21 +217,21 @@ def load_config() -> AppConfig:
         try:
             if bundle_yaml.exists():
                 shutil.copy2(bundle_yaml, external_yaml)
-                print(f"✅ Copied bundled config to: {external_yaml}")
+                logger.info("Copied bundled config to external location", source=str(bundle_yaml), destination=str(external_yaml))
             elif bundle_json.exists():
                 # Convert JSON to YAML for external editing
                 with open(bundle_json, 'r', encoding='utf-8') as f:
                     config_data = json.load(f)
                 with open(external_yaml, 'w', encoding='utf-8') as f:
                     yaml.safe_dump(config_data, f, default_flow_style=False, sort_keys=False)
-                print(f"✅ Converted and copied bundled config to: {external_yaml}")
+                logger.info("Converted and copied bundled config to external location", source=str(bundle_json), destination=str(external_yaml))
         except Exception as e:
-            print(f"⚠️  Failed to copy config to external location: {e}")
+            logger.warning("Failed to copy config to external location", error=str(e))
 
         return bundled_config
 
     # 3rd: Create default config (YAML format)
-    print("ℹ️  Creating default config...")
+    logger.info("Creating default config", config_path=str(external_yaml))
     config_data = create_default_config(external_yaml)
     return AppConfig(**config_data)
 

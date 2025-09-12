@@ -1,0 +1,2 @@
+[console_scripts]
+proxy-log-viewer = proxy_logging.cli:log_viewer

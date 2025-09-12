@@ -1,0 +1,39 @@
+Metadata-Version: 2.4
+Name: proxy-context
+Version: 1.0.0
+Summary: Context management and caching components for LLM Proxy
+Author-email: ProxyAPI Team <team@proxyapi.dev>
+License: MIT
+Project-URL: Homepage, https://github.com/proxyapi/proxy-context
+Project-URL: Documentation, https://proxy-context.readthedocs.io
+Project-URL: Repository, https://github.com/proxyapi/proxy-context.git
+Project-URL: Issues, https://github.com/proxyapi/proxy-context/issues
+Keywords: llm,proxy,context,cache,summarization
+Classifier: Development Status :: 4 - Beta
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Topic :: Software Development :: Libraries :: Python Modules
+Classifier: Topic :: Scientific/Engineering :: Artificial Intelligence
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+Requires-Dist: pydantic>=2.8.0
+Requires-Dist: cachetools>=5.3.0
+Requires-Dist: orjson>=3.10.0
+Requires-Dist: psutil>=5.9.0
+Requires-Dist: opentelemetry-api>=1.25.0
+Requires-Dist: proxy-logging>=1.0.0
+Provides-Extra: dev
+Requires-Dist: pytest>=8.4.2; extra == "dev"
+Requires-Dist: pytest-asyncio>=0.21.0; extra == "dev"
+Requires-Dist: mypy>=1.9.0; extra == "dev"
+Requires-Dist: black>=24.0.0; extra == "dev"
+Requires-Dist: ruff>=0.5.0; extra == "dev"
+Requires-Dist: isort>=5.13.0; extra == "dev"
+Provides-Extra: redis
+Requires-Dist: redis>=5.0.0; extra == "redis"

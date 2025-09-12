@@ -21,10 +21,10 @@ import psutil
 from fastapi.testclient import TestClient
 import numpy as np
 
-from src.core.model_discovery import ModelDiscovery
+from src.core.model_discovery import ModelDiscoveryService
 from src.core.cache_manager import CacheManager
 from src.core.provider_factory import ProviderFactory
-from src.api.endpoints import app
+from main import app
 from src.models.model_info import ModelInfo
 
 
@@ -42,7 +42,7 @@ class TestModelDiscoveryPerformance:
         """Create model discovery service with test configuration."""
         cache_manager = CacheManager(cache_dir=temp_cache_dir, ttl=300)
         provider_factory = ProviderFactory()
-        return ModelDiscovery(
+        return ModelDiscoveryService(
             cache_manager=cache_manager,
             provider_factory=provider_factory,
             timeout=30

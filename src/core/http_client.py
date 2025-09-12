@@ -10,6 +10,13 @@ import httpx
 from contextlib import asynccontextmanager
 import logging
 
+# Import retry strategies
+from src.core.retry_strategies import (
+    RetryConfig, RetryStrategy, create_retry_strategy,
+    ErrorType, retry_strategy_registry
+)
+from src.core.exceptions import ProviderError, RateLimitError
+from src.core.metrics import metrics_collector
 logger = logging.getLogger(__name__)
 
 
@@ -237,7 +244,7 @@ class OptimizedHTTPClient:
             if self.request_count > 0 else 0
         )
 
-        return {
+        metrics = {
             'requests_total': self.request_count,
             'errors_total': self.error_count,
             'avg_response_time_ms': round(avg_response_time * 1000, 2),
@@ -248,6 +255,21 @@ class OptimizedHTTPClient:
             'max_connections': self.max_connections,
             'active_connections': getattr(self._client, '_pool', {}).get('connections', 0) if self._client else 0
         }
+
+        # Update main metrics collector with connection pool data
+        pool_metrics = {
+            'max_keepalive_connections': self.max_keepalive_connections,
+            'max_connections': self.max_connections,
+            'active_connections': metrics['active_connections'],
+            'available_connections': getattr(self._client, '_pool', {}).get('available_connections', 0) if self._client else 0,
+            'pending_requests': getattr(self._client, '_pool', {}).get('pending_requests', 0) if self._client else 0,
+            'total_requests': self.request_count,
+            'error_count': self.error_count,
+            'avg_response_time_ms': metrics['avg_response_time_ms']
+        }
+        metrics_collector.update_connection_pool_metrics(pool_metrics)
+
+        return metrics
 
 
 # Backward compatibility alias

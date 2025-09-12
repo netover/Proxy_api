@@ -1,0 +1,36 @@
+Metadata-Version: 2.4
+Name: proxy-core
+Version: 1.0.0
+Summary: Core routing and resilience components for LLM Proxy
+Author-email: ProxyAPI Team <team@proxyapi.dev>
+License: MIT
+Project-URL: Homepage, https://github.com/proxyapi/proxy-core
+Project-URL: Documentation, https://proxy-core.readthedocs.io
+Project-URL: Repository, https://github.com/proxyapi/proxy-core.git
+Project-URL: Issues, https://github.com/proxyapi/proxy-core/issues
+Keywords: llm,proxy,circuit-breaker,rate-limiter,resilience
+Classifier: Development Status :: 4 - Beta
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Topic :: Software Development :: Libraries :: Python Modules
+Classifier: Topic :: Internet :: Proxy Servers
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+Requires-Dist: httpx[http2]>=0.27.0
+Requires-Dist: slowapi>=0.1.9
+Requires-Dist: anyio>=3.7.1
+Requires-Dist: pydantic>=2.8.0
+Requires-Dist: opentelemetry-api>=1.25.0
+Provides-Extra: dev
+Requires-Dist: pytest>=8.4.2; extra == "dev"
+Requires-Dist: pytest-asyncio>=0.21.0; extra == "dev"
+Requires-Dist: mypy>=1.9.0; extra == "dev"
+Requires-Dist: black>=24.0.0; extra == "dev"
+Requires-Dist: ruff>=0.5.0; extra == "dev"
+Requires-Dist: isort>=5.13.0; extra == "dev"

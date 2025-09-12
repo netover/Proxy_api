@@ -1,0 +1,2 @@
+    def record_request(self, provider: str, success: bool, response_time: float, model: str = "unknown", error_type: Optional[str] = None, tokens: Optional[int] = None) -> None:
+        """Record a request metric with detailed tracking."""

@@ -35,6 +35,11 @@ class AuthenticationError(ProviderError):
     def __init__(self, message: str, code: str = "authentication_error"):
         super().__init__(message, code=code)
 
+class AuthorizationError(ProviderError):
+    """Raised for authorization failures"""
+    def __init__(self, message: str, code: str = "authorization_error"):
+        super().__init__(message, code=code)
+
 class ServiceUnavailableError(ProviderError):
     """Raised when service is unavailable"""
     def __init__(self, message: str, code: str = "service_unavailable_error"):
@@ -55,6 +60,16 @@ class ValidationError(Exception):
     def __init__(self, message: str):
         self.message = message
         super().__init__(self.message)
+
+class NotFoundError(ProviderError):
+    """Raised when a requested resource is not found"""
+    def __init__(self, message: str, code: str = "not_found_error"):
+        super().__init__(message, code=code)
+
+class TimeoutError(ProviderError):
+    """Raised when an operation times out"""
+    def __init__(self, message: str, code: str = "timeout_error"):
+        super().__init__(message, code=code)
 
 class ConfigurationError(Exception):
     """Raised for configuration-related errors"""

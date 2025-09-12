@@ -352,32 +352,4 @@ async def refresh_provider_models(
     """
     return await model_manager.refresh_models(request, provider_name, background_tasks)
 
-# Error handlers
-
-@router.exception_handler(NotFoundError)
-async def not_found_handler(request: Request, exc: NotFoundError):
-    """Handle not found errors with proper HTTP status."""
-    return JSONResponse(
-        status_code=404,
-        content={
-            "error": {
-                "message": str(exc),
-                "type": "not_found",
-                "code": "resource_not_found"
-            }
-        }
-    )
-
-@router.exception_handler(InvalidRequestError)
-async def invalid_request_handler(request: Request, exc: InvalidRequestError):
-    """Handle invalid request errors with proper HTTP status."""
-    return JSONResponse(
-        status_code=400,
-        content={
-            "error": {
-                "message": str(exc),
-                "type": "invalid_request",
-                "code": getattr(exc, 'code', 'invalid_request_error')
-            }
-        }
-    )
+# Error handlers are now handled at the app level

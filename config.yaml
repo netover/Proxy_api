@@ -74,7 +74,7 @@ auth:
 providers:
   - name: "openai"
     type: "openai"
-    api_key: "${OPENAI_API_KEY}"
+    api_key_env: "OPENAI_API_KEY"
     base_url: "https://api.openai.com/v1"
     models:
       - "gpt-3.5-turbo"
@@ -85,10 +85,16 @@ providers:
     priority: 1
     timeout: 30
     max_retries: 3
+    max_connections: 50
+    max_keepalive_connections: 20
+    keepalive_expiry: 30.0
+    retry_delay: 1.0
+    custom_headers:
+      "X-Client-Type": "llm-proxy"
 
   - name: "anthropic"
     type: "anthropic"
-    api_key: "${ANTHROPIC_API_KEY}"
+    api_key_env: "ANTHROPIC_API_KEY"
     base_url: "https://api.anthropic.com"
     models:
       - "claude-3-haiku"
@@ -99,12 +105,17 @@ providers:
     priority: 2
     timeout: 30
     max_retries: 3
+    max_connections: 50
+    max_keepalive_connections: 20
+    keepalive_expiry: 30.0
+    retry_delay: 1.0
+    custom_headers:
+      "X-Client-Type": "llm-proxy"
 
   - name: "azure"
-    type: "azure"
-    api_key: "${AZURE_OPENAI_KEY}"
-    endpoint: "${AZURE_OPENAI_ENDPOINT}"
-    deployment_name: "${AZURE_DEPLOYMENT_NAME}"
+    type: "azure_openai"
+    api_key_env: "AZURE_OPENAI_KEY"
+    base_url: "https://api.openai.azure.com"
     models:
       - "gpt-35-turbo"
       - "gpt-4"
@@ -113,6 +124,12 @@ providers:
     priority: 3
     timeout: 30
     max_retries: 3
+    max_connections: 50
+    max_keepalive_connections: 20
+    keepalive_expiry: 30.0
+    retry_delay: 1.0
+    custom_headers:
+      "X-Client-Type": "llm-proxy"
 
 # Circuit Breaker Configuration
 circuit_breaker:

@@ -72,6 +72,9 @@ from src.core.chaos_engineering import chaos_monkey
 from src.utils.context_condenser import condense_context
 from src.core.provider_factory import provider_factory
 
+# New API router imports
+from src.api.router import main_router, root_router, setup_middleware, setup_exception_handlers
+
 # Performance optimization imports
 from src.core.http_client import get_http_client
 from src.core.smart_cache import get_response_cache, get_summary_cache, initialize_caches, shutdown_caches
@@ -490,30 +493,19 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Middleware setup
+# Include new API routers
+app.include_router(root_router)
+app.include_router(main_router)
+
+# Setup middleware and exception handlers from new API structure
+setup_middleware(app)
+setup_exception_handlers(app)
+
+# Legacy middleware setup (keeping for compatibility)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-@app.exception_handler(InvalidRequestError)
-async def invalid_request_handler(request: Request, exc: InvalidRequestError):
-    return JSONResponse(status_code=400, content=exc.to_dict())
-
-@app.exception_handler(AuthenticationError)
-async def authentication_handler(request: Request, exc: AuthenticationError):
-    return JSONResponse(status_code=401, content=exc.to_dict())
-
-@app.exception_handler(RateLimitError)
-async def rate_limit_handler(request: Request, exc: RateLimitError):
-    return JSONResponse(status_code=429, content=exc.to_dict())
-
-@app.exception_handler(NotImplementedError)
-async def not_implemented_handler(request: Request, exc: NotImplementedError):
-    return JSONResponse(status_code=501, content=exc.to_dict())
-
-
-@app.exception_handler(ServiceUnavailableError)
-async def service_unavailable_handler(request: Request, exc: ServiceUnavailableError):
-    return JSONResponse(status_code=503, content=exc.to_dict())
+# Exception handlers are now managed by the new error handling framework in src/api/errors/
 
 app.add_middleware(
     CORSMiddleware,
@@ -525,420 +517,16 @@ app.add_middleware(
 
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
-# API Routes
-@app.get("/")
-@limiter.limit(f"{settings.rate_limit_requests}/{settings.rate_limit_window}second")
-async def root():
-    """Root endpoint with API information"""
-    # Dynamically generate endpoints from app routes
-    endpoints = {}
-    for route in app.routes:
-        if hasattr(route, 'path') and route.path.startswith('/v1/'):
-            endpoints[route.path.replace('/v1/', '')] = route.path
-        elif route.path in ['/health', '/metrics', '/providers']:
-            endpoints[route.path.lstrip('/')] = route.path
-    
-    return {
-        "name": settings.app_name,
-        "version": settings.app_version,
-        "status": "operational",
-        "endpoints": endpoints
-    }
+# Root endpoint is now handled by root_router in src/api/router.py
 
-@app.get("/health")
-@limiter.limit(f"{settings.rate_limit_requests}/{settings.rate_limit_window}second")
-async def health_check(request: Request):
-    """Comprehensive health check endpoint with performance metrics"""
-    start_time = getattr(request.app.state, 'start_time', time.time())
-    uptime_seconds = time.time() - start_time
+# Health endpoint is now handled by health_controller in src/api/controllers/health_controller.py
 
-    health_status = {
-        "status": "healthy",
-        "timestamp": time.time(),
-        "version": settings.app_version,
-        "uptime": {
-            "seconds": int(uptime_seconds),
-            "formatted": f"{int(uptime_seconds // 3600)}h {int((uptime_seconds % 3600) // 60)}m {int(uptime_seconds % 60)}s"
-        },
-        "checks": {}
-    }
+# Metrics endpoint is now handled by analytics_controller in src/api/controllers/analytics_controller.py
 
-    # Provider health from health worker service or direct parallel checks
-    try:
-        health_worker_url = os.getenv("HEALTH_WORKER_URL", "http://localhost:8002")
-        async with httpx.AsyncClient(timeout=HEALTH_CHECK_TIMEOUT) as client:
-            response = await client.get(f"{health_worker_url}/status")
-            if response.status_code == 200:
-                health_data = response.json()
-                health_status["checks"]["providers"] = {
-                    "status": "healthy" if health_data["healthy_providers"] > 0 else "unhealthy",
-                    "total": health_data["total_providers"],
-                    "healthy": health_data["healthy_providers"],
-                    "unhealthy": health_data["unhealthy_providers"],
-                    "details": health_data["providers"]
-                }
-            else:
-                # Fallback to direct parallel health checks
-                logger.warning("Health worker unavailable, using direct parallel checks")
-                parallel_results = await perform_parallel_health_checks()
-                health_status["checks"]["providers"] = {
-                    "status": "healthy" if parallel_results["healthy_providers"] > 0 else "unhealthy",
-                    "total": parallel_results["total_providers"],
-                    "healthy": parallel_results["healthy_providers"],
-                    "unhealthy": parallel_results["unhealthy_providers"],
-                    "details": parallel_results["providers"]
-                }
-    except Exception as e:
-        # Fallback to direct parallel health checks on error
-        logger.warning(f"Health worker error ({e}), using direct parallel checks")
-        try:
-            parallel_results = await perform_parallel_health_checks()
-            health_status["checks"]["providers"] = {
-                "status": "healthy" if parallel_results["healthy_providers"] > 0 else "unhealthy",
-                "total": parallel_results["total_providers"],
-                "healthy": parallel_results["healthy_providers"],
-                "unhealthy": parallel_results["unhealthy_providers"],
-                "details": parallel_results["providers"]
-            }
-        except Exception as parallel_error:
-            health_status["checks"]["providers"] = {
-                "status": "error",
-                "error": f"Both health worker and parallel checks failed: {str(parallel_error)}"
-            }
-
-    # Context service health
-    try:
-        context_service_url = os.getenv("CONTEXT_SERVICE_URL", "http://localhost:8001")
-        async with httpx.AsyncClient(timeout=HEALTH_CHECK_TIMEOUT) as client:
-            response = await client.get(f"{context_service_url}/health")
-            if response.status_code == 200:
-                health_status["checks"]["context_service"] = {
-                    "status": "healthy",
-                    "url": context_service_url
-                }
-            else:
-                health_status["checks"]["context_service"] = {
-                    "status": "unhealthy",
-                    "error": f"HTTP {response.status_code}",
-                    "url": context_service_url
-                }
-    except Exception as e:
-        health_status["checks"]["context_service"] = {
-            "status": "error",
-            "error": f"Failed to connect: {str(e)}",
-            "url": os.getenv("CONTEXT_SERVICE_URL", "http://localhost:8001")
-        }
-
-    # Memory health
-    try:
-        if hasattr(request.app.state, 'memory_manager'):
-            memory_stats = request.app.state.memory_manager.get_memory_stats()
-            memory_usage_percent = memory_stats.memory_percent
-
-            health_status["checks"]["memory"] = {
-                "status": "healthy" if memory_usage_percent < 90 else "warning" if memory_usage_percent < 95 else "critical",
-                "usage_percent": memory_usage_percent,
-                "used_mb": memory_stats.used_memory_mb,
-                "available_mb": memory_stats.available_memory_mb
-            }
-        else:
-            health_status["checks"]["memory"] = {"status": "not_initialized"}
-    except Exception as e:
-        health_status["checks"]["memory"] = {"status": "error", "error": str(e)}
-
-    # Cache health
-    try:
-        if hasattr(request.app.state, 'response_cache'):
-            cache_stats = request.app.state.response_cache.get_stats()
-            health_status["checks"]["cache"] = {
-                "status": "healthy",
-                "entries": cache_stats['entries'],
-                "hit_rate": cache_stats['hit_rate'],
-                "memory_mb": cache_stats['memory_usage_mb']
-            }
-        else:
-            health_status["checks"]["cache"] = {"status": "not_initialized"}
-    except Exception as e:
-        health_status["checks"]["cache"] = {"status": "error", "error": str(e)}
-
-    # HTTP client health
-    try:
-        if hasattr(request.app.state, 'http_client'):
-            client_metrics = request.app.state.http_client.get_metrics()
-            health_status["checks"]["http_client"] = {
-                "status": "healthy",
-                "requests_total": client_metrics['requests_total'],
-                "error_rate": client_metrics['error_rate'],
-                "avg_response_time_ms": client_metrics['avg_response_time_ms']
-            }
-        else:
-            health_status["checks"]["http_client"] = {"status": "not_initialized"}
-    except Exception as e:
-        health_status["checks"]["http_client"] = {"status": "error", "error": str(e)}
-
-    # Circuit breaker health
-    try:
-        from src.core.circuit_breaker import get_circuit_breaker_metrics
-        cb_metrics = get_circuit_breaker_metrics()
-        open_breakers = sum(1 for m in cb_metrics.values() if m['state'] == 'open')
-
-        health_status["checks"]["circuit_breakers"] = {
-            "status": "healthy" if open_breakers == 0 else "warning",
-            "total": len(cb_metrics),
-            "open": open_breakers,
-            "closed": len(cb_metrics) - open_breakers
-        }
-    except Exception as e:
-        health_status["checks"]["circuit_breakers"] = {"status": "error", "error": str(e)}
-
-    # Overall status determination
-    critical_checks = ['providers', 'memory', 'context_service']
-    if any(health_status["checks"].get(check, {}).get("status") in ["unhealthy", "critical", "error"]
-           for check in critical_checks):
-        health_status["status"] = "unhealthy"
-    elif any(health_status["checks"].get(check, {}).get("status") == "warning"
-             for check in health_status["checks"]):
-        health_status["status"] = "warning"
-
-    return health_status
-
-@app.get("/metrics")
-@limiter.limit(f"{settings.rate_limit_requests}/{settings.rate_limit_window}second")
-async def get_metrics(request: Request):
-    """Comprehensive metrics endpoint with performance data"""
-    base_metrics = metrics_collector.get_all_stats()
-
-    # Add performance system metrics
-    performance_metrics = {
-        "performance": {},
-        "system": {},
-        "caches": {},
-        "circuit_breakers": {}
-    }
-
-    # Memory metrics
-    try:
-        if hasattr(request.app.state, 'memory_manager'):
-            memory_stats = request.app.state.memory_manager.get_memory_stats()
-            performance_metrics["performance"]["memory"] = {
-                "used_mb": memory_stats.process_memory_mb,
-                "system_used_percent": memory_stats.memory_percent,
-                "gc_collections": memory_stats.gc_collections
-            }
-    except Exception as e:
-        performance_metrics["performance"]["memory"] = {"error": str(e)}
-
-    # Cache metrics
-    try:
-        if hasattr(request.app.state, 'response_cache'):
-            cache_stats = request.app.state.response_cache.get_stats()
-            performance_metrics["caches"]["response_cache"] = cache_stats
-
-        if hasattr(request.app.state, 'summary_cache_obj'):
-            summary_stats = request.app.state.summary_cache_obj.get_stats()
-            performance_metrics["caches"]["summary_cache"] = summary_stats
-    except Exception as e:
-        performance_metrics["caches"]["error"] = str(e)
-
-    # HTTP client metrics
-    try:
-        if hasattr(request.app.state, 'http_client'):
-            http_metrics = request.app.state.http_client.get_metrics()
-            performance_metrics["performance"]["http_client"] = http_metrics
-    except Exception as e:
-        performance_metrics["performance"]["http_client"] = {"error": str(e)}
-
-    # Circuit breaker metrics
-    try:
-        from src.core.circuit_breaker import get_circuit_breaker_metrics
-        cb_metrics = get_circuit_breaker_metrics()
-        performance_metrics["circuit_breakers"] = cb_metrics
-    except Exception as e:
-        performance_metrics["circuit_breakers"]["error"] = str(e)
-
-    # System metrics
-    if psutil:
-        try:
-            performance_metrics["system"] = {
-                "cpu_percent": psutil.cpu_percent(interval=1),
-                "memory_percent": psutil.virtual_memory().percent,
-                "disk_usage_percent": psutil.disk_usage('/').percent,
-                "load_average": psutil.getloadavg() if hasattr(psutil, 'getloadavg') else None
-            }
-        except Exception as e:
-            performance_metrics["system"] = {"error": str(e)}
-    else:
-        performance_metrics["system"] = {"error": "psutil not available"}
-
-    # Combine all metrics
-    return {
-        **base_metrics,
-        **performance_metrics,
-        "timestamp": time.time(),
-        "version": settings.app_version
-    }
-
-@app.get("/providers")
-@limiter.limit(f"{settings.rate_limit_requests}/{settings.rate_limit_window}second")
-async def list_providers(request: Request):
-    """List all providers and their capabilities"""
-    return [
-        {
-            "name": provider.name,
-            "type": provider.type,
-            "models": provider.models,
-            "enabled": provider.enabled,
-            "priority": provider.priority
-        }
-        for provider in request.app.state.config.providers
-    ]
+# Providers endpoint is now handled by model_controller in src/api/controllers/model_controller.py
 
 
-@app.post("/v1/chat/completions", response_model=None)
-@limiter.limit(f"{settings.rate_limit_requests}/{settings.rate_limit_window}second")
-async def chat_completions(
-    request: Request,
-    background_tasks: BackgroundTasks,
-    completion_request: ChatCompletionRequest,
-    _: bool = Depends(verify_api_key)
-) -> Union[Dict[str, Any], StreamingResponse]:
-    """
-    OpenAI-compatible chat completions endpoint with intelligent routing.
-
-    Features:
-    - Automatic provider failover
-    - Context condensation for long conversations
-    - Circuit breaker protection
-    - Streaming support
-    """
-    model = completion_request.model
-    if not model:
-        raise InvalidRequestError("Model is required", param="model", code="missing_model")
-
-    req = completion_request.dict(exclude_unset=True)
-
-    # Handle context condensation
-    condensation_response = await handle_context_condensation(
-        request, background_tasks, req, "chat_completion"
-    )
-    if condensation_response:
-        return condensation_response
-
-    # Get providers and process request
-    providers = get_providers_for_model(request, model)
-    if not providers:
-        raise InvalidRequestError(
-            f"Model '{model}' is not supported by any provider",
-            param="model",
-            code="model_not_found"
-        )
-
-    return await process_request_with_fallback(
-        request, req, providers, "chat_completion", background_tasks
-    )
-
-@app.post("/v1/completions", response_model=None)
-@limiter.limit(f"{settings.rate_limit_requests}/{settings.rate_limit_window}second")
-async def completions(
-    request: Request,
-    background_tasks: BackgroundTasks,
-    completion_request: TextCompletionRequest,
-    _: bool = Depends(verify_api_key)
-) -> Union[Dict[str, Any], StreamingResponse]:
-    """
-    OpenAI-compatible text completions endpoint with intelligent routing.
-
-    Features:
-    - Automatic provider failover
-    - Context condensation for long prompts
-    - Circuit breaker protection
-    - Streaming support
-    """
-    model = completion_request.model
-    if not model:
-        raise InvalidRequestError("Model is required", param="model", code="missing_model")
-
-    req = completion_request.dict(exclude_unset=True)
-
-    # Handle context condensation for prompts
-    config = request.app.state.condensation_config
-    prompt = req.get("prompt", "")
-    if isinstance(prompt, list):
-        total_content = sum(len(p) for p in prompt)
-    else:
-        total_content = len(prompt)
-
-    if total_content > config.truncation_threshold:
-        request_id = str(uuid.uuid4())
-        full_chunks = prompt if isinstance(prompt, list) else [prompt]
-        background_tasks.add_task(safe_background_task(background_condense), request_id, request, full_chunks)
-
-        if not req.get("stream", False):
-            return JSONResponse(
-                status_code=HTTPStatus.ACCEPTED,
-                content={
-                    "status": "processing",
-                    "request_id": request_id,
-                    "message": "Long prompt detected; summarization in progress. Poll /summary/{request_id} for result.",
-                    "estimated_time": "5-10 seconds"
-                }
-            )
-
-        # For streaming, truncate and proceed
-        truncate_len = config.truncation_threshold // 2
-        if isinstance(prompt, list):
-            num_items_to_keep = max(1, len(prompt) * truncate_len // total_content)
-            req["prompt"] = prompt[-num_items_to_keep:]
-        else:
-            req["prompt"] = prompt[-truncate_len:]
-        logger.info(f"Proactive truncation for long prompt ({total_content} chars), background task added: {request_id}")
-
-    # Get providers and process request
-    providers = get_providers_for_model(request, model)
-    if not providers:
-        raise InvalidRequestError(
-            f"Model '{model}' is not supported by any provider",
-            param="model",
-            code="model_not_found"
-        )
-
-    return await process_request_with_fallback(
-        request, req, providers, "text_completion", background_tasks
-    )
-
-@app.post("/v1/embeddings")
-@limiter.limit(f"{settings.rate_limit_requests}/{settings.rate_limit_window}second")
-async def embeddings(
-    request: Request,
-    embedding_request: EmbeddingRequest,
-    _: bool = Depends(verify_api_key)
-) -> Dict[str, Any]:
-    """
-    OpenAI-compatible embeddings endpoint with intelligent routing.
-
-    Features:
-    - Automatic provider failover
-    - Circuit breaker protection
-    - Optimized for embedding workloads
-    """
-    model = embedding_request.model
-    if not model:
-        raise InvalidRequestError("Model is required", param="model", code="missing_model")
-
-    req = embedding_request.dict(exclude_unset=True)
-
-    # Get providers and process request
-    providers = get_providers_for_model(request, model)
-    if not providers:
-        raise InvalidRequestError(
-            f"Model '{model}' is not supported by any provider",
-            param="model",
-            code="model_not_found"
-        )
-
-    return await process_request_with_fallback(
-        request, req, providers, "embeddings", BackgroundTasks()
-    )
+# API endpoints are now handled by the new thin controllers in src/api/controllers/
 
 async def perform_parallel_health_checks() -> Dict[str, Any]:
     """Perform health checks in parallel for better performance - PERFORMANCE OPTIMIZATION"""
@@ -1139,46 +727,9 @@ async def get_summary_status(request_id: str, request: Request):
         "request_id": request_id
     }
 
-@app.get("/v1/models")
-@limiter.limit(f"{settings.rate_limit_requests}/{settings.rate_limit_window}second")
-async def list_models(request: Request) -> Dict[str, Any]:
-    """
-    OpenAI-compatible models endpoint with comprehensive model information.
+# Additional models endpoint is now handled by the new model controller
 
-    Returns all available models across all enabled providers with metadata.
-    """
-    models = []
-    for provider in request.app.state.config.providers:
-        if provider.enabled:
-            for model in provider.models:
-                models.append({
-                    "id": model,
-                    "object": "model",
-                    "created": int(datetime.now(timezone.utc).timestamp()),
-                    "owned_by": provider.name,
-                    "permission": [],  # OpenAI compatibility
-                    "root": model,
-                    "parent": None
-                })
-
-    return {
-        "object": "list",
-        "data": models
-    }
-
-# Error handlers
-@app.exception_handler(Exception)
-async def global_exception_handler(request: Request, exc: Exception):
-    logger.error(f"Unhandled exception: {exc}", path=request.url.path)
-
-    return JSONResponse(
-        status_code=500,
-        content={
-            "error": "Internal server error",
-            "code": "internal_error",
-            "detail": "An unexpected error occurred"
-        }
-    )
+# Global exception handler is now managed by the error handling framework in src/api/errors/
             
 if __name__ == "__main__":
     uvicorn.run(

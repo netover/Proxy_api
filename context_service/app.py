@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import List
 import logging
-from utils.context_condenser_impl import condense_context
+from .utils.context_condenser_impl import condense_context
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

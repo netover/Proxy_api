@@ -1,0 +1,43 @@
+Metadata-Version: 2.4
+Name: proxy-api
+Version: 1.0.0
+Summary: FastAPI and validation components for LLM Proxy
+Author-email: ProxyAPI Team <team@proxyapi.dev>
+License: MIT
+Project-URL: Homepage, https://github.com/proxyapi/proxy-api
+Project-URL: Documentation, https://proxy-api.readthedocs.io
+Project-URL: Repository, https://github.com/proxyapi/proxy-api.git
+Project-URL: Issues, https://github.com/proxyapi/proxy-api/issues
+Keywords: llm,proxy,fastapi,api,validation,openapi
+Classifier: Development Status :: 4 - Beta
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Topic :: Software Development :: Libraries :: Python Modules
+Classifier: Topic :: Internet :: WWW/HTTP :: HTTP Servers
+Classifier: Framework :: FastAPI
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+Requires-Dist: fastapi>=0.115.0
+Requires-Dist: uvicorn[standard]>=0.30.0
+Requires-Dist: pydantic>=2.8.0
+Requires-Dist: pydantic-settings>=2.3.0
+Requires-Dist: PyYAML>=6.0.2
+Requires-Dist: PyJWT>=2.8.0
+Requires-Dist: jinja2>=3.1.0
+Requires-Dist: proxy-core>=1.0.0
+Requires-Dist: proxy-context>=1.0.0
+Requires-Dist: proxy-logging>=1.0.0
+Provides-Extra: dev
+Requires-Dist: pytest>=8.4.2; extra == "dev"
+Requires-Dist: pytest-asyncio>=0.21.0; extra == "dev"
+Requires-Dist: httpx>=0.27.0; extra == "dev"
+Requires-Dist: mypy>=1.9.0; extra == "dev"
+Requires-Dist: black>=24.0.0; extra == "dev"
+Requires-Dist: ruff>=0.5.0; extra == "dev"
+Requires-Dist: isort>=5.13.0; extra == "dev"

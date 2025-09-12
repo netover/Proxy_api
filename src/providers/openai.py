@@ -4,6 +4,8 @@ from src.core.unified_config import ProviderConfig
 from src.models.model_info import ModelInfo
 from src.core.model_cache import ModelCache
 from src.core.model_discovery import ModelDiscoveryService, ProviderConfig as DiscoveryProviderConfig
+from src.core.logging import ContextualLogger
+from src.core.metrics import metrics_collector
 import json
 import httpx
 import time
@@ -17,6 +19,7 @@ class OpenAIProvider(BaseProvider):
         super().__init__(config)
         self._discovery_service = None
         self._model_cache = None
+        self.logger = ContextualLogger(f"provider.{config.name}")
     
     @property
     def discovery_service(self):
@@ -78,6 +81,7 @@ class OpenAIProvider(BaseProvider):
     async def create_completion(self, request: Dict[str, Any]) -> Union[Dict[str, Any], AsyncGenerator]:
         """Create chat completion using OpenAI API with streaming support"""
         self._validate_request(request, is_chat=True)
+        start_time = time.time()
         headers = {"Authorization": f"Bearer {self.api_key}"}
         
         if request.get('stream', False):
@@ -159,7 +163,22 @@ class OpenAIProvider(BaseProvider):
                         'completion_tokens': data['usage']['completion_tokens'],
                         'total_tokens': data['usage']['total_tokens']
                     }
-                
+
+                # Record metrics and log success
+                usage = data.get('usage', {})
+                total_tokens = usage.get('total_tokens', 0)
+                response_time = time.time() - start_time
+                metrics_collector.record_request(
+                    self.name,
+                    success=True,
+                    response_time=response_time,
+                    tokens=total_tokens
+                )
+                self.logger.info("Chat completion successful",
+                               model=request.get('model'),
+                               response_time=response_time,
+                               tokens=total_tokens)
+
                 return data
             except httpx.HTTPStatusError as e:
                 if e.response.status_code == 401:

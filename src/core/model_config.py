@@ -213,8 +213,9 @@ class ModelConfigManager:
                 yield self
                 # Save only if no exception occurred
                 self._save_selections()
-            except Exception:
-                # Rollback on exception
+            except (OSError, ValueError, RuntimeError) as e:
+                # Rollback on file operation, data validation, or runtime errors
+                logger.error(f"Atomic update failed, rolling back: {e}")
                 self._selections = old_selections
                 raise
     

@@ -1,9 +1,10 @@
 from fastapi import FastAPI, Response, Request, HTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
-logging.info("BaseHTTPMiddleware imported successfully")
 import asyncio
 import httpx
 import logging
+
+logging.info("BaseHTTPMiddleware imported successfully")
 import os
 import time
 import random

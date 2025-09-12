@@ -1,0 +1,110 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "proxy-logging"
+version = "1.0.0"
+description = "Structured logging and observability components for LLM Proxy"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "MIT"}
+authors = [
+    {name = "ProxyAPI Team", email = "team@proxyapi.dev"}
+]
+keywords = ["llm", "proxy", "logging", "observability", "opentelemetry", "metrics"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: System :: Logging",
+    "Topic :: System :: Monitoring",
+]
+
+dependencies = [
+    "opentelemetry-api>=1.25.0",
+    "opentelemetry-sdk>=1.25.0",
+    "opentelemetry-semantic-conventions>=0.46b0",
+    "prometheus-client>=0.19.0",
+    "structlog>=24.0.0",
+    "orjson>=3.10.0",
+    "pydantic>=2.8.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.4.2",
+    "pytest-asyncio>=0.21.0",
+    "mypy>=1.9.0",
+    "black>=24.0.0",
+    "ruff>=0.5.0",
+    "isort>=5.13.0",
+]
+otlp = ["opentelemetry-exporter-otlp>=1.25.0"]
+graylog = ["graypy>=2.1.0"]
+elk = ["python-logstash>=0.4.6"]
+
+[project.urls]
+Homepage = "https://github.com/proxyapi/proxy-logging"
+Documentation = "https://proxy-logging.readthedocs.io"
+Repository = "https://github.com/proxyapi/proxy-logging.git"
+Issues = "https://github.com/proxyapi/proxy-logging/issues"
+
+[project.scripts]
+proxy-log-viewer = "proxy_logging.cli:log_viewer"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-dir]
+"" = "src"
+
+[tool.mypy]
+python_version = "3.8"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+strict_equality = true
+
+[tool.ruff]
+target-version = "py38"
+line-length = 88
+select = [
+    "E",  # pycodestyle errors
+    "W",  # pycodestyle warnings
+    "F",  # pyflakes
+    "I",  # isort
+    "B",  # flake8-bugbear
+    "C4", # flake8-comprehensions
+    "UP", # pyupgrade
+]
+ignore = [
+    "E501",  # line too long, handled by black
+    "B008",  # do not perform function calls in argument defaults
+]
+
+[tool.black]
+line-length = 88
+target-version = ['py38']
+include = '\.pyi?$'
+
+[tool.isort]
+profile = "black"
+line_length = 88
+multi_line_output = 3

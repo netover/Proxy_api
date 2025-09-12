@@ -21,28 +21,32 @@ except ImportError:
             self.ttl = ttl
             self._cache = {}
             self._timestamps = {}
+            self._lock = threading.RLock()
         
         def __getitem__(self, key):
-            if key not in self._cache:
-                raise KeyError(key)
-            if datetime.now() - self._timestamps[key] > timedelta(seconds=self.ttl):
-                del self._cache[key]
-                del self._timestamps[key]
-                raise KeyError(key)
-            return self._cache[key]
+            with self._lock:
+                if key not in self._cache:
+                    raise KeyError(key)
+                if datetime.now() - self._timestamps[key] > timedelta(seconds=self.ttl):
+                    del self._cache[key]
+                    del self._timestamps[key]
+                    raise KeyError(key)
+                return self._cache[key]
         
         def __setitem__(self, key, value):
-            if len(self._cache) >= self.maxsize:
-                # Simple eviction - remove oldest
-                oldest_key = min(self._timestamps, key=self._timestamps.get)
-                del self._cache[oldest_key]
-                del self._timestamps[oldest_key]
-            self._cache[key] = value
-            self._timestamps[key] = datetime.now()
+            with self._lock:
+                if len(self._cache) >= self.maxsize:
+                    # Simple eviction - remove oldest
+                    oldest_key = min(self._timestamps, key=self._timestamps.get)
+                    del self._cache[oldest_key]
+                    del self._timestamps[oldest_key]
+                self._cache[key] = value
+                self._timestamps[key] = datetime.now()
         
         def __delitem__(self, key):
-            del self._cache[key]
-            del self._timestamps[key]
+            with self._lock:
+                del self._cache[key]
+                del self._timestamps[key]
         
         def __contains__(self, key):
             try:
@@ -52,25 +56,43 @@ except ImportError:
                 return False
         
         def pop(self, key, default=None):
-            if key in self._cache:
-                value = self._cache.pop(key)
-                self._timestamps.pop(key)
-                return value
-            return default
+            with self._lock:
+                if key in self._cache:
+                    value = self._cache.pop(key)
+                    self._timestamps.pop(key)
+                    return value
+                return default
         
         def clear(self):
-            self._cache.clear()
-            self._timestamps.clear()
+            with self._lock:
+                self._cache.clear()
+                self._timestamps.clear()
         
         def __len__(self):
-            return len(self._cache)
+            with self._lock:
+                return len(self._cache)
         
         def keys(self):
-            return self._cache.keys()
+            with self._lock:
+                # Return a list to match cachetools behavior
+                return list(self._cache.keys())
+        
+        def get(self, key, default=None):
+            """Get value for key, return default if key doesn't exist."""
+            try:
+                return self[key]
+            except KeyError:
+                return default
+        
+        def items(self):
+            """Return a list of (key, value) pairs."""
+            with self._lock:
+                return [(k, self[k]) for k in list(self._cache.keys()) if k in self._cache]
 
 from ..models.model_info import ModelInfo
+from .logging import ContextualLogger
 
-logger = logging.getLogger(__name__)
+logger = ContextualLogger(__name__)
 
 
 class ModelCache:
@@ -121,10 +143,11 @@ class ModelCache:
             self.cache_dir.mkdir(parents=True, exist_ok=True)
             self._load_from_disk()
         
-        logger.info(
-            f"ModelCache initialized: ttl={ttl}s, max_size={max_size}, "
-            f"persist={persist}, cache_dir={self.cache_dir}"
-        )
+        logger.info("ModelCache initialized",
+                   ttl_seconds=ttl,
+                   max_size=max_size,
+                   persist=persist,
+                   cache_dir=str(self.cache_dir))
     
     def _generate_cache_key(self, provider_name: str, base_url: str) -> str:
         """
@@ -215,12 +238,15 @@ class ModelCache:
         with self._lock:
             try:
                 models = self._cache[cache_key]
-                logger.debug(
-                    f"Cache hit for {provider_name}: {len(models)} models"
-                )
+                logger.debug("Cache hit for models",
+                           provider=provider_name,
+                           model_count=len(models),
+                           cache_key=cache_key)
                 return models
             except KeyError:
-                logger.debug(f"Cache miss for {provider_name}")
+                logger.debug("Cache miss for models",
+                           provider=provider_name,
+                           cache_key=cache_key)
                 return None
     
     def set_models(
@@ -241,9 +267,10 @@ class ModelCache:
         
         with self._lock:
             self._cache[cache_key] = models
-            logger.debug(
-                f"Cached {len(models)} models for {provider_name}"
-            )
+            logger.debug("Cached models",
+                        provider=provider_name,
+                        model_count=len(models),
+                        cache_key=cache_key)
             
             if self.persist:
                 self._save_to_disk(cache_key, models)
@@ -276,11 +303,15 @@ class ModelCache:
                 if self.persist:
                     cache_file = self._get_cache_file_path(cache_key)
                     cache_file.unlink(missing_ok=True)
-                
-                logger.info(f"Invalidated cache for {provider_name}")
+
+                logger.info("Invalidated cache entry",
+                           provider=provider_name,
+                           cache_key=cache_key)
                 return True
-            
-            logger.debug(f"No cache entry to invalidate for {provider_name}")
+
+            logger.debug("No cache entry to invalidate",
+                        provider=provider_name,
+                        cache_key=cache_key)
             return False
     
     def invalidate_all(self) -> int:
@@ -297,8 +328,10 @@ class ModelCache:
             if self.persist and self.cache_dir.exists():
                 for cache_file in self.cache_dir.glob("*.json"):
                     cache_file.unlink(missing_ok=True)
-            
-            logger.info(f"Invalidated all cache entries ({count} total)")
+
+            logger.info("Invalidated all cache entries",
+                       entries_invalidated=count,
+                       persist=self.persist)
             return count
     
     def is_valid(self, provider_name: str, base_url: str) -> bool:

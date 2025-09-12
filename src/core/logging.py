@@ -152,3 +152,6 @@ class ContextualLogger:
 
     def debug(self, msg: str, **kwargs):
         self._log_with_context(logging.DEBUG, msg, kwargs)
+
+    def critical(self, msg: str, **kwargs):
+        self._log_with_context(logging.CRITICAL, msg, kwargs)

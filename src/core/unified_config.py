@@ -3,8 +3,12 @@ from pydantic import BaseModel, Field, field_validator, HttpUrl, validator
 from pathlib import Path
 import yaml
 import os
+import time
 from enum import Enum
 from .model_config import model_config_manager, ModelSelection
+from .optimized_config import config_loader, load_critical_config, load_config_section, load_full_config
+from .metrics import metrics_collector
+import asyncio
 
 class ProviderType(str, Enum):
     OPENAI = "openai"
@@ -34,8 +38,9 @@ class ProviderConfig(BaseModel):
     rate_limit: Optional[int] = Field(default=None, ge=1)
     
     # Connection settings
-    max_connections: int = Field(default=10, ge=1, le=100)
-    keepalive_timeout: int = Field(default=30, ge=1, le=300)
+    max_keepalive_connections: int = Field(default=100, ge=1, le=1000, description="Maximum keepalive connections")
+    max_connections: int = Field(default=1000, ge=1, le=10000, description="Maximum total connections")
+    keepalive_expiry: float = Field(default=30.0, ge=1.0, le=300.0, description="Keepalive expiry in seconds")
     
     # Headers
     custom_headers: Dict[str, str] = Field(default_factory=dict)
@@ -176,43 +181,113 @@ class ProxyConfig(BaseModel):
         return forced_providers[0] if forced_providers else None
 
 class ConfigManager:
-    """Centralized configuration manager with caching and validation"""
-    
+    """Centralized configuration manager with optimized loading and validation"""
+
     def __init__(self, config_path: Optional[Path] = None):
         self.config_path = config_path or Path("config.yaml")
         self._config: Optional[ProxyConfig] = None
-        self._last_modified: Optional[float] = None
-    
+        self._critical_config: Optional[Dict[str, Any]] = None
+        self._lazy_loaded_sections: Dict[str, Any] = {}
+        self._event_loop = None
+
+    def _get_event_loop(self):
+        """Get or create event loop for async operations"""
+        if self._event_loop is None:
+            try:
+                self._event_loop = asyncio.get_event_loop()
+            except RuntimeError:
+                self._event_loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(self._event_loop)
+        return self._event_loop
+
     def load_config(self, force_reload: bool = False) -> ProxyConfig:
-        """Load configuration with caching and hot-reload detection"""
+        """Load configuration with optimized loading and caching"""
+        start_time = time.time()
+        success = False
+        config_file_size = 0
+        providers_count = 0
+
         try:
-            current_modified = self.config_path.stat().st_mtime
-            
-            # Check if reload needed
-            if (not force_reload and 
-                self._config is not None and 
-                self._last_modified == current_modified):
-                return self._config
-            
-            # Load from file
-            with open(self.config_path, 'r', encoding='utf-8') as f:
-                config_data = yaml.safe_load(f)
-            
+            # Get config file size if it exists
+            if self.config_path.exists():
+                config_file_size = self.config_path.stat().st_size
+
+            # Try to load critical config first (async)
+            loop = self._get_event_loop()
+            if loop.is_running():
+                # If loop is running, we need to use the optimized loader directly
+                config = self._load_config_sync(force_reload)
+            else:
+                # Can run async operations
+                config = loop.run_until_complete(self._load_config_async(force_reload))
+
+            success = True
+            providers_count = len(config.providers) if config.providers else 0
+            return config
+
+        except Exception as e:
+            raise ValueError(f"Failed to load configuration: {e}")
+        finally:
+            # Record metrics
+            load_time_ms = (time.time() - start_time) * 1000
+            metrics_collector.record_config_load(
+                load_time_ms=load_time_ms,
+                success=success,
+                config_file_size=config_file_size,
+                providers_count=providers_count
+            )
+
+    async def _load_config_async(self, force_reload: bool = False) -> ProxyConfig:
+        """Async configuration loading with lazy loading"""
+        try:
+            # Load critical sections first
+            if self._critical_config is None or force_reload:
+                self._critical_config = await load_critical_config()
+
+            # Load providers (critical)
+            providers_data = self._critical_config.get('providers', [])
+
+            # Load other critical settings
+            settings_data = {k: v for k, v in self._critical_config.items()
+                           if k != 'providers'}
+
+            # Create configuration with critical data
+            self._config = ProxyConfig(
+                settings=GlobalSettings(**settings_data),
+                providers=[ProviderConfig(**p) for p in providers_data]
+            )
+
+            return self._config
+
+        except Exception as e:
+            # Fallback to sync loading
+            return self._load_config_sync(force_reload)
+
+    def _load_config_sync(self, force_reload: bool = False) -> ProxyConfig:
+        """Synchronous fallback for configuration loading"""
+        try:
+            # Use optimized loader's sync interface
+            loop = self._get_event_loop()
+            if not loop.is_running():
+                config_data = loop.run_until_complete(load_full_config())
+            else:
+                # Load synchronously using yaml directly
+                with open(self.config_path, 'r', encoding='utf-8') as f:
+                    config_data = yaml.safe_load(f)
+
             # Separate global settings from providers
             providers_data = config_data.pop('providers', [])
             settings_data = config_data
-            
+
             # Create configuration
             self._config = ProxyConfig(
                 settings=GlobalSettings(**settings_data),
                 providers=[ProviderConfig(**p) for p in providers_data]
             )
-            
-            self._last_modified = current_modified
+
             return self._config
-            
+
         except FileNotFoundError:
-            # Create default config
             return self._create_default_config()
         except Exception as e:
             raise ValueError(f"Failed to load configuration: {e}")
@@ -405,9 +480,51 @@ class ConfigManager:
         """Get available models for a provider"""
         if not self._config:
             self.load_config()
-        
+
         provider = self.get_provider_by_name(provider_name)
         return provider.models if provider else []
+
+    async def load_section_async(self, section: str) -> Optional[Any]:
+        """Lazily load a non-critical configuration section"""
+        if section in self._lazy_loaded_sections:
+            return self._lazy_loaded_sections[section]
+
+        try:
+            section_data = await load_config_section(section)
+            if section_data:
+                self._lazy_loaded_sections[section] = section_data
+            return section_data
+        except Exception as e:
+            logger.warning(f"Failed to lazy load section '{section}': {e}")
+            return None
+
+    def load_section(self, section: str) -> Optional[Any]:
+        """Synchronous version of lazy section loading"""
+        loop = self._get_event_loop()
+        if loop.is_running():
+            # Create task for async operation
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                future = executor.submit(asyncio.run, self.load_section_async(section))
+                return future.result()
+        else:
+            return loop.run_until_complete(self.load_section_async(section))
+
+    def get_telemetry_config(self) -> Optional[Dict[str, Any]]:
+        """Get telemetry configuration (lazy loaded)"""
+        return self.load_section('telemetry')
+
+    def get_chaos_config(self) -> Optional[Dict[str, Any]]:
+        """Get chaos engineering configuration (lazy loaded)"""
+        return self.load_section('chaos_engineering')
+
+    def get_load_testing_config(self) -> Optional[Dict[str, Any]]:
+        """Get load testing configuration (lazy loaded)"""
+        return self.load_section('load_testing')
+
+    def get_network_simulation_config(self) -> Optional[Dict[str, Any]]:
+        """Get network simulation configuration (lazy loaded)"""
+        return self.load_section('network_simulation')
 
 # Global instance
 config_manager = ConfigManager()

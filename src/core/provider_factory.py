@@ -16,6 +16,7 @@ from src.core.unified_config import ProviderConfig, ProviderType, config_manager
 from src.core.metrics import metrics_collector
 from src.core.logging import ContextualLogger
 from src.models.model_info import ModelInfo
+from src.core.http_client_v2 import get_advanced_http_client, AdvancedHTTPClient
 
 logger = ContextualLogger(__name__)
 
@@ -48,56 +49,54 @@ class BaseProvider(ABC):
         self.models = config.models
         self.priority = config.priority
         self.logger = ContextualLogger(f"provider.{config.name}")
-        
+
         # Status tracking
         self._status = ProviderStatus.HEALTHY
         self._last_health_check = 0.0
         self._error_count = 0
         self._last_error: Optional[str] = None
-        
+
         # Initialize API key
         self.api_key = os.getenv(config.api_key_env)
         if not self.api_key:
             raise ValueError(f"API key not found for {config.name}: {config.api_key_env}")
-        
-        # HTTP client with proper configuration
-        self._client: Optional[httpx.AsyncClient] = None
-        self._client_lock = asyncio.Lock()
+
+        # Use centralized HTTP client with connection pooling
+        self._http_client: Optional[AdvancedHTTPClient] = None
     
     @property
-    async def client(self) -> httpx.AsyncClient:
-        """Lazy-loaded HTTP client with proper configuration"""
-        if self._client is None:
-            async with self._client_lock:
-                if self._client is None:
-                    headers = {
-                        "User-Agent": f"LLM-Proxy-API/2.0 ({self.name})",
-                        **self.config.custom_headers
-                    }
-                    
-                    self._client = httpx.AsyncClient(
-                        timeout=httpx.Timeout(self.config.timeout),
-                        limits=httpx.Limits(
-                            max_keepalive_connections=self.config.max_connections,
-                            max_connections=self.config.max_connections * 2,
-                            keepalive_expiry=self.config.keepalive_timeout
-                        ),
-                        headers=headers,
-                        http2=True  # Enable HTTP/2 for better performance
-                    )
-                    
-                    self.logger.info(f"HTTP client initialized", 
-                                   timeout=self.config.timeout,
-                                   max_connections=self.config.max_connections)
-        
-        return self._client
-    
+    async def http_client(self) -> AdvancedHTTPClient:
+        """Get centralized HTTP client with connection pooling"""
+        if self._http_client is None:
+            # Get configuration from config manager
+            config = config_manager.load_config()
+            http_config = config.get('http_client', {})
+
+            # Use provider-specific settings with fallback to global config
+            max_keepalive = getattr(self.config, 'max_keepalive_connections',
+                                  http_config.get('pool_limits', {}).get('max_keepalive_connections', 30))
+            max_connections = getattr(self.config, 'max_connections',
+                                    http_config.get('pool_limits', {}).get('max_connections', 100))
+            keepalive_expiry = getattr(self.config, 'keepalive_expiry',
+                                     http_config.get('pool_limits', {}).get('keepalive_timeout', 30.0))
+            timeout = getattr(self.config, 'timeout', http_config.get('timeout', 30.0))
+
+            self._http_client = get_advanced_http_client(
+                provider_name=self.name,
+                max_keepalive_connections=max_keepalive,
+                max_connections=max_connections,
+                keepalive_expiry=keepalive_expiry,
+                timeout=timeout
+            )
+
+        return self._http_client
+
     async def close(self) -> None:
-        """Properly close HTTP client"""
-        if self._client:
-            await self._client.aclose()
-            self._client = None
-            self.logger.info("HTTP client closed")
+        """Close provider resources (HTTP client is managed centrally)"""
+        # The centralized HTTP client manages its own lifecycle
+        # We don't close it here as it may be shared across providers
+        self._http_client = None
+        self.logger.info("Provider resources closed")
     
     @property
     def status(self) -> ProviderStatus:
@@ -210,76 +209,29 @@ class BaseProvider(ABC):
         """Create embeddings"""
         pass
     
-    async def make_request(self, 
-                          method: str, 
-                          url: str, 
+    async def make_request(self,
+                          method: str,
+                          url: str,
                           **kwargs) -> httpx.Response:
-        """Make HTTP request with comprehensive retry logic"""
-        client = await self.client
-        last_exception = None
-        
-        for attempt in range(self.config.max_retries + 1):
-            try:
-                if attempt > 0:
-                    # Exponential backoff with jitter
-                    delay = self.config.retry_delay * (2 ** (attempt - 1))
-                    jitter = delay * 0.1 * (random.random() - 0.5)
-                    await asyncio.sleep(delay + jitter)
-                    
-                    self.logger.info(f"Retry attempt {attempt + 1} after {delay:.2f}s delay")
-                
-                response = await client.request(method, url, **kwargs)
-                
-                # Check for specific error codes that shouldn't be retried
-                if response.status_code in [400, 401, 403, 404, 422]:
-                    response.raise_for_status()
-                
-                # Rate limiting - should retry
-                if response.status_code == 429:
-                    if attempt < self.config.max_retries:
-                        retry_after = int(response.headers.get("Retry-After", 60))
-                        self.logger.warning(f"Rate limited, waiting {retry_after}s")
-                        await asyncio.sleep(retry_after)
-                        continue
-                
-                # Server errors - should retry
-                if response.status_code >= 500:
-                    if attempt < self.config.max_retries:
-                        self.logger.warning(f"Server error {response.status_code}, retrying...")
-                        continue
-                
-                response.raise_for_status()
-                return response
-                
-            except httpx.TimeoutException as e:
-                last_exception = e
-                if attempt < self.config.max_retries:
-                    self.logger.warning(f"Request timeout, attempt {attempt + 1}")
-                    continue
-                    
-            except httpx.NetworkError as e:
-                last_exception = e
-                if attempt < self.config.max_retries:
-                    self.logger.warning(f"Network error, attempt {attempt + 1}: {e}")
-                    continue
-                    
-            except httpx.HTTPStatusError as e:
-                # Don't retry client errors (4xx)
-                if 400 <= e.response.status_code < 500:
-                    raise
-                last_exception = e
-                if attempt < self.config.max_retries:
-                    self.logger.warning(f"HTTP error {e.response.status_code}, attempt {attempt + 1}")
-                    continue
-                    
-            except Exception as e:
-                last_exception = e
-                self.logger.error(f"Unexpected error during request: {e}")
-                break
-        
-        # All retries exhausted
-        self.logger.error(f"Request failed after {self.config.max_retries + 1} attempts")
-        raise last_exception
+        """Make HTTP request using centralized HTTP client with connection pooling"""
+        client = await self.http_client
+
+        # Add authorization header if not present
+        if 'headers' not in kwargs:
+            kwargs['headers'] = {}
+        if 'Authorization' not in kwargs['headers'] and hasattr(self, 'api_key'):
+            kwargs['headers']['Authorization'] = f"Bearer {self.api_key}"
+
+        # Add User-Agent if not present
+        if 'User-Agent' not in kwargs['headers']:
+            kwargs['headers']['User-Agent'] = f"LLM-Proxy-API/2.0 ({self.name})"
+
+        # Add custom headers from config
+        if hasattr(self.config, 'custom_headers'):
+            kwargs['headers'].update(self.config.custom_headers)
+
+        # Use the centralized client's request method which includes retry logic
+        return await client.request(method, url, **kwargs)
     
     async def __aenter__(self):
         return self
