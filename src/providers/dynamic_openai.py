@@ -6,7 +6,7 @@ from src.core.metrics import metrics_collector
 class DynamicOpenAIProvider(DynamicProvider):
     """Dynamic OpenAI provider implementation"""
 
-    async def _health_check(self) -> Dict[str, Any]:
+    async def _perform_health_check(self) -> Dict[str, Any]:
         """Check OpenAI health"""
         try:
             response = await self.make_request(

@@ -1,3 +1,4 @@
+from typing import Dict, Any, Optional, Set
 """
 Blackbox.ai provider implementation
 Unified API for chat, image, video, and tool calling
@@ -10,17 +11,32 @@ import httpx
 from src.core.unified_config import ProviderConfig
 from src.core.metrics import metrics_collector
 from src.core.logging import ContextualLogger
-from .base import Provider
+from src.core.provider_factory import BaseProvider, ProviderCapability
 from src.core.exceptions import InvalidRequestError, AuthenticationError, RateLimitError, APIConnectionError
 
 
-class BlackboxProvider(Provider):
+class BlackboxProvider(BaseProvider):
     """Blackbox.ai provider with unified API interface"""
 
     def __init__(self, config: ProviderConfig):
         super().__init__(config)
         self.base_url = config.base_url or "https://api.blackbox.ai"
         self.logger = ContextualLogger(f"provider.{config.name}")
+        self.logger = ContextualLogger(f"provider.{config.name}")
+
+    def _get_capabilities(self) -> Set[ProviderCapability]:
+        """Get Blackbox provider capabilities"""
+        from src.core.provider_factory import ProviderCapability
+        capabilities = super()._get_capabilities()
+
+        # Blackbox doesn't support embeddings
+        capabilities.discard(ProviderCapability.EMBEDDINGS)
+
+        # Blackbox supports image and video generation
+        capabilities.add(ProviderCapability.IMAGE_GENERATION)
+        capabilities.add(ProviderCapability.VIDEO_GENERATION)
+
+        return capabilities
 
     async def _perform_health_check(self) -> Dict[str, Any]:
         """Check Blackbox API health"""

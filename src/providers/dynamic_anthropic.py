@@ -7,7 +7,7 @@ import time
 class DynamicAnthropicProvider(DynamicProvider):
     """Dynamic Anthropic provider implementation"""
 
-    async def _health_check(self) -> Dict[str, Any]:
+    async def _perform_health_check(self) -> Dict[str, Any]:
         """Check Anthropic health"""
         try:
             response = await self.make_request(

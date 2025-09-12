@@ -1,5 +1,6 @@
+from typing import Dict, Any, Union, AsyncGenerator, Set
 from typing import Dict, Any, Union, AsyncGenerator
-from src.core.provider_factory import BaseProvider
+from src.core.provider_factory import BaseProvider, ProviderCapability
 from src.core.unified_config import ProviderConfig
 import json
 import httpx
@@ -10,6 +11,17 @@ class AnthropicProvider(BaseProvider):
     """Anthropic API provider implementation"""
     
     def __init__(self, config: ProviderConfig):
+        super().__init__(config)
+
+    def _get_capabilities(self) -> Set[ProviderCapability]:
+        """Get Anthropic provider capabilities"""
+        from src.core.provider_factory import ProviderCapability
+        capabilities = super()._get_capabilities()
+
+        # Anthropic doesn't support embeddings
+        capabilities.discard(ProviderCapability.EMBEDDINGS)
+
+        return capabilities
         super().__init__(config)
 
     async def _perform_health_check(self) -> Dict[str, Any]:

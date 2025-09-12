@@ -3,7 +3,7 @@ import asyncio
 import json
 import time
 from unittest.mock import Mock, patch, AsyncMock
-from src.providers.base import ProviderError, InvalidRequestError, AuthenticationError, RateLimitError, ServiceUnavailableError
+from src.core.exceptions import ProviderError, InvalidRequestError, AuthenticationError, RateLimitError, ServiceUnavailableError
 from src.providers.cohere import CohereProvider
 from src.providers.azure_openai import AzureOpenAIProvider
 from src.providers.blackbox import BlackboxProvider

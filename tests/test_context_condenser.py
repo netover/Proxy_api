@@ -4,7 +4,7 @@ from unittest.mock import Mock, AsyncMock, patch
 from pathlib import Path
 from src.utils.context_condenser import condense_context, AsyncLRUCache
 from src.core.unified_config import CondensationSettings, ProviderConfig, ProviderType
-from src.providers.base import Provider
+from src.core.provider_factory import BaseProvider
 
 @pytest.fixture
 def mock_request():
@@ -18,7 +18,7 @@ def mock_request():
 
 @pytest.fixture
 def mock_provider():
-    provider = AsyncMock(spec=Provider)
+    provider = AsyncMock(spec=BaseProvider)
     provider.create_completion.return_value = {
         "choices": [{"message": {"content": "test summary"}}]
     }

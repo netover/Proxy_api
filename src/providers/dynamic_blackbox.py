@@ -8,7 +8,7 @@ import time
 class DynamicBlackboxProvider(DynamicProvider):
     """Dynamic Blackbox.ai provider implementation"""
 
-    async def _health_check(self) -> Dict[str, Any]:
+    async def _perform_health_check(self) -> Dict[str, Any]:
         """Check Blackbox API health"""
         try:
             response = await self.make_request(
@@ -94,6 +94,9 @@ class DynamicBlackboxProvider(DynamicProvider):
 
     async def create_text_completion(self, request: Dict[str, Any]) -> Dict[str, Any]:
         """Create text completion (mapped to chat completion)"""
+    async def create_embeddings(self, request: Dict[str, Any]) -> Dict[str, Any]:
+        """Create embeddings (not supported by Blackbox)"""
+        raise NotImplementedError("Blackbox provider does not support embeddings")
         messages = [{"role": "user", "content": request.get("prompt", "")}]
         chat_request = {**request, "messages": messages}
         return await self.create_completion(chat_request)

@@ -77,7 +77,7 @@ from src.api.router import main_router, root_router, setup_middleware, setup_exc
 
 # Performance optimization imports
 from src.core.http_client import get_http_client
-from src.core.smart_cache import get_response_cache, get_summary_cache, initialize_caches, shutdown_caches
+from src.core.consolidated_cache import get_consolidated_cache_manager, initialize_consolidated_cache, shutdown_consolidated_cache
 from src.core.memory_manager import get_memory_manager, initialize_memory_manager, shutdown_memory_manager
 
 

@@ -8,7 +8,7 @@ import os
 import re
 from pathlib import Path
 from collections import OrderedDict
-from src.providers.base import get_provider
+from src.core.provider_factory import provider_factory
 from src.core.logging import ContextualLogger
 from src.core.unified_config import config_manager
 from src.core.metrics import metrics_collector
@@ -228,7 +228,7 @@ async def condense_context(request: Request, chunks: List[str], max_tokens: int 
         tasks = []
         max_parallel = min(condensation_config.parallel_providers, len(sorted_providers))
         for cfg in sorted_providers[:max_parallel]:
-            prov = await get_provider(cfg)
+            prov = await provider_factory.create_provider(cfg)
             # Copy request_body for each
             body_copy = request_body.copy()
             body_copy["model"] = cfg.models[0]
@@ -256,7 +256,7 @@ async def condense_context(request: Request, chunks: List[str], max_tokens: int 
     else:
         # Sequential with fallback
         top_cfg = sorted_providers[0]
-        provider = await get_provider(top_cfg)
+        provider = await provider_factory.create_provider(top_cfg)
 
         # Update request body for sequential execution
         request_body["model"] = top_cfg.models[0]
@@ -295,7 +295,7 @@ async def condense_context(request: Request, chunks: List[str], max_tokens: int 
                                     next_cfg = sorted_providers[next_idx]
                                     if next_cfg.enabled:
                                         top_cfg = next_cfg
-                                        provider = await get_provider(top_cfg)
+                                        provider = await provider_factory.create_provider(top_cfg)
                                         request_body["model"] = top_cfg.models[0]
                                         logger.info(f"Applied secondary provider fallback: {top_cfg.name}")
                                         fallback_applied = True

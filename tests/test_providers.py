@@ -3,13 +3,13 @@ import asyncio
 import httpx
 from unittest.mock import AsyncMock, MagicMock
 from src.core.app_config import ProviderConfig
-from src.providers.base import Provider
+from src.core.provider_factory import BaseProvider
 from src.providers.openai import OpenAIProvider
 from src.providers.anthropic import AnthropicProvider
 from src.providers.cohere import CohereProvider
 from src.providers.azure_openai import AzureOpenAIProvider
 from src.providers.blackbox import BlackboxProvider
-from src.providers.base import InvalidRequestError, AuthenticationError, RateLimitError
+from src.core.exceptions import InvalidRequestError, AuthenticationError, RateLimitError
 
 
 class TestProviderBase:

@@ -7,7 +7,7 @@ import time
 class DynamicPerplexityProvider(DynamicProvider):
     """Dynamic Perplexity provider implementation"""
 
-    async def _health_check(self) -> Dict[str, Any]:
+    async def _perform_health_check(self) -> Dict[str, Any]:
         """Check Perplexity health by listing models."""
         try:
             response = await self.make_request(

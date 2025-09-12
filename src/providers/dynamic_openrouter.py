@@ -6,7 +6,7 @@ import time
 class DynamicOpenRouterProvider(DynamicProvider):
     """Dynamic OpenRouter provider implementation"""
 
-    async def _health_check(self) -> Dict[str, Any]:
+    async def _perform_health_check(self) -> Dict[str, Any]:
         """Check OpenRouter API health"""
         try:
             response = await self.make_request(
@@ -63,6 +63,9 @@ class DynamicOpenRouterProvider(DynamicProvider):
         """Create text completion (mapped to chat completion)"""
         messages = [{"role": "user", "content": request.get("prompt", "")}]
         chat_request = {**request, "messages": messages}
+    async def create_embeddings(self, request: Dict[str, Any]) -> Dict[str, Any]:
+        """Create embeddings (not supported by OpenRouter)"""
+        raise NotImplementedError("OpenRouter provider does not support embeddings")
         return await self.create_completion(chat_request)
 
     async def create_embeddings(self, request: Dict[str, Any]) -> Dict[str, Any]:

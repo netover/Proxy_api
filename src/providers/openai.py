@@ -1,13 +1,15 @@
+from typing import Dict, Any, Union, AsyncGenerator, List, Optional, Set
 from typing import Dict, Any, Union, AsyncGenerator, List, Optional
 from src.core.provider_factory import BaseProvider
 from src.core.unified_config import ProviderConfig
 from src.models.model_info import ModelInfo
-from src.core.model_cache import ModelCache
+from src.core.consolidated_cache import get_consolidated_cache_manager
 from src.core.model_discovery import ModelDiscoveryService, ProviderConfig as DiscoveryProviderConfig
 from src.core.logging import ContextualLogger
 from src.core.metrics import metrics_collector
 import json
 import httpx
+from src.core.provider_factory import BaseProvider, ProviderCapability
 import time
 
 from src.core.exceptions import InvalidRequestError, AuthenticationError, RateLimitError, APIConnectionError
@@ -18,7 +20,18 @@ class OpenAIProvider(BaseProvider):
     def __init__(self, config: ProviderConfig):
         super().__init__(config)
         self._discovery_service = None
-        self._model_cache = None
+        self._cache_manager = None
+        self.logger = ContextualLogger(f"provider.{config.name}")
+
+    def _get_capabilities(self) -> Set[ProviderCapability]:
+        """Get OpenAI provider capabilities"""
+        from src.core.provider_factory import ProviderCapability
+        capabilities = super()._get_capabilities()
+
+        # OpenAI supports model discovery
+        capabilities.add(ProviderCapability.MODEL_DISCOVERY)
+
+        return capabilities
         self.logger = ContextualLogger(f"provider.{config.name}")
     
     @property
@@ -31,7 +44,7 @@ class OpenAIProvider(BaseProvider):
     @property
     def model_cache(self):
         """Lazy-loaded model cache"""
-        if self._model_cache is None:
+        if self._cache_manager is None:
             self._model_cache = ModelCache(
                 ttl=300,  # 5 minutes default
                 max_size=1000,
@@ -286,7 +299,7 @@ class OpenAIProvider(BaseProvider):
         # Close model cache
         if self._model_cache:
             self._model_cache.close()
-            self._model_cache = None
+            self._cache_manager = None
 
     async def create_text_completion(self, request: Dict[str, Any]) -> Union[Dict[str, Any], AsyncGenerator]:
         """Create text completion using OpenAI API with streaming support"""

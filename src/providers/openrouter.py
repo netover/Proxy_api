@@ -12,11 +12,11 @@ import httpx
 from src.core.unified_config import ProviderConfig
 from src.core.metrics import metrics_collector
 from src.core.logging import ContextualLogger
-from .base import Provider
+from src.core.provider_factory import BaseProvider
 from src.core.exceptions import InvalidRequestError, AuthenticationError, RateLimitError, APIConnectionError
 
 
-class OpenRouterProvider(Provider):
+class OpenRouterProvider(BaseProvider):
     """OpenRouter provider with unified model access"""
 
     def __init__(self, config: ProviderConfig):

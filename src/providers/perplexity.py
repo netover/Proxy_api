@@ -11,11 +11,11 @@ import httpx
 from src.core.unified_config import ProviderConfig
 from src.core.metrics import metrics_collector
 from src.core.logging import ContextualLogger
-from .base import Provider
+from src.core.provider_factory import BaseProvider
 from src.core.exceptions import InvalidRequestError, AuthenticationError, RateLimitError, APIConnectionError
 
 
-class PerplexityProvider(Provider):
+class PerplexityProvider(BaseProvider):
     """Perplexity.ai provider with /v1/ask interface mapped to OpenAI-compatible"""
  
     def __init__(self, config: ProviderConfig):

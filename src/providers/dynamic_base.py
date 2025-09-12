@@ -1,12 +1,12 @@
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Union
-from src.providers.base import Provider
+from src.core.provider_factory import BaseProvider
 from src.core.unified_config import ProviderConfig
 from src.core.logging import ContextualLogger
 import httpx
 import asyncio
 
-class DynamicProvider(Provider):
+class DynamicProvider(BaseProvider):
     """Base class for dynamically loaded AI providers"""
 
     def __init__(self, config: ProviderConfig):

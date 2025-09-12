@@ -1,6 +1,7 @@
 import os
 import importlib
 import asyncio
+from typing import Dict, List, Type, Optional, Any, Set
 from typing import Dict, List, Type, Optional, Any
 from abc import ABC, abstractmethod
 import weakref
@@ -11,6 +12,7 @@ from enum import Enum
 import time
 import httpx
 import random
+from enum import Enum
 
 from src.core.unified_config import ProviderConfig, ProviderType, config_manager
 from src.core.metrics import metrics_collector
@@ -23,6 +25,16 @@ logger = ContextualLogger(__name__)
 class ProviderStatus(Enum):
     HEALTHY = "healthy"
     DEGRADED = "degraded"
+class ProviderCapability(Enum):
+    """Capabilities supported by providers"""
+    CHAT_COMPLETION = "chat_completion"
+    TEXT_COMPLETION = "text_completion"
+    EMBEDDINGS = "embeddings"
+    MODEL_DISCOVERY = "model_discovery"
+    STREAMING = "streaming"
+    IMAGE_GENERATION = "image_generation"
+    VIDEO_GENERATION = "video_generation"
+    TOOL_CALLING = "tool_calling"
     UNHEALTHY = "unhealthy"
     DISABLED = "disabled"
 
@@ -48,6 +60,39 @@ class BaseProvider(ABC):
         self.name = config.name
         self.models = config.models
         self.priority = config.priority
+        # Use centralized HTTP client with connection pooling
+        self._http_client: Optional[AdvancedHTTPClient] = None
+
+        # Initialize provider capabilities
+        self._capabilities = self._get_capabilities()
+
+    @property
+    def capabilities(self) -> Set[ProviderCapability]:
+        """Get provider capabilities"""
+        return self._capabilities
+
+    def _get_capabilities(self) -> set[ProviderCapability]:
+        """Get provider capabilities - override in subclasses"""
+        capabilities = {
+            ProviderCapability.CHAT_COMPLETION,
+            ProviderCapability.TEXT_COMPLETION,
+            ProviderCapability.EMBEDDINGS
+        }
+
+        # Add streaming if supported
+        if hasattr(self, 'create_completion') and callable(getattr(self, 'create_completion', None)):
+            # Check if create_completion accepts 'stream' parameter
+            import inspect
+            sig = inspect.signature(self.create_completion)
+            if 'stream' in sig.parameters:
+                capabilities.add(ProviderCapability.STREAMING)
+
+        # Add model discovery if supported
+        if (hasattr(self, 'list_models') and hasattr(self, 'retrieve_model') and
+            callable(getattr(self, 'list_models', None)) and callable(getattr(self, 'retrieve_model', None))):
+            capabilities.add(ProviderCapability.MODEL_DISCOVERY)
+
+        return capabilities
         self.logger = ContextualLogger(f"provider.{config.name}")
 
         # Status tracking
@@ -232,6 +277,16 @@ class BaseProvider(ABC):
 
         # Use the centralized client's request method which includes retry logic
         return await client.request(method, url, **kwargs)
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        await self.close()
+
+    async def list_models(self) -> List[ModelInfo]:
+        """List available models - default implementation raises NotImplementedError"""
+        raise NotImplementedError("Model discovery not supported by this provider")
+
+    async def retrieve_model(self, model_id: str) -> Optional[ModelInfo]:
+        """Retrieve model information - default implementation raises NotImplementedError"""
+        raise NotImplementedError("Model retrieval not supported by this provider")
     
     async def __aenter__(self):
         return self
@@ -329,30 +384,30 @@ class ProviderFactory:
         # Create new providers
         successful_providers = {}
         failed_providers = []
-        
+
         for config in provider_configs:
             if not config.enabled:
                 logger.info(f"Skipping disabled provider: {config.name}")
                 continue
-            
+
             try:
                 provider = await self.create_provider(config)
                 successful_providers[config.name] = provider
                 self._providers[config.name] = provider
-                
+
             except Exception as e:
                 logger.error(f"Failed to initialize provider {config.name}: {e}")
                 failed_providers.append((config.name, str(e)))
-        
+
         logger.info(f"Initialized {len(successful_providers)} providers successfully")
-        
+
         if failed_providers:
             logger.warning(f"Failed to initialize {len(failed_providers)} providers: {failed_providers}")
-        
+
         # Start background health checks
         if successful_providers:
             await self.start_health_monitoring()
-        
+
         return successful_providers
     
     async def start_health_monitoring(self) -> None:
@@ -385,27 +440,33 @@ class ProviderFactory:
                 logger.error(f"Health check loop error: {e}")
                 await asyncio.sleep(60)  # Wait before retrying
     
-    async def get_providers_for_model(self, model: str) -> List[BaseProvider]:
-        """Get providers that support the model, with forced provider priority"""
+    async def get_providers_for_model(self, model: str, required_capability: Optional[ProviderCapability] = None) -> List[BaseProvider]:
+        """Get providers that support the model and optional capability, with forced provider priority"""
         from src.core.unified_config import config_manager
-        
+
         config = config_manager.load_config()
-        
+
         # Check for forced provider first
         forced_provider = config.get_forced_provider()
         if forced_provider:
             forced_instance = self._providers.get(forced_provider.name)
             if forced_instance and model in forced_instance.models:
+                # Check capability if required
+                if required_capability and required_capability not in forced_instance.capabilities:
+                    return []  # Forced provider doesn't support required capability
                 # Return only the forced provider
                 return [forced_instance]
-        
+
         # Fall back to normal selection
         providers = []
         for provider in self._providers.values():
             if (model in provider.models and
                 provider.status in [ProviderStatus.HEALTHY, ProviderStatus.DEGRADED]):
+                # Check capability if required
+                if required_capability and required_capability not in provider.capabilities:
+                    continue  # Skip providers that don't support required capability
                 providers.append(provider)
-        
+
         # Sort by priority (lower number = higher priority)
         return sorted(providers, key=lambda p: p.priority)
     
