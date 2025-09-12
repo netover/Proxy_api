@@ -12,6 +12,8 @@ import logging
 from dataclasses import dataclass, field
 from threading import Lock
 
+from .feature_flags import get_feature_flag_manager, is_feature_enabled
+
 logger = logging.getLogger(__name__)
 
 
@@ -60,6 +62,21 @@ class SmartCache:
         self.max_memory_bytes = max_memory_mb * 1024 * 1024
         self.cleanup_interval = cleanup_interval
         self.enable_compression = enable_compression
+
+        # Feature flag manager
+        self._feature_manager = get_feature_flag_manager()
+
+        # Apply feature flags to configuration
+        if is_feature_enabled('smart_cache_memory_optimization'):
+            # Increase memory limits with optimization enabled
+            self.max_memory_bytes = int(self.max_memory_bytes * 1.5)
+            logger.info("Smart cache memory optimization enabled")
+
+        if is_feature_enabled('smart_cache_compression'):
+            self.enable_compression = True
+            logger.info("Smart cache compression enabled")
+        else:
+            self.enable_compression = False
 
         # Thread-safe storage
         self._cache: OrderedDict[str, CacheEntry] = OrderedDict()
@@ -146,11 +163,15 @@ class SmartCache:
 
     async def get(self, key: str) -> Optional[Any]:
         """Get value from cache"""
+        start_time = time.time() if is_feature_enabled('cache_performance_monitoring') else None
+
         with self._lock:
             self.total_requests += 1
 
             if key not in self._cache:
                 self.misses += 1
+                if start_time:
+                    logger.debug(f"Cache miss for key: {key}, time: {time.time() - start_time:.6f}s")
                 return None
 
             entry = self._cache[key]
@@ -159,6 +180,8 @@ class SmartCache:
                 # Remove expired entry
                 del self._cache[key]
                 self.misses += 1
+                if start_time:
+                    logger.debug(f"Cache expired for key: {key}, time: {time.time() - start_time:.6f}s")
                 return None
 
             # Update access statistics
@@ -168,6 +191,11 @@ class SmartCache:
             self._cache.move_to_end(key)
 
             self.hits += 1
+
+            if start_time:
+                access_time = time.time() - start_time
+                logger.debug(f"Cache hit for key: {key}, time: {access_time:.6f}s")
+
             return entry.value
 
     async def set(

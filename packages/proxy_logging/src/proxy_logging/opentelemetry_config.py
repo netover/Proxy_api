@@ -10,7 +10,8 @@ try:
     from opentelemetry.sdk.trace.export import BatchSpanProcessor
     from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
     from opentelemetry.sdk.resources import Resource
-    
+    from opentelemetry.sdk.trace.sampling import TraceIdRatioBasedSampler
+
     # Handle different import paths for ResourceAttributes
     try:
         # Newer versions of OpenTelemetry
@@ -24,7 +25,7 @@ try:
             class ResourceAttributes:
                 SERVICE_NAME = "service.name"
                 SERVICE_VERSION = "service.version"
-    
+
     OTEL_AVAILABLE = True
 except ImportError:
     OTEL_AVAILABLE = False
@@ -32,11 +33,28 @@ except ImportError:
 
 class OpenTelemetryConfig:
     """Configuration for OpenTelemetry tracing and metrics."""
-    
-    def __init__(self, service_name: str = "proxy-api", service_version: str = "1.0.0"):
+
+    def __init__(self, service_name: str = "proxy-api", service_version: str = "1.0.0", prometheus_exporter=None):
         self.service_name = service_name
         self.service_version = service_version
         self._initialized = False
+        self.prometheus_exporter = prometheus_exporter
+
+    def _get_sampling_rate(self) -> float:
+        """Get sampling rate based on environment."""
+        env = os.getenv("ENVIRONMENT", "development").lower()
+
+        sampling_rates = {
+            "development": 1.0,  # 100%
+            "staging": 0.5,      # 50%
+            "production": 0.1    # 10%
+        }
+
+        rate = sampling_rates.get(env, 1.0)  # Default to 100% if unknown env
+        logging.getLogger(__name__).info(
+            f"OpenTelemetry sampling rate for {env} environment: {rate * 100}%"
+        )
+        return rate
         
     def configure(self) -> bool:
         """Configure OpenTelemetry if available."""
@@ -54,8 +72,12 @@ class OpenTelemetryConfig:
                 ResourceAttributes.SERVICE_NAME: self.service_name,
                 ResourceAttributes.SERVICE_VERSION: self.service_version,
             })
-            
-            provider = TracerProvider(resource=resource)
+
+            # Configure sampling based on environment
+            sampling_rate = self._get_sampling_rate()
+            sampler = TraceIdRatioBasedSampler(sampling_rate)
+
+            provider = TracerProvider(resource=resource, sampler=sampler)
             trace.set_tracer_provider(provider)
             
             # Configure OTLP exporter if endpoint is provided
@@ -66,6 +88,12 @@ class OpenTelemetryConfig:
                 provider.add_span_processor(span_processor)
                 
             self._initialized = True
+
+            # Report sampling rate to Prometheus if exporter is available
+            if self.prometheus_exporter:
+                sampling_rate = self._get_sampling_rate()
+                self.prometheus_exporter.set_telemetry_sampling_rate(sampling_rate)
+
             return True
             
         except Exception as e:
@@ -77,3 +105,19 @@ class OpenTelemetryConfig:
         if not self._initialized or not OTEL_AVAILABLE:
             return None
         return trace.get_tracer(name)
+
+    def get_telemetry_config(self) -> Dict[str, Any]:
+        """Get current telemetry configuration for monitoring."""
+        env = os.getenv("ENVIRONMENT", "development").lower()
+        sampling_rate = self._get_sampling_rate()
+
+        return {
+            "environment": env,
+            "sampling_rate": sampling_rate,
+            "sampling_percentage": sampling_rate * 100,
+            "otel_available": OTEL_AVAILABLE,
+            "initialized": self._initialized,
+            "service_name": self.service_name,
+            "service_version": self.service_version,
+            "otlp_endpoint": os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
+        }

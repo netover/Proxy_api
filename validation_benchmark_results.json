@@ -1,0 +1,62 @@
+{
+  "timestamp": 1757666826.4785554,
+  "startup_with_validation": {
+    "config_light": 0.002061128616333008,
+    "config_medium": 0.00450897216796875,
+    "config_heavy": 0.01378488540649414
+  },
+  "startup_without_validation": {
+    "config_light": 0.0014264583587646484,
+    "config_medium": 0.003760814666748047,
+    "config_heavy": 0.012164592742919922
+  },
+  "runtime_overhead": {
+    "light_load": {
+      "mean": 2.1491050720214844e-05,
+      "median": 1.3387203216552736e-05,
+      "p95": 7.367134094238281e-05,
+      "p99": 0.00018203258514404297,
+      "min": 1.1563301086425781e-05,
+      "max": 0.00018203258514404297,
+      "count": 1000
+    },
+    "medium_load": {
+      "mean": 6.45749568939209e-05,
+      "median": 6.608724594116211e-05,
+      "p95": 0.00011523246765136719,
+      "p99": 0.00011523246765136719,
+      "min": 8.974075317382813e-06,
+      "max": 0.00011523246765136719,
+      "count": 1000
+    },
+    "heavy_load": {
+      "mean": 4.711127281188965e-05,
+      "median": 4.5551061630249025e-05,
+      "p95": 7.684707641601562e-05,
+      "p99": 7.684707641601562e-05,
+      "min": 1.1813640594482421e-05,
+      "max": 7.684707641601562e-05,
+      "count": 1000
+    }
+  },
+  "summary": {
+    "total_startup_overhead": {
+      "config_light": ".2f",
+      "config_medium": ".2f",
+      "config_heavy": ".2f"
+    },
+    "average_runtime_latency": {
+      "light_load": ".4f",
+      "medium_load": ".4f",
+      "heavy_load": ".4f"
+    },
+    "recommendations": [
+      "Validation performance is acceptable. No immediate optimizations needed."
+    ]
+  },
+  "startup_overhead_percent": {
+    "config_light": 44.49272939996657,
+    "config_medium": 19.893495625713197,
+    "config_heavy": 13.319744423973972
+  }
+}

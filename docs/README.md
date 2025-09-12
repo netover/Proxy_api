@@ -1,182 +1,110 @@
-# 📚 Documentação - LLM Proxy API
+# ProxyAPI Core Modules Documentation
 
-## Bem-vindo à Documentação Completa
+This directory contains comprehensive technical documentation for the core modules of ProxyAPI.
 
-Esta documentação fornece informações abrangentes sobre o **LLM Proxy API**, uma solução enterprise-ready para proxy de APIs de Language Learning Models (LLMs).
+## 📋 Documentation Overview
 
----
+The [CORE_MODULES_DOCUMENTATION.md](./CORE_MODULES_DOCUMENTATION.md) file provides detailed technical documentation covering:
 
-## 📖 Documentos Disponíveis
+### 🔗 HTTP Client Implementations
+- **V1 HTTP Client (OptimizedHTTPClient)**: Production-ready client with connection pooling and basic retries
+- **V2 HTTP Client (AdvancedHTTPClient)**: Advanced client with provider-specific retry strategies and sophisticated error handling
+- **Migration Guide**: Complete migration instructions from V1 to V2
+- **Performance Characteristics**: Benchmark results and performance comparisons
 
-### 🚀 Início Rápido
-- **[Quick Start Guide](QUICK_START.md)** - Comece em 5 minutos
-  - Instalação rápida
-  - Primeiro teste
-  - Exemplos básicos
+### 💾 Unified Caching Architecture
+- **Cache Interface Protocol**: Standardized interface for all cache implementations
+- **Unified Cache Implementation**: Single-layer caching with smart TTL management
+- **Cache Strategies**: Intelligent eviction, predictive warming, and consistency monitoring
+- **TTL Management**: Dynamic TTL adjustment based on access patterns
+- **Monitoring and Metrics**: Comprehensive cache performance monitoring
 
-#documentacao-tecnica-documentacao-completa-do-projeto-project-documentation-md)** - Documentação técnica abrangente
-  - Visão geral e arquitetura
-  - Instalação e configuração
-  - APIs e endpoints
-  - Monitoramento e métricas
-  - Desenvolvimento
-  - Troubleshooting
+### 🔐 Authentication System
+- **API Key Authentication**: Secure API key verification with timing attack protection
+- **Security Best Practices**: Implementation guidelines for secure authentication
+- **Rate Limiting Implementation**: Token bucket algorithm with provider-specific limits
+- **FastAPI Integration**: Complete integration examples
 
-### 📋 Referências
-- **[Referência de Arquivos](FILE_REFERENCE.md)** - Descrição detalhada de todos os arquivos
-  - Arquivos principais
-  - Configurações
-  - Código fonte
-  - Provedores
-  - Utilitários
+### ⚙️ Configuration Options
+Detailed configuration examples for all core modules including HTTP clients, caching, and authentication.
 
-#funcionalidades-especificas-dataset-export-guide-export-dataset-md)** - Guia completo de exportação
-  - Extração de dados
-  - Formatação JSONL
-  - Filtros avançados
-  - Integração
+### 📊 Performance Metrics
+Comprehensive performance benchmarks and metrics for all core modules.
 
----
+### 🛠️ Troubleshooting Guides
+Step-by-step troubleshooting procedures for common issues with HTTP clients, caching, and authentication.
 
-## 🎯 Mapa de Navegação
+### 💻 Code Examples
+Complete, runnable code examples demonstrating:
+- HTTP client setup and usage
+- Advanced cache operations
+- Authentication and rate limiting integration
+- Monitoring and alerting setup
 
-```
-📚 Documentação Principal
-├── 🚀 QUICK_START.md          # Início rápido (5 min)
-├── 📖 PROJECT_DOCUMENTATION.md # Documentação técnica completa
-├── 📋 FILE_REFERENCE.md       # Referência de arquivos
-└── 📊 export_dataset.md       # Guia de exportação
+## 🚀 Key Features Documented
 
-🎯 Por Tipo de Usuário
-├── 👨‍💻 Desenvolvedores
-│   ├── PROJECT_DOCUMENTATION.md (Desenvolvimento)
-│   └── FILE_REFERENCE.md (Estrutura)
-├── 👨‍🔧 Administradores
-│   ├── QUICK_START.md (Instalação)
-│   └── PROJECT_DOCUMENTATION.md (Configuração)
-└── 👨‍🎨 Usuários Finais
-    ├── QUICK_START.md (Uso básico)
-    └── export_dataset.md (Exportação)
-```
+### HTTP Client Features
+- Connection pooling and reuse tracking
+- Multiple retry strategies (exponential backoff, immediate retry, adaptive)
+- Provider-specific configurations
+- Circuit breaker integration
+- Comprehensive metrics and monitoring
 
----
+### Caching Features
+- Single-layer caching architecture
+- Multi-level caching (memory + disk)
+- Intelligent TTL management
+- Predictive cache warming
+- Consistency monitoring and alerting
+- Memory-aware operations
 
-## 📋 Sumário Executivo
+### Authentication Features
+- Secure API key hashing with SHA-256
+- Timing attack protection using `secrets.compare_digest()`
+- Token bucket rate limiting
+- Provider-specific and route-specific limits
+- FastAPI dependency injection integration
 
-### ✨ Principais Características
+## 📈 Performance Improvements
 
-- **🔄 Roteamento Inteligente**: Failover automático entre provedores
-- **🏥 Monitoramento de Saúde**: Health checks com cache e circuit breakers
-- **📊 Métricas Abrangentes**: Prometheus + métricas customizadas
-- **🔧 Configuração Flexível**: YAML + JSON + env vars
-- **🛡️ Segurança**: Rate limiting, autenticação, validação
-- **📈 Escalabilidade**: Connection pooling, concorrência, cache
-- **🔍 Observabilidade**: Logging estruturado, tracing, dashboards
+Based on the documentation analysis:
 
-### 🎯 Casos de Uso
+| Component | V1 Performance | V2 Performance | Improvement |
+|-----------|----------------|----------------|-------------|
+| HTTP Client Success Rate | 93.2% | 94.5% | +1.3% |
+| HTTP Client Latency | 245ms | 218ms | -11% |
+| Cache Hit Rate | ~80% | ~87% | +7% |
+| Memory Usage | 78MB | 72MB | -8% |
+| Error Recovery | 30s | 15s | -50% |
 
-- **Proxy Unificado**: Interface única para múltiplos provedores
-- **Load Balancing**: Distribuição inteligente de carga
-- **Failover Automático**: Continuidade com fallback
-- **Monitoramento Centralizado**: Dashboard único
-- **Otimização de Custos**: Roteamento baseado em custo/performance
+## 🔧 Quick Start
 
-### 🏗️ Arquitetura
+1. **HTTP Client**: Use V2 for new implementations with provider-specific retry strategies
+2. **Caching**: Enable unified cache with smart TTL and predictive warming
+3. **Authentication**: Implement API key authentication with rate limiting
+4. **Monitoring**: Set up comprehensive metrics collection and alerting
 
-```
-FastAPI Server
-├── Request Router (Roteamento inteligente)
-├── Provider Factory (Gerenciamento de provedores)
-├── Health Monitor (Monitoramento de saúde)
-├── Metrics Collector (Coleta de métricas)
-└── Configuration Manager (Gerenciamento de config)
-```
+## 📖 Usage Examples
 
----
+See the [CORE_MODULES_DOCUMENTATION.md](./CORE_MODULES_DOCUMENTATION.md) file for complete examples including:
 
-## 🔗 Links Rápidos
+- Setting up HTTP clients for different providers
+- Configuring unified caching with custom settings
+- Implementing secure authentication and rate limiting
+- Monitoring and alerting integration
 
-### Instalação
-- [📦 Instalação Rápida](QUICK_START.md#instalacao-rapida)
-- [🐳 Docker](PROJECT_DOCUMENTATION.md#docker-deployment)
-- [☸️ Kubernetes](PROJECT_DOCUMENTATION.md#kubernetes)
+## 🤝 Contributing
 
-### Configuração
-- [⚙️ Arquivos de Config](PROJECT_DOCUMENTATION.md#arquivos-de-configuracao)
-- [🔧 Variáveis de Ambiente](PROJECT_DOCUMENTATION.md#environment-variables)
-- [🔌 Provedores Suportados](PROJECT_DOCUMENTATION.md#provedores-suportados)
+When making changes to core modules, ensure:
+- Update the corresponding documentation sections
+- Include performance benchmarks for new features
+- Add troubleshooting guides for new error scenarios
+- Update configuration examples for new options
 
-### Uso
-- [📡 APIs e Endpoints](PROJECT_DOCUMENTATION.md#apis-e-endpoints)
-- [💻 Exemplos de Código](QUICK_START.md#exemplos-de-uso)
-- [🔄 Streaming](PROJECT_DOCUMENTATION.md#streaming-com-sse)
+## 📞 Support
 
-### Monitoramento
-- [📊 Métricas Prometheus](PROJECT_DOCUMENTATION.md#monitoramento-e-metricas)
-- [🏥 Health Checks](PROJECT_DOCUMENTATION.md#health-checks)
-- [📈 Dashboards](PROJECT_DOCUMENTATION.md#dashboards)
-
-### Desenvolvimento
-- [👨‍💻 Guia de Desenvolvimento](PROJECT_DOCUMENTATION.md#desenvolvimento)
-- [🧪 Testes](PROJECT_DOCUMENTATION.md#testes)
-- [🔌 Adicionando Provedores](PROJECT_DOCUMENTATION.md#adicionando-novos-provedores)
-
----
-
-## 📞 Suporte e Contribuição
-
-### Canais de Suporte
-- **📧 Email**: suporte@empresa.com
-- **💬 Discord**: [Servidor Discord](#)
-- **📋 Issues**: [GitHub Issues](https://github.com/your-org/llm-proxy-api/issues)
-- **📖 Wiki**: [Wiki do Projeto](#)
-
-### Como Contribuir
-1. Fork o repositório
-2. Crie uma branch para sua feature
-3. Faça commit das mudanças
-4. Abra um Pull Request
-
-### Padrões de Código
-- **Python**: PEP 8
-- **Commits**: Conventional Commits
-- **Documentação**: Google Style Docstrings
-- **Testes**: pytest com cobertura > 80%
-
----
-
-## 📈 Versões e Changelog
-
-### Versão Atual: v2.0.0
-
-#### 🚀 Novidades v2.0.0
-- ✅ Arquitetura unificada com configuration manager
-- ✅ Health monitoring avançado com cache
-- ✅ Provider auto-discovery
-- ✅ Métricas Prometheus integradas
-- ✅ Circuit breakers e retry logic
-- ✅ Interface web de administração
-- ✅ Suporte completo a streaming
-- ✅ Dataset export para fine-tuning
-
-#### 📋 Changelog Completo
-- [v2.0.0](CHANGELOG.md#v200) - Release atual
-- [v1.5.0](CHANGELOG.md#v150) - Versão anterior
-- [v1.0.0](CHANGELOG.md#v100) - Primeira versão estável
-
----
-
-## 🎉 Começando
-
-Pronto para começar? Siga estes passos:
-
-1. **📖 Leia o [Quick Start](QUICK_START.md)** para instalação rápida
-2. **⚙️ Configure** seu primeiro provedor
-3. **🧪 Teste** com os exemplos fornecidos
-4. **📊 Monitore** usando as métricas integradas
-5. **🔧 Customize** conforme suas necessidades
-
----
-
-*Documentação atualizada em Janeiro 2024*
-*LLM Proxy API v2.0.0*
+For questions about core module implementations, refer to:
+1. The detailed code examples in the documentation
+2. The troubleshooting guides for common issues
+3. The performance metrics for optimization guidance
+4. The configuration options for customization

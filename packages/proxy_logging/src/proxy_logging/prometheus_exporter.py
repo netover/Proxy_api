@@ -91,6 +91,32 @@ class PrometheusExporter:
             ['provider'],
             registry=self.registry
         )
+
+        # Telemetry overhead metrics
+        self.telemetry_overhead_ratio = Gauge(
+            'proxy_api_telemetry_overhead_ratio',
+            'Telemetry overhead as percentage of total request time',
+            registry=self.registry
+        )
+
+        self.telemetry_sampling_rate = Gauge(
+            'proxy_api_telemetry_sampling_rate',
+            'Current telemetry sampling rate (0.0 to 1.0)',
+            registry=self.registry
+        )
+
+        self.telemetry_span_count = Counter(
+            'proxy_api_telemetry_spans_total',
+            'Total number of telemetry spans created',
+            ['sampled'],
+            registry=self.registry
+        )
+
+        self.telemetry_processing_time = Histogram(
+            'proxy_api_telemetry_processing_time_seconds',
+            'Time spent processing telemetry data',
+            registry=self.registry
+        )
         
     def start_server(self) -> bool:
         """Start the Prometheus metrics server."""
@@ -164,3 +190,27 @@ class PrometheusExporter:
         if not self._initialized or not PROMETHEUS_AVAILABLE:
             return
         self.circuit_breaker_state.labels(provider=provider).set(state)
+
+    def record_telemetry_overhead(self, overhead_ratio: float) -> None:
+        """Record telemetry overhead ratio."""
+        if not self._initialized or not PROMETHEUS_AVAILABLE:
+            return
+        self.telemetry_overhead_ratio.set(overhead_ratio)
+
+    def set_telemetry_sampling_rate(self, sampling_rate: float) -> None:
+        """Set current telemetry sampling rate."""
+        if not self._initialized or not PROMETHEUS_AVAILABLE:
+            return
+        self.telemetry_sampling_rate.set(sampling_rate)
+
+    def record_telemetry_span(self, sampled: bool) -> None:
+        """Record a telemetry span creation."""
+        if not self._initialized or not PROMETHEUS_AVAILABLE:
+            return
+        self.telemetry_span_count.labels(sampled=str(sampled).lower()).inc()
+
+    def record_telemetry_processing_time(self, duration: float) -> None:
+        """Record time spent processing telemetry."""
+        if not self._initialized or not PROMETHEUS_AVAILABLE:
+            return
+        self.telemetry_processing_time.observe(duration)

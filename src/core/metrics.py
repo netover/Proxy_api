@@ -485,7 +485,8 @@ class MetricsCollector:
     """Enhanced metrics collector with persistence and advanced features"""
 
     def __init__(self, enable_persistence: bool = True, persistence_path: Optional[str] = None,
-                 enable_sampling: bool = True, sampling_rate: float = 0.1):
+                 enable_sampling: bool = True, sampling_rate: float = 0.1,
+                 enable_adaptive_sampling: bool = True):
         self.providers: Dict[str, ProviderMetrics] = {}
         self.summarization_metrics = SummarizationMetrics()
         self.request_history = deque(maxlen=10000)  # Keep last 10k requests
@@ -502,6 +503,18 @@ class MetricsCollector:
         self.enable_sampling = enable_sampling
         self.sampling_rate = sampling_rate  # Sample 10% of requests by default
         self._sampling_counter = 0
+
+        # Adaptive sampling configuration
+        self.enable_adaptive_sampling = True
+        self.adaptive_sampling_min_rate = 0.01  # Minimum 1% sampling
+        self.adaptive_sampling_max_rate = 0.5   # Maximum 50% sampling
+        self.adaptive_sampling_target_overhead = 0.02  # Target 2% overhead
+
+        # Request volume tracking for adaptive sampling
+        self._request_timestamps = deque(maxlen=1000)  # Track last 1000 request timestamps
+        self._adaptive_update_interval = 60  # Update sampling rate every 60 seconds
+        self._last_adaptive_update = 0
+        self._adaptive_task = None
 
         # Persistence
         self.persistence = MetricsPersistence(persistence_path) if enable_persistence else None
@@ -531,6 +544,8 @@ class MetricsCollector:
         try:
             loop = asyncio.get_running_loop()
             self._system_health_task = loop.create_task(self._background_system_health())
+            if self.enable_adaptive_sampling:
+                self._adaptive_task = loop.create_task(self._background_adaptive_sampling())
         except RuntimeError:
             # No event loop running, will start later when needed
             pass
@@ -556,6 +571,17 @@ class MetricsCollector:
                 logger.error("Background system health update failed", error=str(e))
                 await asyncio.sleep(60)  # Retry after 1 minute
 
+    async def _background_adaptive_sampling(self):
+        """Background task to periodically adjust sampling rate based on system load"""
+        while True:
+            try:
+                await asyncio.sleep(self._adaptive_update_interval)
+                if self.enable_adaptive_sampling:
+                    self._adjust_sampling_rate()
+            except Exception as e:
+                logger.error("Background adaptive sampling update failed", error=str(e))
+                await asyncio.sleep(60)  # Retry after 1 minute
+
     def _save_metrics(self):
         """Save current metrics to persistence"""
         if self.persistence:
@@ -570,9 +596,12 @@ class MetricsCollector:
         return self.providers[provider_name]
 
     def record_request(self, provider_name: str, success: bool, response_time: float,
-                        tokens: int = 0, error_type: str = None, model_name: str = None):
+                         tokens: int = 0, error_type: str = None, model_name: str = None):
         """Record a request for a provider with optional sampling"""
         provider = self.get_or_create_provider(provider_name)
+
+        # Track request timestamp for volume calculation
+        self._request_timestamps.append(time.time())
 
         # Always update basic counters
         provider.total_requests += 1
@@ -754,6 +783,88 @@ class MetricsCollector:
         except Exception as e:
             logger.error("Failed to update system health metrics", error=str(e))
 
+    def _calculate_request_volume(self) -> float:
+        """Calculate current request volume (requests per second)"""
+        if len(self._request_timestamps) < 2:
+            return 0.0
+
+        # Calculate requests per second over the last minute
+        now = time.time()
+        one_minute_ago = now - 60
+
+        # Count requests in the last minute
+        recent_requests = sum(1 for ts in self._request_timestamps if ts > one_minute_ago)
+        return recent_requests / 60.0
+
+    def _calculate_system_load_score(self) -> float:
+        """Calculate system load score (0.0 to 1.0)"""
+        cpu_weight = 0.4
+        memory_weight = 0.4
+        volume_weight = 0.2
+
+        # Normalize CPU and memory (already in percent)
+        cpu_score = self.system_health_metrics.cpu_percent / 100.0
+        memory_score = self.system_health_metrics.memory_percent / 100.0
+
+        # Normalize request volume (assume max 1000 req/sec is high load)
+        request_volume = self._calculate_request_volume()
+        volume_score = min(request_volume / 1000.0, 1.0)
+
+        # Calculate weighted score
+        load_score = (
+            cpu_score * cpu_weight +
+            memory_score * memory_weight +
+            volume_score * volume_weight
+        )
+
+        return min(load_score, 1.0)
+
+    def _adjust_sampling_rate(self):
+        """Adjust sampling rate based on current system load"""
+        if not self.enable_adaptive_sampling:
+            return
+
+        load_score = self._calculate_system_load_score()
+        request_volume = self._calculate_request_volume()
+
+        # Calculate target sampling rate
+        # Higher load = lower sampling rate
+        # Lower load = higher sampling rate
+        if load_score < 0.3:
+            # Low load: increase sampling for better observability
+            target_rate = self.adaptive_sampling_max_rate
+        elif load_score < 0.7:
+            # Medium load: maintain current rate or slight adjustment
+            target_rate = self.sampling_rate
+        else:
+            # High load: decrease sampling to reduce overhead
+            target_rate = self.adaptive_sampling_min_rate
+
+        # Smooth transitions to avoid sudden changes
+        smoothing_factor = 0.3
+        new_rate = (self.sampling_rate * (1 - smoothing_factor) +
+                   target_rate * smoothing_factor)
+
+        # Ensure within bounds
+        new_rate = max(self.adaptive_sampling_min_rate,
+                      min(self.adaptive_sampling_max_rate, new_rate))
+
+        # Only update if change is significant (>1%)
+        if abs(new_rate - self.sampling_rate) > 0.01:
+            old_rate = self.sampling_rate
+            self.sampling_rate = new_rate
+            self._last_adaptive_update = time.time()
+
+            logger.info(
+                "Adaptive sampling rate adjusted",
+                old_rate=f"{old_rate:.3f}",
+                new_rate=f"{new_rate:.3f}",
+                load_score=f"{load_score:.3f}",
+                request_volume=f"{request_volume:.1f}",
+                cpu_percent=f"{self.system_health_metrics.cpu_percent:.1f}",
+                memory_percent=f"{self.system_health_metrics.memory_percent:.1f}"
+            )
+
     def get_all_stats(self) -> Dict[str, Any]:
         """Get stats for all providers"""
         total_requests = sum(p.total_requests for p in self.providers.values())
@@ -783,7 +894,16 @@ class MetricsCollector:
                 "sampling_rate": self.sampling_rate,
                 "sampled_requests": sampled_requests,
                 "total_history_requests": total_history_requests,
-                "sampling_ratio": sampled_requests / total_history_requests if total_history_requests > 0 else 0
+                "sampling_ratio": sampled_requests / total_history_requests if total_history_requests > 0 else 0,
+                "adaptive": {
+                    "enabled": self.enable_adaptive_sampling,
+                    "min_rate": self.adaptive_sampling_min_rate,
+                    "max_rate": self.adaptive_sampling_max_rate,
+                    "target_overhead": self.adaptive_sampling_target_overhead,
+                    "current_load_score": self._calculate_system_load_score(),
+                    "current_request_volume": self._calculate_request_volume(),
+                    "last_update": self._last_adaptive_update
+                }
             }
         }
 
@@ -912,17 +1032,24 @@ class MetricsCollector:
 
     async def shutdown(self):
         """Shutdown the collector and save final metrics"""
-        if hasattr(self, '_save_task'):
+        if self._save_task:
             self._save_task.cancel()
             try:
                 await self._save_task
             except asyncio.CancelledError:
                 pass
 
-        if hasattr(self, '_system_health_task'):
+        if self._system_health_task:
             self._system_health_task.cancel()
             try:
                 await self._system_health_task
+            except asyncio.CancelledError:
+                pass
+
+        if self._adaptive_task:
+            self._adaptive_task.cancel()
+            try:
+                await self._adaptive_task
             except asyncio.CancelledError:
                 pass
 

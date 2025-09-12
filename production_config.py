@@ -104,6 +104,20 @@ PRODUCTION_CONFIG = {
         "alert_threshold_memory": float(os.getenv("ALERT_MEMORY_THRESHOLD", "85.0")),
     },
 
+    # Telemetry Configuration
+    "telemetry": {
+        "enabled": os.getenv("TELEMETRY_ENABLED", "true").lower() == "true",
+        "sampling_rates": {
+            "development": float(os.getenv("TELEMETRY_SAMPLING_DEV", "1.0")),  # 100%
+            "staging": float(os.getenv("TELEMETRY_SAMPLING_STAGING", "0.5")),  # 50%
+            "production": float(os.getenv("TELEMETRY_SAMPLING_PROD", "0.1")),  # 10%
+        },
+        "otlp_endpoint": os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT"),
+        "service_name": os.getenv("OTEL_SERVICE_NAME", "proxy-api"),
+        "service_version": os.getenv("OTEL_SERVICE_VERSION", "1.0.0"),
+        "overhead_target_percent": float(os.getenv("TELEMETRY_OVERHEAD_TARGET", "2.0")),
+    },
+
     # Database Configuration (if needed)
     "database": {
         "url": os.getenv("DATABASE_URL"),

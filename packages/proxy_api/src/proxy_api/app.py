@@ -37,8 +37,9 @@ async def lifespan(app: FastAPI):
     app.state.prometheus.start_server()
     
     # Configure OpenTelemetry
-    otel_config = OpenTelemetryConfig()
+    otel_config = OpenTelemetryConfig(prometheus_exporter=app.state.prometheus)
     otel_config.configure()
+    app.state.otel_config = otel_config
     
     logger.info("Proxy API started successfully")
     
@@ -188,6 +189,14 @@ def create_app() -> FastAPI:
             "uptime": time.time() - getattr(app.state, 'start_time', time.time())
         }
     
+    # Telemetry configuration endpoint
+    @app.get("/telemetry/config")
+    async def telemetry_config():
+        """Get current telemetry configuration."""
+        if hasattr(app.state, 'otel_config'):
+            return app.state.otel_config.get_telemetry_config()
+        return {"error": "Telemetry not configured"}
+
     # Root endpoint
     @app.get("/")
     async def root():

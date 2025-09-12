@@ -90,6 +90,7 @@ except ImportError:
                 return [(k, self[k]) for k in list(self._cache.keys()) if k in self._cache]
 
 from .model_info import ModelInfo
+from .feature_flags import get_feature_flag_manager, is_feature_enabled
 
 logger = logging.getLogger(__name__)
 
@@ -121,30 +122,41 @@ class ModelCache:
     ):
         """
         Initialize the model cache.
-        
+
         Args:
             ttl: Time-to-live for cache entries in seconds (default: 300)
             max_size: Maximum number of cache entries (default: 1000)
             persist: Whether to enable disk persistence (default: False)
             cache_dir: Directory for cache persistence files (default: None)
         """
-        self.ttl = ttl
+        # Feature flag manager
+        self._feature_manager = get_feature_flag_manager()
+
+        # Apply feature flags
+        self.persist = persist or is_feature_enabled('model_cache_persistence')
+
+        if is_feature_enabled('model_cache_ttl_extension'):
+            # Extend TTL by 50% when feature is enabled
+            self.ttl = int(ttl * 1.5)
+            logger.info("Model cache TTL extension enabled")
+        else:
+            self.ttl = ttl
+
         self.max_size = max_size
-        self.persist = persist
         self.cache_dir = cache_dir or Path.cwd() / ".cache" / "model_discovery"
-        
+
         # Thread-safe cache implementation
-        self._cache = TTLCache(maxsize=max_size, ttl=ttl)
+        self._cache = TTLCache(maxsize=max_size, ttl=self.ttl)
         self._lock = threading.RLock()
-        
+
         # Ensure cache directory exists
         if self.persist:
             self.cache_dir.mkdir(parents=True, exist_ok=True)
             self._load_from_disk()
-        
+
         logger.info(
-            f"ModelCache initialized: ttl={ttl}s, max_size={max_size}, "
-            f"persist={persist}, cache_dir={self.cache_dir}"
+            f"ModelCache initialized: ttl={self.ttl}s, max_size={max_size}, "
+            f"persist={self.persist}, cache_dir={self.cache_dir}"
         )
     
     def _generate_cache_key(self, provider_name: str, base_url: str) -> str:

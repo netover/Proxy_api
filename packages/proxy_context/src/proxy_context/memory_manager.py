@@ -13,6 +13,8 @@ from collections import defaultdict
 from dataclasses import dataclass
 import logging
 
+from .feature_flags import get_feature_flag_manager, is_feature_enabled
+
 logger = logging.getLogger(__name__)
 
 
@@ -46,10 +48,21 @@ class MemoryManager:
         enable_gc_tuning: bool = True,
         leak_detection_enabled: bool = True
     ):
+        # Feature flag manager
+        self._feature_manager = get_feature_flag_manager()
+
+        # Apply feature flags
+        if is_feature_enabled('memory_manager_aggressive_gc'):
+            # Enable more aggressive GC settings
+            self.enable_gc_tuning = True
+            self.cleanup_interval = max(60, cleanup_interval // 2)  # More frequent cleanup
+            logger.info("Memory manager aggressive GC enabled")
+        else:
+            self.enable_gc_tuning = enable_gc_tuning
+            self.cleanup_interval = cleanup_interval
+
         self.memory_threshold_mb = memory_threshold_mb
         self.emergency_threshold_mb = emergency_threshold_mb
-        self.cleanup_interval = cleanup_interval
-        self.enable_gc_tuning = enable_gc_tuning
         self.leak_detection_enabled = leak_detection_enabled
 
         # Memory tracking

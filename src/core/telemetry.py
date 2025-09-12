@@ -21,6 +21,10 @@ except ImportError:
     METRICS_AVAILABLE = False
     logger.warning("Metrics collector not available for telemetry integration")
 
+# Adaptive sampling configuration
+ADAPTIVE_SAMPLING_ENABLED = True
+DEFAULT_SAMPLING_RATE = 0.1  # 10% default
+
 class TelemetryManager:
     """Simple telemetry manager for testing."""
 
@@ -86,27 +90,42 @@ class MockSpan:
         if exc_val:
             self.record_error(exc_val)
 
-        # Record span completion in metrics if available
-        if METRICS_AVAILABLE and hasattr(self, '_start_time'):
-            duration = time.time() - self._start_time
-            success = exc_type is None
-
-            # Extract provider and model info from span name if available
-            provider_name = self.attributes.get('provider', 'unknown')
-            model_name = self.attributes.get('model')
-
-            # Record in metrics collector
+        # Always track request timestamp for volume monitoring
+        if METRICS_AVAILABLE:
             try:
-                metrics_collector.record_request(
-                    provider_name=provider_name,
-                    success=success,
-                    response_time=duration * 1000,  # Convert to milliseconds
-                    tokens=self.attributes.get('tokens', 0),
-                    error_type=str(exc_val) if exc_val else None,
-                    model_name=model_name
-                )
+                # Track timestamp regardless of sampling
+                metrics_collector._request_timestamps.append(time.time())
             except Exception as e:
-                logger.debug(f"Failed to record telemetry metrics: {e}")
+                logger.debug(f"Failed to track request timestamp: {e}")
+
+        # Record span completion in metrics if available and sampled
+        if METRICS_AVAILABLE and hasattr(self, '_start_time'):
+            # Check if this span should be sampled based on adaptive sampling
+            should_sample = True
+            if ADAPTIVE_SAMPLING_ENABLED and hasattr(metrics_collector, 'sampling_rate'):
+                import random
+                should_sample = random.random() < metrics_collector.sampling_rate
+
+            if should_sample:
+                duration = time.time() - self._start_time
+                success = exc_type is None
+
+                # Extract provider and model info from span name if available
+                provider_name = self.attributes.get('provider', 'unknown')
+                model_name = self.attributes.get('model')
+
+                # Record in metrics collector
+                try:
+                    metrics_collector.record_request(
+                        provider_name=provider_name,
+                        success=success,
+                        response_time=duration * 1000,  # Convert to milliseconds
+                        tokens=self.attributes.get('tokens', 0),
+                        error_type=str(exc_val) if exc_val else None,
+                        model_name=model_name
+                    )
+                except Exception as e:
+                    logger.debug(f"Failed to record telemetry metrics: {e}")
 
 @contextmanager
 def TracedSpan(name: str, attributes: Optional[Dict[str, Any]] = None):

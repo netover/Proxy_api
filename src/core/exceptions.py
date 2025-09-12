@@ -76,3 +76,10 @@ class ConfigurationError(Exception):
     def __init__(self, message: str):
         self.message = message
         super().__init__(self.message)
+
+
+class InitializationError(Exception):
+    """Raised for initialization-related errors"""
+    def __init__(self, message: str):
+        self.message = message
+        super().__init__(self.message)

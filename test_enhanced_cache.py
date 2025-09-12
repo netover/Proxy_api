@@ -7,11 +7,8 @@ import asyncio
 import sys
 import os
 
-# Add src to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
-
-from core.consolidated_cache import ConsolidatedCacheManager, CacheCategory
-from core.cache_interface import CacheStats
+from src.core.consolidated_cache import ConsolidatedCacheManager, CacheCategory
+from src.core.cache_interface import CacheStats
 
 
 async def test_enhanced_cache():
