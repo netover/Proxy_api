@@ -42,78 +42,70 @@ ALLOWED_ENV_VARS = frozenset({
 # Configuration paths
 CONFIG_PATH = Path(__file__).parent / 'config.yaml'
 ENV_PATH = Path(__file__).parent / '.env'
+SECRET_KEY_PATH = Path(__file__).parent / '.flask_secret_key'
 
-# Initialize Flask app with security
+# --- App Initialization ---
+
 app = Flask(__name__)
+logger = ContextualLogger(__name__)
+
+def get_persistent_secret_key() -> str:
+    """
+    Get a persistent Flask secret key.
+    Reads from FLASK_SECRET_KEY env var, then .flask_secret_key file.
+    Generates and saves a new key if none exist.
+    """
+    env_key = os.getenv('FLASK_SECRET_KEY')
+    if env_key:
+        return env_key
+
+    if SECRET_KEY_PATH.exists():
+        return SECRET_KEY_PATH.read_text().strip()
+
+    logger.info("Generating new persistent secret key.")
+    new_key = secrets.token_hex(32)
+    SECRET_KEY_PATH.write_text(new_key)
+    return new_key
 
 # Security configuration
 app.config.update(
-    SECRET_KEY=os.getenv('FLASK_SECRET_KEY', secrets.token_hex(32)),
-    SESSION_COOKIE_SECURE=False,  # Set to True in production with HTTPS
+    SECRET_KEY=get_persistent_secret_key(),
+    SESSION_COOKIE_SECURE=os.getenv('FLASK_ENV') == 'production',
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE='Lax',
     PERMANENT_SESSION_LIFETIME=3600,  # 1 hour
-    WTF_CSRF_ENABLED=True,
+    WTF_CSRF_ENABLED=True, # Note: Manual CSRF implementation exists below
     WTF_CSRF_TIME_LIMIT=3600
 )
 
-# Initialize logger
-logger = ContextualLogger(__name__)
+# --- Pre-loaded Configuration ---
 
-# --- Helper Functions ---
-
-def load_config() -> Dict[str, Any]:
-    """Load configuration with validation and error handling."""
+def load_config_once() -> Dict[str, Any]:
+    """Load YAML configuration once with validation, intended for app startup."""
     try:
         if not CONFIG_PATH.exists():
-            logger.warning("Configuration file not found, using defaults")
+            logger.warning("Configuration file not found, using defaults.")
             return {"providers": []}
-
         with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
             config = yaml.safe_load(f) or {}
-
-        # Validate structure
         if not isinstance(config.get('providers', []), list):
-            raise ValueError("Invalid config: 'providers' must be a list")
-
-        # Validate each provider
+            raise ValueError("Invalid config: 'providers' must be a list.")
         for provider in config.get('providers', []):
-            if not isinstance(provider, dict):
-                raise ValueError("Invalid provider format")
-            required_keys = ['name', 'type', 'models']
-            for key in required_keys:
-                if key not in provider:
-                    raise ValueError(f"Provider missing required key: {key}")
-
+            if not all(k in provider for k in ['name', 'type', 'models']):
+                raise ValueError("Provider missing required keys.")
         return config
-
-    except yaml.YAMLError as e:
-        logger.error(f"YAML parsing error: {e}")
-        flash("Configuration file contains invalid YAML syntax", "error")
-        return {"providers": []}
-    except Exception as e:
-        logger.error(f"Error loading configuration: {e}")
-        flash(f"Error loading configuration: {str(e)}", "error")
+    except (yaml.YAMLError, ValueError) as e:
+        logger.error(f"Failed to load or validate config.yaml: {e}", exc_info=True)
+        # In a real app, you might want to exit if config is critical and invalid
         return {"providers": []}
 
-def load_env() -> Dict[str, str]:
-    """Load environment variables with validation."""
-    try:
-        env_dict = dotenv_values(ENV_PATH)
+def load_env_once() -> Dict[str, str]:
+    """Load .env file once, intended for app startup."""
+    return dotenv_values(ENV_PATH)
 
-        # Validate critical environment variables
-        critical_vars = ['PROXY_API_PORT']
-        for var in critical_vars:
-            if var not in env_dict or not env_dict[var]:
-                logger.warning(f"Critical environment variable missing: {var}")
-                flash(f"Warning: {var} not set in .env", "warning")
-
-        return env_dict
-
-    except Exception as e:
-        logger.error(f"Error loading environment file: {e}")
-        flash("Error loading environment configuration", "error")
-        return {}
+# Load configurations at startup to avoid repeated disk I/O
+APP_CONFIG = load_config_once()
+APP_ENV_VARS = load_env_once()
 
 def save_config_and_env(form_data) -> bool:
     """Save configuration and environment variables atomically."""
@@ -360,21 +352,14 @@ app.before_request(require_api_key)
 @app.route('/')
 def index():
     """Main configuration page."""
-    try:
-        config = load_config()
-        env_vars = load_env()
-        csrf_token = generate_csrf_token()
-
-        return render_template(
-            'index.html',
-            config=config,
-            env_vars=env_vars,
-            csrf_token=csrf_token
-        )
-    except Exception as e:
-        logger.error(f"Error loading index page: {e}")
-        flash("Error loading configuration", "error")
-        return render_template('index.html', config={'providers': []}, env_vars={}, csrf_token=generate_csrf_token())
+    # Use pre-loaded config to avoid disk I/O on every request
+    csrf_token = generate_csrf_token()
+    return render_template(
+        'index.html',
+        config=APP_CONFIG,
+        env_vars=APP_ENV_VARS,
+        csrf_token=csrf_token
+    )
 
 
 @app.route('/save_config', methods=['POST'])
@@ -446,19 +431,15 @@ def health():
 @app.route('/api/dashboard/providers')
 def api_dashboard_providers():
     """Get providers data for dashboard."""
-    try:
-        config = load_config()
-        providers = config.get('providers', [])
+    # Use pre-loaded config
+    providers = APP_CONFIG.get('providers', [])
 
-        # Add status information
-        for provider in providers:
-            provider['status'] = 'enabled' if provider.get('enabled', True) else 'disabled'
-            provider['forced'] = provider.get('forced', False)
+    # Add status information
+    for provider in providers:
+        provider['status'] = 'enabled' if provider.get('enabled', True) else 'disabled'
+        provider['forced'] = provider.get('forced', False)
 
-        return {'providers': providers}
-    except Exception as e:
-        logger.error(f"Error fetching providers: {e}")
-        return {'providers': [], 'error': str(e)}, 500
+    return {'providers': providers}
 
 
 @app.route('/api/dashboard/logs')
@@ -477,103 +458,22 @@ def api_dashboard_logs():
 
 @app.route('/api/models/discover/<int:provider_index>')
 def api_discover_models(provider_index):
-    """Discover available models for a specific provider."""
-    try:
-        config = load_config()
-        providers = config.get('providers', [])
-        
-        if provider_index >= len(providers):
-            return {'models': [], 'error': 'Provider index out of range'}, 400
-        
-        provider = providers[provider_index]
-        env_vars = load_env()
-        
-        # Get API key from environment
-        api_key_env = provider.get('api_key_env', '')
-        api_key = env_vars.get(api_key_env, '')
-        
-        if not api_key:
-            return {'models': [], 'error': f'API key not found for {api_key_env}'}, 400
-        
-        # Create provider config
-        provider_config = ProviderConfig(
-            name=provider['name'],
-            base_url=provider.get('base_url', 'https://api.openai.com'),
-            api_key=api_key
-        )
-        
-        # Discover models
-        import asyncio
-        async def discover():
-            service = ModelDiscoveryService()
-            try:
-                models = await service.discover_models(provider_config)
-                return [model.to_dict() for model in models]
-            finally:
-                await service.close()
-        
-        models = asyncio.run(discover())
-        
-        return {
-            'models': models,
-            'provider_name': provider['name'],
-            'provider_type': provider['type'],
-            'count': len(models)
-        }
-        
-    except Exception as e:
-        logger.error(f"Error discovering models: {e}")
-        return {'models': [], 'error': str(e)}, 500
+    """
+    (Temporarily Disabled) Discover available models for a specific provider.
+    This endpoint is disabled due to performance risks from blocking asyncio calls.
+    """
+    logger.warning("Attempted to access disabled model discovery endpoint.")
+    abort(501, "Model discovery is temporarily disabled for performance reasons.")
 
 
 @app.route('/api/models/validate/<int:provider_index>/<path:model_id>')
 def api_validate_model(provider_index, model_id):
-    """Validate if a specific model exists for a provider."""
-    try:
-        config = load_config()
-        providers = config.get('providers', [])
-        
-        if provider_index >= len(providers):
-            return {'valid': False, 'error': 'Provider index out of range'}, 400
-        
-        provider = providers[provider_index]
-        env_vars = load_env()
-        
-        # Get API key from environment
-        api_key_env = provider.get('api_key_env', '')
-        api_key = env_vars.get(api_key_env, '')
-        
-        if not api_key:
-            return {'valid': False, 'error': f'API key not found for {api_key_env}'}, 400
-        
-        # Create provider config
-        provider_config = ProviderConfig(
-            name=provider['name'],
-            base_url=provider.get('base_url', 'https://api.openai.com'),
-            api_key=api_key
-        )
-        
-        # Validate model
-        import asyncio
-        async def validate():
-            service = ModelDiscoveryService()
-            try:
-                is_valid = await service.validate_model(provider_config, model_id)
-                return is_valid
-            finally:
-                await service.close()
-        
-        is_valid = asyncio.run(validate())
-        
-        return {
-            'valid': is_valid,
-            'model_id': model_id,
-            'provider_name': provider['name']
-        }
-        
-    except Exception as e:
-        logger.error(f"Error validating model: {e}")
-        return {'valid': False, 'error': str(e)}, 500
+    """
+    (Temporarily Disabled) Validate if a specific model exists for a provider.
+    This endpoint is disabled due to performance risks from blocking asyncio calls.
+    """
+    logger.warning("Attempted to access disabled model validation endpoint.")
+    abort(501, "Model validation is temporarily disabled for performance reasons.")
 
 
 # --- Error Handlers ---
