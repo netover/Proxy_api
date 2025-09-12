@@ -46,16 +46,16 @@ async def run_test_suite():
 
         # Performance summary
         summary = benchmark_report.get('summary', {})
-        print("
-📈 PERFORMANCE SUMMARY:")
-        print(".1f")
-        print(".1f")
-        print(".1f")
+        print("\n📈 PERFORMANCE SUMMARY:")
+        print(f"Overall Success Rate: {summary.get('overall_success_rate', 0):.1f}%")
+        print(f"Best P95 Latency: {summary.get('best_p95_latency', 0):.1f}ms")
+        print(f"Best Throughput: {summary.get('best_throughput', 0):.1f} req/s")
+
         # Recommendations
         recommendations = benchmark_report.get('recommendations', [])
         if recommendations:
-            print("
-💡 RECOMMENDATIONS:"            for rec in recommendations:
+            print("\n💡 RECOMMENDATIONS:")
+            for rec in recommendations:
                 print(f"   • {rec}")
 
         return benchmark_report

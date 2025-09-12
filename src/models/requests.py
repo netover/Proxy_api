@@ -1,5 +1,7 @@
-from typing import Dict, Any, Union, Optional, List
+from typing import Any, Dict, List, Optional, Union
+
 from pydantic import BaseModel, Field, field_validator
+
 
 class ChatCompletionRequest(BaseModel):
     """Pydantic model for chat completions request"""

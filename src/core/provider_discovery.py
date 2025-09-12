@@ -5,16 +5,12 @@ Dynamic provider health monitoring and discovery system
 
 import asyncio
 import time
-from typing import Dict, List, Optional, Set, Tuple, Any
 from dataclasses import dataclass, field
 from enum import Enum
-from collections import defaultdict
-import heapq
+from typing import Any, Dict, List, Optional
 
 from .logging import ContextualLogger
-from .provider_factory import BaseProvider, ProviderStatus, provider_factory
-from .unified_config import ProviderConfig, config_manager
-from .circuit_breaker import get_circuit_breaker, CircuitBreakerOpenException
+from .provider_factory import provider_factory
 from .unified_cache import get_unified_cache
 
 logger = ContextualLogger(__name__)

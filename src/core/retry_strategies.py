@@ -4,18 +4,16 @@ Provides differentiated retry strategies based on error types and adaptive behav
 """
 
 import asyncio
-import time
 import random
+import time
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional, Type, Union, Callable, Tuple, List
+from collections import deque
 from dataclasses import dataclass, field
 from enum import Enum
-from collections import deque
+from typing import Any, Callable, Dict, Optional, Type
 
-from src.core.exceptions import (
-    ProviderError, RateLimitError, APIConnectionError,
-    AuthenticationError, ServiceUnavailableError
-)
+from src.core.exceptions import (AuthenticationError, RateLimitError,
+                                 ServiceUnavailableError)
 from src.core.logging import ContextualLogger
 
 logger = ContextualLogger(__name__)
@@ -200,12 +198,10 @@ class RetryStrategy(ABC):
     @abstractmethod
     async def should_retry(self, error: Exception, attempt: int) -> bool:
         """Determine if request should be retried"""
-        pass
 
     @abstractmethod
     async def get_delay(self, error: Exception, attempt: int) -> float:
         """Calculate delay before next retry attempt"""
-        pass
 
     def classify_error(self, error: Exception) -> ErrorType:
         """Classify error type for strategy selection"""

@@ -1,8 +1,9 @@
-from typing import Dict, Any
-import httpx
-from src.providers.dynamic_base import DynamicProvider
-from src.core.metrics import metrics_collector
 import time
+from typing import Any, Dict
+
+from src.core.metrics import metrics_collector
+from src.providers.dynamic_base import DynamicProvider
+
 
 class DynamicPerplexityProvider(DynamicProvider):
     """Dynamic Perplexity provider implementation"""

@@ -19,23 +19,20 @@ import asyncio
 import hashlib
 import json
 import logging
-import os
+import statistics
 import threading
 import time
 from collections import OrderedDict, defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple, Union
-import statistics
+from typing import Any, Dict, List, Optional, Set
 
 try:
-    from cachetools import TTLCache
     CACHE_AVAILABLE = True
 except ImportError:
     CACHE_AVAILABLE = False
 
-from ..models.model_info import ModelInfo
 from .unified_config import config_manager
 
 logger = logging.getLogger(__name__)
@@ -685,7 +682,6 @@ class UnifiedCache:
     def _record_miss_pattern(self, key: str) -> None:
         """Record cache miss pattern"""
         # Could be used for predictive loading
-        pass
 
     async def _load_from_disk(self, key: str, check_only: bool = False) -> Optional[CacheEntry]:
         """Load entry from disk cache"""

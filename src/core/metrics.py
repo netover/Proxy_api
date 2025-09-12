@@ -1,15 +1,16 @@
-import time
+import asyncio
 import json
-import os
-import psutil
-from typing import Dict, Any, Optional, List
+import threading
+import time
 from collections import defaultdict, deque
-from dataclasses import dataclass, asdict, field
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
-import asyncio
-import threading
-from concurrent.futures import ThreadPoolExecutor
+from typing import Any, Dict, List, Optional
+
+import psutil
+
 from .logging import ContextualLogger
 
 logger = ContextualLogger(__name__)
@@ -483,7 +484,8 @@ class MetricsPersistence:
 class MetricsCollector:
     """Enhanced metrics collector with persistence and advanced features"""
 
-    def __init__(self, enable_persistence: bool = True, persistence_path: Optional[str] = None):
+    def __init__(self, enable_persistence: bool = True, persistence_path: Optional[str] = None,
+                 enable_sampling: bool = True, sampling_rate: float = 0.1):
         self.providers: Dict[str, ProviderMetrics] = {}
         self.summarization_metrics = SummarizationMetrics()
         self.request_history = deque(maxlen=10000)  # Keep last 10k requests
@@ -495,6 +497,11 @@ class MetricsCollector:
         self.config_metrics = ConfigurationMetrics()
         self.system_health_metrics = SystemHealthMetrics()
         self.error_rate_metrics = ErrorRateMetrics()
+
+        # Sampling configuration
+        self.enable_sampling = enable_sampling
+        self.sampling_rate = sampling_rate  # Sample 10% of requests by default
+        self._sampling_counter = 0
 
         # Persistence
         self.persistence = MetricsPersistence(persistence_path) if enable_persistence else None
@@ -563,22 +570,15 @@ class MetricsCollector:
         return self.providers[provider_name]
 
     def record_request(self, provider_name: str, success: bool, response_time: float,
-                       tokens: int = 0, error_type: str = None, model_name: str = None):
-        """Record a request for a provider"""
+                        tokens: int = 0, error_type: str = None, model_name: str = None):
+        """Record a request for a provider with optional sampling"""
         provider = self.get_or_create_provider(provider_name)
 
-        # Update provider-level counters
+        # Always update basic counters
         provider.total_requests += 1
-        provider.min_response_time = min(provider.min_response_time, response_time)
-        provider.max_response_time = max(provider.max_response_time, response_time)
 
         if success:
             provider.successful_requests += 1
-            # Update response time (moving average)
-            if provider.avg_response_time == 0:
-                provider.avg_response_time = response_time
-            else:
-                provider.avg_response_time = (provider.avg_response_time * 0.9) + (response_time * 0.1)
         else:
             provider.failed_requests += 1
             if error_type:
@@ -589,36 +589,62 @@ class MetricsCollector:
         # Update tokens
         provider.total_tokens += tokens
 
-        # Update model-specific metrics
-        if model_name:
-            model_metrics = provider.get_or_create_model(model_name)
-            model_metrics.total_requests += 1
-            model_metrics.min_response_time = min(model_metrics.min_response_time, response_time)
-            model_metrics.max_response_time = max(model_metrics.max_response_time, response_time)
+        # Determine if this request should be sampled for detailed metrics
+        should_sample = not self.enable_sampling or (self._sampling_counter % int(1 / self.sampling_rate)) == 0
+        self._sampling_counter += 1
+
+        if should_sample:
+            # Update detailed metrics only for sampled requests
+            provider.min_response_time = min(provider.min_response_time, response_time)
+            provider.max_response_time = max(provider.max_response_time, response_time)
 
             if success:
-                model_metrics.successful_requests += 1
-                if model_metrics.avg_response_time == 0:
-                    model_metrics.avg_response_time = response_time
+                # Update response time (moving average)
+                if provider.avg_response_time == 0:
+                    provider.avg_response_time = response_time
                 else:
-                    model_metrics.avg_response_time = (model_metrics.avg_response_time * 0.9) + (response_time * 0.1)
-            else:
-                model_metrics.failed_requests += 1
-                if error_type:
-                    model_metrics.errors[error_type] += 1
+                    provider.avg_response_time = (provider.avg_response_time * 0.9) + (response_time * 0.1)
 
-            model_metrics.total_tokens += tokens
+            # Update model-specific metrics
+            if model_name:
+                model_metrics = provider.get_or_create_model(model_name)
+                model_metrics.total_requests += 1
+                model_metrics.min_response_time = min(model_metrics.min_response_time, response_time)
+                model_metrics.max_response_time = max(model_metrics.max_response_time, response_time)
 
-        # Add to request history
-        self.request_history.append({
-            "timestamp": datetime.now().isoformat(),
-            "provider": provider_name,
-            "model": model_name,
-            "success": success,
-            "response_time": response_time,
-            "tokens": tokens,
-            "error_type": error_type
-        })
+                if success:
+                    model_metrics.successful_requests += 1
+                    if model_metrics.avg_response_time == 0:
+                        model_metrics.avg_response_time = response_time
+                    else:
+                        model_metrics.avg_response_time = (model_metrics.avg_response_time * 0.9) + (response_time * 0.1)
+                else:
+                    model_metrics.failed_requests += 1
+                    if error_type:
+                        model_metrics.errors[error_type] += 1
+
+                model_metrics.total_tokens += tokens
+
+            # Add to request history (sampled)
+            self.request_history.append({
+                "timestamp": datetime.now().isoformat(),
+                "provider": provider_name,
+                "model": model_name,
+                "success": success,
+                "response_time": response_time,
+                "tokens": tokens,
+                "error_type": error_type,
+                "sampled": True
+            })
+        else:
+            # Add minimal entry to request history for non-sampled requests
+            self.request_history.append({
+                "timestamp": datetime.now().isoformat(),
+                "provider": provider_name,
+                "model": model_name,
+                "success": success,
+                "sampled": False
+            })
 
     def _categorize_error(self, error_type: str):
         """Categorize error for detailed error rate metrics"""
@@ -734,6 +760,10 @@ class MetricsCollector:
         successful_requests = sum(p.successful_requests for p in self.providers.values())
         failed_requests = sum(p.failed_requests for p in self.providers.values())
 
+        # Calculate sampling statistics
+        sampled_requests = sum(1 for req in self.request_history if req.get("sampled", False))
+        total_history_requests = len(self.request_history)
+
         return {
             "providers": {name: self.get_provider_stats(name) for name in self.providers.keys()},
             "summarization": asdict(self.summarization_metrics),
@@ -747,7 +777,14 @@ class MetricsCollector:
             "successful_requests": successful_requests,
             "failed_requests": failed_requests,
             "overall_success_rate": (successful_requests / total_requests) if total_requests > 0 else 0,
-            "request_history_size": len(self.request_history)
+            "request_history_size": len(self.request_history),
+            "sampling": {
+                "enabled": self.enable_sampling,
+                "sampling_rate": self.sampling_rate,
+                "sampled_requests": sampled_requests,
+                "total_history_requests": total_history_requests,
+                "sampling_ratio": sampled_requests / total_history_requests if total_history_requests > 0 else 0
+            }
         }
 
     def get_model_stats(self, provider_name: str, model_name: str) -> Optional[Dict[str, Any]]:

@@ -14,11 +14,12 @@ class StructuredLogger:
     def __init__(self, name: str, level: Optional[str] = None):
         self.name = name
         self.logger = logging.getLogger(name)
-        
-        # Set level from environment or parameter
+
+        # Set level from parameter, environment, or default
         if level:
             self.logger.setLevel(getattr(logging, level.upper()))
         else:
+            # Check for LOG_LEVEL first, then fall back to INFO
             env_level = os.getenv("LOG_LEVEL", "INFO").upper()
             self.logger.setLevel(getattr(logging, env_level, logging.INFO))
         

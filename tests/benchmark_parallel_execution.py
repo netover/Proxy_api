@@ -332,7 +332,8 @@ class ParallelExecutionBenchmark:
             self.results.append(result)
 
             print(f"  📊 Avg Latency: {result.avg_latency:.1f}ms")
-    def _analyze_latencies(self, test_name: str, latencies: List[float], total_requests: int) -> BenchmarkResult:
+
+    async def _analyze_latencies(self, test_name: str, latencies: List[float], total_requests: int) -> BenchmarkResult:
         """Analyze latency measurements and create benchmark result"""
         if not latencies:
             return BenchmarkResult(
@@ -463,7 +464,7 @@ class ParallelExecutionBenchmark:
 
     def _mock_providers_context(self):
         """Context manager for mocking provider factory and discovery"""
-        from unittest.mock import patch
+        from unittest.mock import patch, AsyncMock
         import contextlib
 
         @contextlib.asynccontextmanager

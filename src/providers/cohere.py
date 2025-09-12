@@ -3,15 +3,17 @@ Cohere provider implementation
 Uses /v1/generate endpoint with prompt-based payload
 """
 
-from typing import Dict, Any
-import json
 import time
+from typing import Any, Dict
+
 import httpx
+
+from src.core.exceptions import (APIConnectionError, AuthenticationError,
+                                 InvalidRequestError, RateLimitError)
+from src.core.logging import ContextualLogger
+from src.core.metrics import metrics_collector
 from src.core.provider_factory import BaseProvider
 from src.core.unified_config import ProviderConfig
-from src.core.metrics import metrics_collector
-from src.core.logging import ContextualLogger
-from src.core.exceptions import InvalidRequestError, AuthenticationError, RateLimitError, APIConnectionError
 
 
 class CohereProvider(BaseProvider):

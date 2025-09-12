@@ -3,16 +3,15 @@ Jinja2 Template Manager for dynamic prompt assembly and response formatting.
 Provides template validation, caching, and performance optimization.
 """
 
-import os
-from typing import Dict, Any, Optional, List
 from pathlib import Path
-import json
+from typing import Any, Dict, Optional
 
-from jinja2 import Environment, FileSystemLoader, Template, TemplateNotFound, TemplateSyntaxError
+from jinja2 import (Environment, FileSystemLoader, TemplateNotFound,
+                    TemplateSyntaxError)
 from jinja2.exceptions import UndefinedError
 
 from .logging import ContextualLogger
-from .telemetry import traced, TracedSpan
+from .telemetry import TracedSpan, traced
 
 logger = ContextualLogger(__name__)
 

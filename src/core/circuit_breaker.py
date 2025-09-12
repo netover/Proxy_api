@@ -3,13 +3,13 @@ Circuit breaker implementation for LLM Proxy API
 Prevents cascading failures when providers become unresponsive
 """
 
-import time
 import asyncio
-from enum import Enum
-from typing import Dict, Any, Callable, Awaitable, Optional, Union, Tuple, Type
+import time
 from dataclasses import dataclass
+from enum import Enum
+from typing import Any, Awaitable, Callable, Dict, Optional, Tuple, Type
+
 from src.core.logging import ContextualLogger
-import logging
 
 logger = ContextualLogger(__name__)
 
@@ -115,13 +115,10 @@ class ProductionCircuitBreaker:
         return self.state == CircuitState.HALF_OPEN
 
     def get_success_rate(self) -> float:
-        """Calculate success rate over recent requests"""
-        total = len(self.success_rate_window)
-        if total == 0:
-            return 1.0
-
-        successful = sum(1 for result in self.success_rate_window if result)
-        return successful / total
+        """Get current success rate from EMA"""
+        if self.ema_success_rate is None:
+            return 1.0  # Default to 100% success if no data
+        return self.ema_success_rate
 
     def _update_success_rate(self, success: bool):
         """Update EMA success rate"""
@@ -342,6 +339,7 @@ class CircuitBreaker:
 _circuit_breakers: Dict[str, ProductionCircuitBreaker] = {}
 
 from src.core.unified_config import config_manager
+
 
 def get_circuit_breaker(
     name: str,

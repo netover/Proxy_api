@@ -5,12 +5,12 @@ This module provides centralized request validation, sanitization,
 and security checks for all incoming API requests.
 """
 
-import re
-from typing import Dict, Any, List, Optional, Union
-from fastapi import HTTPException
 import logging
+import re
+from typing import Any, Dict
 
 from src.core.exceptions import InvalidRequestError
+from src.api.errors.error_handlers import error_handler
 
 logger = logging.getLogger(__name__)
 
@@ -116,7 +116,8 @@ class RequestValidator:
             raise
         except Exception as e:
             logger.error(f"Unexpected error validating chat request: {e}")
-            raise InvalidRequestError(f"Request validation failed: {str(e)}")
+            sanitized_error = error_handler._sanitize_error_message(str(e))
+            raise InvalidRequestError(f"Request validation failed: {sanitized_error}")
 
     async def validate_text_completion_request(self, request_data: Dict[str, Any]) -> Dict[str, Any]:
         """Validate and sanitize text completion request."""
@@ -155,7 +156,8 @@ class RequestValidator:
             raise
         except Exception as e:
             logger.error(f"Unexpected error validating text request: {e}")
-            raise InvalidRequestError(f"Request validation failed: {str(e)}")
+            sanitized_error = error_handler._sanitize_error_message(str(e))
+            raise InvalidRequestError(f"Request validation failed: {sanitized_error}")
 
     async def validate_embedding_request(self, request_data: Dict[str, Any]) -> Dict[str, Any]:
         """Validate and sanitize embedding request."""
@@ -198,7 +200,8 @@ class RequestValidator:
             raise
         except Exception as e:
             logger.error(f"Unexpected error validating embedding request: {e}")
-            raise InvalidRequestError(f"Request validation failed: {str(e)}")
+            sanitized_error = error_handler._sanitize_error_message(str(e))
+            raise InvalidRequestError(f"Request validation failed: {sanitized_error}")
 
     def _is_valid_model_name(self, model_name: str) -> bool:
         """Check if model name has valid format."""

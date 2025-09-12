@@ -1,18 +1,20 @@
-from typing import Dict, Any, Union, AsyncGenerator, List, Optional, Set
-from typing import Dict, Any, Union, AsyncGenerator, List, Optional
-from src.core.provider_factory import BaseProvider
-from src.core.unified_config import ProviderConfig
-from src.models.model_info import ModelInfo
-from src.core.consolidated_cache import get_consolidated_cache_manager
-from src.core.model_discovery import ModelDiscoveryService, ProviderConfig as DiscoveryProviderConfig
+import json
+import time
+from typing import Any, AsyncGenerator, Dict, List, Optional, Set, Union
+
+import httpx
+
+from src.core.exceptions import (APIConnectionError, AuthenticationError,
+                                 InvalidRequestError, RateLimitError)
 from src.core.logging import ContextualLogger
 from src.core.metrics import metrics_collector
-import json
-import httpx
+from src.core.model_discovery import ModelDiscoveryService
+from src.core.model_discovery import ProviderConfig as DiscoveryProviderConfig
 from src.core.provider_factory import BaseProvider, ProviderCapability
-import time
+from src.core.unified_config import ProviderConfig
+from src.models.model_info import ModelInfo
+from src.api.errors.error_handlers import error_handler
 
-from src.core.exceptions import InvalidRequestError, AuthenticationError, RateLimitError, APIConnectionError
 
 class OpenAIProvider(BaseProvider):
     """OpenAI API provider implementation with model discovery support"""
@@ -32,7 +34,6 @@ class OpenAIProvider(BaseProvider):
         capabilities.add(ProviderCapability.MODEL_DISCOVERY)
 
         return capabilities
-        self.logger = ContextualLogger(f"provider.{config.name}")
     
     @property
     def discovery_service(self):
@@ -116,7 +117,8 @@ class OpenAIProvider(BaseProvider):
                             error_data = await response.aread()
                             try:
                                 error_json = json.loads(error_data)
-                                raise InvalidRequestError(error_json['error']['message'], code=error_json['error']['type'])
+                                sanitized_message = error_handler._sanitize_error_message(error_json['error']['message'])
+                                raise InvalidRequestError(sanitized_message, code=error_json['error']['type'])
                             except (json.JSONDecodeError, KeyError):
                                 raise InvalidRequestError(f"OpenAI Invalid Request: HTTP {response.status_code}", code="invalid_request")
                         response.raise_for_status()
@@ -137,7 +139,8 @@ class OpenAIProvider(BaseProvider):
                     elif e.response.status_code == 429:
                         raise RateLimitError("OpenAI Rate limit exceeded", code="rate_limit")
                     elif e.response.status_code == 400:
-                        raise InvalidRequestError(f"OpenAI Invalid Request: {e.response.text}", code="invalid_request")
+                        sanitized_text = error_handler.sanitize_provider_error_response(e.response.text)
+                        raise InvalidRequestError(f"OpenAI Invalid Request: {sanitized_text}", code="invalid_request")
                     else:
                         raise APIConnectionError(f"OpenAI API error: {e.response.status_code}", code="api_error")
                 except Exception as e:
@@ -199,7 +202,8 @@ class OpenAIProvider(BaseProvider):
                 elif e.response.status_code == 429:
                     raise RateLimitError("OpenAI Rate limit exceeded", code="rate_limit")
                 elif e.response.status_code == 400:
-                    raise InvalidRequestError(f"OpenAI Invalid Request: {e.response.text}", code="invalid_request")
+                    sanitized_text = error_handler.sanitize_provider_error_response(e.response.text)
+                    raise InvalidRequestError(f"OpenAI Invalid Request: {sanitized_text}", code="invalid_request")
                 else:
                     raise APIConnectionError(f"OpenAI API error: {e.response.status_code}", code="api_error")
     
@@ -325,7 +329,8 @@ class OpenAIProvider(BaseProvider):
                             error_data = await response.aread()
                             try:
                                 error_json = json.loads(error_data)
-                                raise InvalidRequestError(error_json['error']['message'], code=error_json['error']['type'])
+                                sanitized_message = error_handler._sanitize_error_message(error_json['error']['message'])
+                                raise InvalidRequestError(sanitized_message, code=error_json['error']['type'])
                             except (json.JSONDecodeError, KeyError):
                                 raise InvalidRequestError(f"OpenAI Invalid Request: HTTP {response.status_code}", code="invalid_request")
                         response.raise_for_status()
@@ -346,7 +351,8 @@ class OpenAIProvider(BaseProvider):
                     elif e.response.status_code == 429:
                         raise RateLimitError("OpenAI Rate limit exceeded", code="rate_limit")
                     elif e.response.status_code == 400:
-                        raise InvalidRequestError(f"OpenAI Invalid Request: {e.response.text}", code="invalid_request")
+                        sanitized_text = error_handler.sanitize_provider_error_response(e.response.text)
+                        raise InvalidRequestError(f"OpenAI Invalid Request: {sanitized_text}", code="invalid_request")
                     else:
                         raise APIConnectionError(f"OpenAI API error: {e.response.status_code}", code="api_error")
                 except Exception as e:
@@ -393,7 +399,8 @@ class OpenAIProvider(BaseProvider):
                 elif e.response.status_code == 429:
                     raise RateLimitError("OpenAI Rate limit exceeded", code="rate_limit")
                 elif e.response.status_code == 400:
-                    raise InvalidRequestError(f"OpenAI Invalid Request: {e.response.text}", code="invalid_request")
+                    sanitized_text = error_handler.sanitize_provider_error_response(e.response.text)
+                    raise InvalidRequestError(f"OpenAI Invalid Request: {sanitized_text}", code="invalid_request")
                 else:
                     raise APIConnectionError(f"OpenAI API error: {e.response.status_code}", code="api_error")
 

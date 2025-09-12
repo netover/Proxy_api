@@ -62,6 +62,20 @@ rate_limit:
   requests_per_window: 1000
   window_seconds: 60
   burst_limit: 50
+  routes:
+    "/health": "1000/minute"
+    "/v1/chat/completions": "100/minute"
+    "/v1/completions": "100/minute"
+    "/v1/embeddings": "200/minute"
+    "/v1/images/generations": "50/minute"
+    "/v1/health": "1000/minute"
+    "/v1/metrics": "500/minute"
+    "/v1/models": "200/minute"
+    "/v1/status": "500/minute"
+    "/v1/providers": "200/minute"
+    "/v1/config/reload": "50/minute"
+    "/v1/config/status": "100/minute"
+    "/v1/config/invalidate-cache": "50/minute"
 
 # Authentication
 auth:
@@ -184,12 +198,16 @@ http_client:
 
 # Logging
 logging:
-  level: "INFO"
+  level: "INFO"  # Default level, overridden by LOG_LEVEL env var
   format: "json"
   file: "logs/app.log"
   rotation:
     max_size_mb: 100
     max_files: 5
+  # Environment-specific overrides:
+  # Development: Set LOG_LEVEL=DEBUG for detailed logging
+  # Production: Set LOG_LEVEL=WARNING for minimal logging
+  # Default: INFO level
 
 # Health Check Configuration
 health_check:

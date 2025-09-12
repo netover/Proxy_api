@@ -5,23 +5,19 @@ This module provides endpoints for managing models across different providers,
 including listing, retrieving details, updating selections, and cache management.
 """
 
-from fastapi import APIRouter, HTTPException, Depends, Request, BackgroundTasks
-from fastapi.responses import JSONResponse
-from typing import Dict, Any, List, Optional
-import time
 import logging
+import time
+from typing import Any, Dict, List
+
+from fastapi import APIRouter, BackgroundTasks, Depends, Request
 
 from src.core.auth import verify_api_key
-from src.core.rate_limiter import rate_limiter
 from src.core.exceptions import InvalidRequestError, NotFoundError
-from src.models.requests import (
-    ModelSelectionRequest,
-    ModelListResponse,
-    ModelDetailResponse,
-    RefreshResponse,
-    ModelInfoExtended
-)
-from src.core.provider_factory import ProviderStatus
+from src.api.errors.error_handlers import error_handler
+from src.core.rate_limiter import rate_limiter
+from src.models.requests import (ModelDetailResponse, ModelInfoExtended,
+                                 ModelListResponse, ModelSelectionRequest,
+                                 RefreshResponse)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/v1/providers", tags=["model-management"])
@@ -79,7 +75,8 @@ class ModelManager:
             
         except Exception as e:
             self.logger.error(f"Failed to get models for provider {provider_name}: {e}")
-            raise InvalidRequestError(f"Failed to retrieve models: {str(e)}")
+            sanitized_error = error_handler._sanitize_error_message(str(e))
+            raise InvalidRequestError(f"Failed to retrieve models: {sanitized_error}")
     
     async def get_model_details(self, request: Request, provider_name: str, model_id: str) -> ModelDetailResponse:
         """Get detailed information for a specific model."""
@@ -128,7 +125,8 @@ class ModelManager:
             raise
         except Exception as e:
             self.logger.error(f"Failed to get model details for {provider_name}/{model_id}: {e}")
-            raise InvalidRequestError(f"Failed to retrieve model details: {str(e)}")
+            sanitized_error = error_handler._sanitize_error_message(str(e))
+            raise InvalidRequestError(f"Failed to retrieve model details: {sanitized_error}")
     
     async def update_model_selection(self, request: Request, provider_name: str, selection: ModelSelectionRequest) -> Dict[str, Any]:
         """Update model selection configuration for a provider."""
@@ -192,7 +190,8 @@ class ModelManager:
             
         except Exception as e:
             logger.error(f"Failed to update model selection for {provider_name}: {e}")
-            raise InvalidRequestError(f"Failed to update model selection: {str(e)}")
+            sanitized_error = error_handler._sanitize_error_message(str(e))
+            raise InvalidRequestError(f"Failed to update model selection: {sanitized_error}")
     
     async def refresh_models(self, request: Request, provider_name: str, background_tasks: BackgroundTasks) -> RefreshResponse:
         """Force refresh model cache for a provider."""
@@ -240,7 +239,8 @@ class ModelManager:
             
         except Exception as e:
             logger.error(f"Failed to refresh models for {provider_name}: {e}")
-            raise InvalidRequestError(f"Failed to refresh models: {str(e)}")
+            sanitized_error = error_handler._sanitize_error_message(str(e))
+            raise InvalidRequestError(f"Failed to refresh models: {sanitized_error}")
     
     def _infer_capabilities(self, model_id: str) -> List[str]:
         """Infer model capabilities based on model ID patterns."""

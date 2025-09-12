@@ -14,21 +14,17 @@ Features:
 """
 
 import asyncio
-import json
 import logging
-import time
-import threading
-from collections import defaultdict, Counter
-from dataclasses import dataclass, field
-from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional, Set, Tuple, Callable, Union
-from concurrent.futures import ThreadPoolExecutor
 import statistics
-import random
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Any, Callable, Dict, List, Optional, Set
 
-from .unified_cache import UnifiedCache, get_unified_cache
 from .model_discovery import ModelDiscoveryService, ProviderConfig
-from ..models.model_info import ModelInfo
+from .unified_cache import UnifiedCache, get_unified_cache
 
 logger = logging.getLogger(__name__)
 

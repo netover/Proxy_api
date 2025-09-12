@@ -7,9 +7,9 @@ and migration.
 """
 
 import asyncio
-import time
-from typing import Any, Dict, List, Optional, Union
-from .cache_interface import ICache, CacheEntry, CacheStats
+from typing import Any, Dict, List, Optional
+
+from .cache_interface import CacheStats, ICache
 
 
 class ModelCacheAdapter:

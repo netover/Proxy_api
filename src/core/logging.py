@@ -1,11 +1,12 @@
-import logging
-import sys
-from pathlib import Path
-from logging.handlers import RotatingFileHandler
 import json
+import logging
 import re
+import sys
 from datetime import datetime, timezone
+from logging.handlers import RotatingFileHandler
+from pathlib import Path
 from typing import Any, Dict
+
 
 class JSONFormatter(logging.Formatter):
     """JSON formatter for structured logging"""

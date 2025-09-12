@@ -1,0 +1,277 @@
+name: Security Monitoring
+
+on:
+  schedule:
+    # Run comprehensive security checks daily at 3 AM UTC
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+    inputs:
+      scan_type:
+        description: 'Type of security scan to run'
+        required: true
+        default: 'full'
+        type: choice
+        options:
+          - full
+          - quick
+          - dependency-only
+
+jobs:
+  dependency-audit:
+    name: Dependency Vulnerability Audit
+    runs-on: ubuntu-latest
+    if: github.event.inputs.scan_type != 'quick' || github.event_name == 'schedule'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install pip-audit
+        run: |
+          python -m pip install --upgrade pip
+          pip install pip-audit
+
+      - name: Run pip-audit
+        run: |
+          pip-audit --format json > pip-audit-results.json || true
+          pip-audit --format markdown > pip-audit-results.md || true
+          pip-audit || true
+
+      - name: Upload dependency audit results
+        uses: actions/upload-artifact@v3
+        with:
+          name: dependency-audit-results
+          path: |
+            pip-audit-results.json
+            pip-audit-results.md
+          retention-days: 30
+
+  secrets-detection:
+    name: Secrets Detection
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  sast-scan:
+    name: Static Application Security Testing
+    runs-on: ubuntu-latest
+    if: github.event.inputs.scan_type != 'dependency-only' || github.event_name == 'schedule'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Semgrep SAST
+        uses: semgrep/semgrep-action@v1
+        with:
+          config: p/security-audit
+          output: semgrep-results.json
+          generateSarif: "1"
+        env:
+          SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
+
+      - name: Upload SAST results
+        uses: actions/upload-artifact@v3
+        with:
+          name: sast-results
+          path: semgrep-results.json
+          retention-days: 30
+
+      - name: Upload SARIF file
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: semgrep-results.json
+        if: always()
+
+  container-security:
+    name: Container Image Security Scan
+    runs-on: ubuntu-latest
+    if: github.event.inputs.scan_type != 'dependency-only' || github.event_name == 'schedule'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: |
+          docker build -t llm-proxy-api:security-scan .
+
+      - name: Scan with Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'image'
+          scan-ref: 'llm-proxy-api:security-scan'
+          format: 'sarif'
+          output: 'trivy-image-results.sarif'
+
+      - name: Upload Trivy image scan results
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: 'trivy-image-results.sarif'
+
+      - name: Scan with Anchore Grype
+        uses: anchore/scan-action@v3
+        with:
+          image: llm-proxy-api:security-scan
+          fail-build: false
+          output-format: json
+          output-file: grype-results.json
+
+      - name: Upload Grype results
+        uses: actions/upload-artifact@v3
+        with:
+          name: container-security-results
+          path: grype-results.json
+          retention-days: 30
+
+  compliance-check:
+    name: Compliance and License Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install license tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install pip-licenses
+
+      - name: Check licenses
+        run: |
+          pip-licenses --format json > licenses.json
+          pip-licenses --format markdown > licenses.md
+
+      - name: Check for forbidden licenses
+        run: |
+          python -c "
+          import json
+          with open('licenses.json') as f:
+              licenses = json.load(f)
+
+          forbidden = ['GPL', 'LGPL', 'AGPL']
+          violations = []
+
+          for pkg in licenses:
+              license_name = pkg.get('License', '')
+              if any(f in license_name.upper() for f in forbidden):
+                  violations.append(f'{pkg[\"Name\"]}: {license_name}')
+
+          if violations:
+              print('❌ Forbidden licenses found:')
+              for v in violations:
+                  print(f'  - {v}')
+              exit(1)
+          else:
+              print('✅ No forbidden licenses found')
+          "
+
+      - name: Upload license report
+        uses: actions/upload-artifact@v3
+        with:
+          name: license-report
+          path: |
+            licenses.json
+            licenses.md
+          retention-days: 30
+
+  security-summary:
+    name: Security Monitoring Summary
+    runs-on: ubuntu-latest
+    needs: [dependency-audit, secrets-detection, sast-scan, container-security, compliance-check]
+    if: always()
+    steps:
+      - name: Generate security summary
+        run: |
+          echo "# 🔒 Security Monitoring Summary" > security-monitoring-summary.md
+          echo "" >> security-monitoring-summary.md
+          echo "## Scan Results" >> security-monitoring-summary.md
+          echo "" >> security-monitoring-summary.md
+
+          # Dependency audit status
+          if [ "${{ needs.dependency-audit.result }}" == "success" ]; then
+            echo "- ✅ Dependency vulnerability audit: PASSED" >> security-monitoring-summary.md
+          elif [ "${{ needs.dependency-audit.result }}" == "skipped" ]; then
+            echo "- ⏭️  Dependency vulnerability audit: SKIPPED" >> security-monitoring-summary.md
+          else
+            echo "- ❌ Dependency vulnerability audit: FAILED" >> security-monitoring-summary.md
+          fi
+
+          # Secrets detection status
+          if [ "${{ needs.secrets-detection.result }}" == "success" ]; then
+            echo "- ✅ Secrets detection: PASSED" >> security-monitoring-summary.md
+          else
+            echo "- ❌ Secrets detection: FAILED" >> security-monitoring-summary.md
+          fi
+
+          # SAST scan status
+          if [ "${{ needs.sast-scan.result }}" == "success" ]; then
+            echo "- ✅ SAST scan: PASSED" >> security-monitoring-summary.md
+          elif [ "${{ needs.sast-scan.result }}" == "skipped" ]; then
+            echo "- ⏭️  SAST scan: SKIPPED" >> security-monitoring-summary.md
+          else
+            echo "- ❌ SAST scan: FAILED" >> security-monitoring-summary.md
+          fi
+
+          # Container security status
+          if [ "${{ needs.container-security.result }}" == "success" ]; then
+            echo "- ✅ Container security scan: PASSED" >> security-monitoring-summary.md
+          elif [ "${{ needs.container-security.result }}" == "skipped" ]; then
+            echo "- ⏭️  Container security scan: SKIPPED" >> security-monitoring-summary.md
+          else
+            echo "- ❌ Container security scan: FAILED" >> security-monitoring-summary.md
+          fi
+
+          # Compliance check status
+          if [ "${{ needs.compliance-check.result }}" == "success" ]; then
+            echo "- ✅ License compliance check: PASSED" >> security-monitoring-summary.md
+          else
+            echo "- ❌ License compliance check: FAILED" >> security-monitoring-summary.md
+          fi
+
+          echo "" >> security-monitoring-summary.md
+          echo "## Security Recommendations" >> security-monitoring-summary.md
+          echo "" >> security-monitoring-summary.md
+          echo "1. Review all security scan results in the artifacts" >> security-monitoring-summary.md
+          echo "2. Address any critical or high-severity findings immediately" >> security-monitoring-summary.md
+          echo "3. Ensure no secrets are committed to the repository" >> security-monitoring-summary.md
+          echo "4. Keep dependencies updated to latest secure versions" >> security-monitoring-summary.md
+          echo "5. Monitor license compliance regularly" >> security-monitoring-summary.md
+          echo "6. Run security scans regularly, not just on schedule" >> security-monitoring-summary.md
+
+          cat security-monitoring-summary.md
+
+      - name: Upload security summary
+        uses: actions/upload-artifact@v3
+        with:
+          name: security-monitoring-summary
+          path: security-monitoring-summary.md
+          retention-days: 30
+
+      - name: Create security issue on failures
+        if: contains(needs.*.result, 'failure')
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: '🚨 Security Monitoring Alert',
+              body: `Security monitoring detected issues that need attention.\n\nPlease review the security scan results and address any findings.`,
+              labels: ['security', 'alert', 'urgent']
+            })

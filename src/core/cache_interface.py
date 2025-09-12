@@ -13,9 +13,8 @@ Features:
 """
 
 import asyncio
-from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional, Union, Protocol
 from datetime import datetime
+from typing import Any, Dict, List, Optional, Protocol
 
 
 class CacheEntry:

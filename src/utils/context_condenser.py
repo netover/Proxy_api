@@ -1,17 +1,18 @@
-from fastapi import Request
-from typing import List, Optional
-import hashlib
-import time
 import asyncio
+import hashlib
 import json
 import os
 import re
-from pathlib import Path
+import time
 from collections import OrderedDict
-from src.core.provider_factory import provider_factory
+from typing import List, Optional
+
+from fastapi import Request
+
 from src.core.logging import ContextualLogger
-from src.core.unified_config import config_manager
 from src.core.metrics import metrics_collector
+from src.core.provider_factory import provider_factory
+from src.core.unified_config import config_manager
 
 # Optional Redis import for distributed caching in high-load environments
 try:
@@ -41,6 +42,10 @@ class AsyncLRUCache:
         self.persist_file = persist_file
         self.redis_url = redis_url
         self.redis_client = None
+
+        # Background task management
+        self._background_tasks: set = set()
+        self._shutdown_event = asyncio.Event()
 
         # Initialize Redis if URL provided and available
         if self.redis_url and REDIS_AVAILABLE:
@@ -126,13 +131,21 @@ class AsyncLRUCache:
                 logger.debug(f"Evicted cache item: {oldest_key}")
                 # Also remove from Redis if using Redis
                 if self.redis_client:
-                    asyncio.create_task(self.redis_client.delete(f"cache:{oldest_key}"))
+                    task = asyncio.create_task(self.redis_client.delete(f"cache:{oldest_key}"))
+                    self._background_tasks.add(task)
+                    task.add_done_callback(self._background_tasks.discard)
             self.cache[key] = value
-        asyncio.create_task(self.save())  # Async save on set
+        # Async save on set
+        task = asyncio.create_task(self.save())
+        self._background_tasks.add(task)
+        task.add_done_callback(self._background_tasks.discard)
 
     def clear(self):
         self.cache.clear()
-        asyncio.create_task(self.save())
+        # Async save on clear
+        task = asyncio.create_task(self.save())
+        self._background_tasks.add(task)
+        task.add_done_callback(self._background_tasks.discard)
 
     async def initialize(self):
         """Initialize cache by loading from persistence if enabled"""
@@ -140,6 +153,19 @@ class AsyncLRUCache:
 
     async def shutdown(self):
         """Shutdown cache and save to file/Redis if persistence enabled"""
+        # Cancel all pending background tasks
+        if self._background_tasks:
+            logger.info(f"Cancelling {len(self._background_tasks)} background tasks")
+            for task in list(self._background_tasks):
+                if not task.done():
+                    task.cancel()
+
+            # Wait for tasks to complete or be cancelled
+            if self._background_tasks:
+                await asyncio.gather(*self._background_tasks, return_exceptions=True)
+            logger.info("All background tasks cancelled")
+
+        # Final save
         await self.save()
         if self.redis_client:
             await self.redis_client.close()

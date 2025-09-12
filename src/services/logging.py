@@ -4,10 +4,9 @@ Integrates with the existing JSON-based logging system.
 """
 
 import json
-import logging
+from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any, List, Iterator, Optional
-from datetime import datetime, timezone
+from typing import Any, Dict, Iterator, List, Optional
 
 from src.core.logging import ContextualLogger
 

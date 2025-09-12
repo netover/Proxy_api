@@ -13,7 +13,8 @@ import logging
 
 from .auth import verify_api_key
 from .rate_limiter import rate_limiter
-from .exceptions import InvalidRequestError, NotFoundError
+from src.core.exceptions import InvalidRequestError, NotFoundError
+from src.api.errors.error_handlers import error_handler
 from .models import (
     ModelSelectionRequest,
     ModelListResponse,
@@ -80,7 +81,8 @@ class ModelManager:
             
         except Exception as e:
             self.logger.error(f"Failed to get models for provider {provider_name}: {e}")
-            raise InvalidRequestError(f"Failed to retrieve models: {str(e)}")
+            sanitized_error = error_handler._sanitize_error_message(str(e))
+            raise InvalidRequestError(f"Failed to retrieve models: {sanitized_error}")
     
     async def get_model_details(self, request: Request, provider_name: str, model_id: str) -> ModelDetailResponse:
         """Get detailed information for a specific model."""
@@ -129,7 +131,8 @@ class ModelManager:
             raise
         except Exception as e:
             self.logger.error(f"Failed to get model details for {provider_name}/{model_id}: {e}")
-            raise InvalidRequestError(f"Failed to retrieve model details: {str(e)}")
+            sanitized_error = error_handler._sanitize_error_message(str(e))
+            raise InvalidRequestError(f"Failed to retrieve model details: {sanitized_error}")
     
     async def update_model_selection(self, request: Request, provider_name: str, selection: ModelSelectionRequest) -> Dict[str, Any]:
         """Update model selection configuration for a provider."""
@@ -186,7 +189,8 @@ class ModelManager:
             
         except Exception as e:
             logger.error(f"Failed to update model selection for {provider_name}: {e}")
-            raise InvalidRequestError(f"Failed to update model selection: {str(e)}")
+            sanitized_error = error_handler._sanitize_error_message(str(e))
+            raise InvalidRequestError(f"Failed to update model selection: {sanitized_error}")
     
     async def refresh_models(self, request: Request, provider_name: str, background_tasks: BackgroundTasks) -> RefreshResponse:
         """Force refresh model cache for a provider."""
@@ -234,7 +238,8 @@ class ModelManager:
             
         except Exception as e:
             logger.error(f"Failed to refresh models for {provider_name}: {e}")
-            raise InvalidRequestError(f"Failed to refresh models: {str(e)}")
+            sanitized_error = error_handler._sanitize_error_message(str(e))
+            raise InvalidRequestError(f"Failed to refresh models: {sanitized_error}")
     
     def _infer_capabilities(self, model_id: str) -> List[str]:
         """Infer model capabilities based on model ID patterns."""

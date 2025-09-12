@@ -1,12 +1,13 @@
-from fastapi import APIRouter, Depends, Request, BackgroundTasks
-from fastapi.responses import StreamingResponse
-from typing import AsyncGenerator, Dict, Any
 import time
 
+from fastapi import APIRouter, BackgroundTasks, Depends, Request
+from fastapi.responses import StreamingResponse
+
 from src.core.auth import verify_api_key
-from src.core.rate_limiter import rate_limiter
 from src.core.logging import ContextualLogger
+from src.core.rate_limiter import rate_limiter
 from src.models.requests import ChatCompletionRequest, TextCompletionRequest
+
 from .common import request_router  # Import shared router
 
 logger = ContextualLogger(__name__)

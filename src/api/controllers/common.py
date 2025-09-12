@@ -1,19 +1,14 @@
-from fastapi import Request, BackgroundTasks
-from typing import Dict, Any, List, Union, AsyncGenerator
-import asyncio
 import time
-from contextlib import asynccontextmanager
+from typing import Any, AsyncGenerator, Dict, List, Union
 
-from src.core.provider_factory import ProviderStatus
-from src.core.metrics import metrics_collector
+from fastapi import BackgroundTasks, Request
+
+from src.core.exceptions import (InvalidRequestError, NotImplementedError,
+                                 ServiceUnavailableError)
 from src.core.logging import ContextualLogger
-from src.core.exceptions import InvalidRequestError, NotImplementedError, ServiceUnavailableError
-from src.models.requests import (
-    ChatCompletionRequest,
-    TextCompletionRequest,
-    EmbeddingRequest,
-    ImageGenerationRequest
-)
+from src.core.metrics import metrics_collector
+from src.models.requests import (ChatCompletionRequest, EmbeddingRequest,
+                                 TextCompletionRequest)
 
 logger = ContextualLogger(__name__)
 

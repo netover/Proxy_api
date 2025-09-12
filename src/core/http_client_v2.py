@@ -3,21 +3,19 @@ Advanced HTTP Client with Retry Strategies
 Enhanced version with sophisticated retry mechanisms and provider-specific configurations.
 """
 
-import asyncio
-import time
-from typing import Dict, Any, Optional, Union, Callable
-import httpx
-from contextlib import asynccontextmanager
 import logging
+import threading
+import time
+from contextlib import asynccontextmanager
+from typing import Any, Dict, Optional
+
+import httpx
 
 logger = logging.getLogger(__name__)
 
 # Import retry strategies
-from src.core.retry_strategies import (
-    RetryConfig, RetryStrategy, create_retry_strategy,
-    ErrorType, retry_strategy_registry
-)
-from src.core.exceptions import ProviderError, RateLimitError
+from src.core.retry_strategies import (RetryConfig, create_retry_strategy,
+                                       retry_strategy_registry)
 
 
 class AdvancedHTTPClient:
@@ -299,6 +297,7 @@ class AdvancedHTTPClient:
 
 # Global client registry for provider-specific clients
 _http_clients: Dict[str, AdvancedHTTPClient] = {}
+_http_clients_lock = threading.Lock()
 
 
 def get_advanced_http_client(
@@ -309,12 +308,13 @@ def get_advanced_http_client(
     """Get or create provider-specific HTTP client instance"""
     key = provider_name
 
-    if key not in _http_clients or _http_clients[key]._closed:
-        _http_clients[key] = AdvancedHTTPClient(
-            provider_name=provider_name,
-            retry_config=retry_config,
-            **kwargs
-        )
+    with _http_clients_lock:
+        if key not in _http_clients or _http_clients[key]._closed:
+            _http_clients[key] = AdvancedHTTPClient(
+                provider_name=provider_name,
+                retry_config=retry_config,
+                **kwargs
+            )
 
     return _http_clients[key]
 

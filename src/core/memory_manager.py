@@ -5,13 +5,13 @@ Prevents memory leaks and optimizes memory usage in high-throughput scenarios.
 
 import asyncio
 import gc
-import psutil
+import logging
 import threading
 import time
-from typing import Dict, Any, List, Optional, Callable
-from collections import defaultdict
 from dataclasses import dataclass
-import logging
+from typing import Any, Callable, Dict, List, Optional
+
+import psutil
 
 logger = logging.getLogger(__name__)
 
@@ -276,11 +276,17 @@ class MemoryManager:
         logger.info("Forcing memory cleanup")
         collected = gc.collect()
         logger.info(f"Force cleanup collected {collected} objects")
+        return collected
 
     def get_memory_stats(self) -> MemoryStats:
         """Get comprehensive memory statistics"""
         process = psutil.Process()
         memory_info = process.memory_info()
+
+        # Convert GC stats to dictionary format
+        gc_stats = {}
+        for i, stat in enumerate(gc.get_stats()):
+            gc_stats[i] = stat.get('collections', 0)
 
         return MemoryStats(
             total_memory_mb=round(psutil.virtual_memory().total / (1024 * 1024), 2),
@@ -288,7 +294,7 @@ class MemoryManager:
             used_memory_mb=round(psutil.virtual_memory().used / (1024 * 1024), 2),
             memory_percent=round(psutil.virtual_memory().percent, 2),
             process_memory_mb=round(memory_info.rss / (1024 * 1024), 2),
-            gc_collections=dict(gc.get_stats()),
+            gc_collections=gc_stats,
             object_counts=self._get_object_snapshot()
         )
 

@@ -5,17 +5,16 @@ Revolutionary parallel execution with first-success-wins strategy
 
 import asyncio
 import time
-from typing import Dict, List, Any, Optional, Callable, Awaitable, Union, Tuple
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from enum import Enum
-from concurrent.futures import ThreadPoolExecutor
-import threading
+from typing import Any, Dict, List, Optional
 
+from .circuit_breaker import get_circuit_breaker
+from .exceptions import ProviderError
 from .logging import ContextualLogger
 from .provider_discovery import provider_discovery
-from .circuit_breaker import get_circuit_breaker, CircuitBreakerOpenException
-from .provider_factory import provider_factory, BaseProvider
-from .exceptions import ProviderError, TimeoutError
+from .provider_factory import BaseProvider, provider_factory
 
 logger = ContextualLogger(__name__)
 

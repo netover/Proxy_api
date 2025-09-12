@@ -3,12 +3,13 @@ Authentication middleware for LLM Proxy API
 Provides API key and JWT token-based authentication
 """
 
-from fastapi import Request, HTTPException, Depends
-from typing import Any
 import hashlib
 import secrets
-from src.core.unified_config import config_manager
+
+from fastapi import Depends, HTTPException, Request
+
 from src.core.logging import ContextualLogger
+from src.core.unified_config import config_manager
 
 logger = ContextualLogger(__name__)
 
@@ -40,8 +41,7 @@ class APIKeyAuth:
         # This is important to prevent timing attacks.
         is_valid = False
         for valid_hash in self.valid_api_key_hashes:
-            secrets.compare_digest(key_hash, valid_hash)
-            if key_hash == valid_hash:
+            if secrets.compare_digest(key_hash, valid_hash):
                 is_valid = True
                 break
 

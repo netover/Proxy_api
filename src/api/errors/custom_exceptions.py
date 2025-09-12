@@ -5,14 +5,14 @@ This module defines domain-specific exceptions for the API layer,
 extending the core exceptions with API-specific context and error codes.
 """
 
-from src.core.exceptions import (
-    InvalidRequestError as CoreInvalidRequestError,
-    NotFoundError as CoreNotFoundError,
-    ServiceUnavailableError as CoreServiceUnavailableError,
-    AuthenticationError as CoreAuthenticationError,
-    AuthorizationError as CoreAuthorizationError,
-    RateLimitError as CoreRateLimitError
-)
+from src.core.exceptions import AuthenticationError as CoreAuthenticationError
+from src.core.exceptions import AuthorizationError as CoreAuthorizationError
+from src.core.exceptions import InvalidRequestError as CoreInvalidRequestError
+from src.core.exceptions import NotFoundError as CoreNotFoundError
+from src.core.exceptions import RateLimitError as CoreRateLimitError
+from src.core.exceptions import \
+    ServiceUnavailableError as CoreServiceUnavailableError
+
 
 class APIException(Exception):
     """Base exception for API layer errors."""

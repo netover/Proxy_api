@@ -1,11 +1,15 @@
-from typing import Dict, Any, Union, AsyncGenerator, Set
-from typing import Dict, Any, Union, AsyncGenerator
+import json
+import time
+from typing import Any, AsyncGenerator, Dict, Set, Union
+
+import httpx
+
+from src.core.exceptions import (APIConnectionError, AuthenticationError,
+                                 InvalidRequestError, RateLimitError)
 from src.core.provider_factory import BaseProvider, ProviderCapability
 from src.core.unified_config import ProviderConfig
-import json
-import httpx
-import time
-from src.core.exceptions import InvalidRequestError, AuthenticationError, RateLimitError, APIConnectionError
+from src.api.errors.error_handlers import error_handler
+
 
 class AnthropicProvider(BaseProvider):
     """Anthropic API provider implementation"""
@@ -22,7 +26,6 @@ class AnthropicProvider(BaseProvider):
         capabilities.discard(ProviderCapability.EMBEDDINGS)
 
         return capabilities
-        super().__init__(config)
 
     async def _perform_health_check(self) -> Dict[str, Any]:
         """Health check for Anthropic API - use a simple messages request"""
@@ -187,7 +190,8 @@ class AnthropicProvider(BaseProvider):
                     elif e.response.status_code == 429:
                         raise RateLimitError("Anthropic Rate limit exceeded", code="rate_limit")
                     elif e.response.status_code == 400:
-                        raise InvalidRequestError(f"Anthropic Invalid Request: {e.response.text}", code="invalid_request")
+                        sanitized_text = error_handler.sanitize_provider_error_response(e.response.text)
+                        raise InvalidRequestError(f"Anthropic Invalid Request: {sanitized_text}", code="invalid_request")
                     else:
                         raise APIConnectionError(f"Anthropic API error: {e.response.status_code}", code="api_error")
                 except Exception as e:
@@ -227,7 +231,8 @@ class AnthropicProvider(BaseProvider):
                 elif e.response.status_code == 429:
                     raise RateLimitError("Anthropic Rate limit exceeded", code="rate_limit")
                 elif e.response.status_code == 400:
-                    raise InvalidRequestError(f"Anthropic Invalid Request: {e.response.text}", code="invalid_request")
+                    sanitized_text = error_handler.sanitize_provider_error_response(e.response.text)
+                    raise InvalidRequestError(f"Anthropic Invalid Request: {sanitized_text}", code="invalid_request")
                 else:
                     raise APIConnectionError(f"Anthropic API error: {e.response.status_code}", code="api_error")
 

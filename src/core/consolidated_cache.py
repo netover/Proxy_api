@@ -14,20 +14,56 @@ Features:
 """
 
 import asyncio
-import logging
 import threading
-from typing import Any, Dict, List, Optional, Union, Callable
+from datetime import datetime
 from pathlib import Path
-from datetime import datetime, timedelta
+from typing import Any, Callable, Dict, List, Optional, Set
+from enum import Enum
 
-from .cache_interface import ICache, CacheEntry, CacheStats
-from .unified_cache import UnifiedCache, get_unified_cache
-from .cache_warmer import CacheWarmer
-from .cache_monitor import CacheMonitor
+from .cache_interface import CacheStats, ICache
 from .cache_migration import CacheMigrationService
+from .cache_monitor import CacheMonitor
+from .cache_warmer import CacheWarmer
 from .logging import ContextualLogger
+from .unified_cache import get_unified_cache
 
 logger = ContextualLogger(__name__)
+
+
+class CacheTier(Enum):
+    """Cache tier levels for data organization"""
+    HOT = "hot"       # Frequently accessed, fast storage
+    WARM = "warm"     # Moderately accessed, balanced storage
+    COLD = "cold"     # Rarely accessed, cost-effective storage
+
+
+class CacheCategory:
+    """Predefined cache categories for better organization"""
+
+    # Core data types
+    MODELS = "models"
+    RESPONSES = "responses"
+    SUMMARIES = "summaries"
+    METRICS = "metrics"
+
+    # System categories
+    CONFIG = "config"
+    TOKENS = "tokens"
+    SESSIONS = "sessions"
+
+    # Performance categories
+    QUERIES = "queries"
+    RESULTS = "results"
+    ANALYTICS = "analytics"
+
+    @classmethod
+    def get_all_categories(cls) -> List[str]:
+        """Get all predefined categories"""
+        return [
+            cls.MODELS, cls.RESPONSES, cls.SUMMARIES, cls.METRICS,
+            cls.CONFIG, cls.TOKENS, cls.SESSIONS,
+            cls.QUERIES, cls.RESULTS, cls.ANALYTICS
+        ]
 
 
 class ConsolidatedCacheManager:

@@ -6,8 +6,10 @@ for formatting different types of API errors.
 """
 
 import time
-from typing import Dict, Any, List, Optional, Union
+from typing import Any, Dict, List
+
 from fastapi.responses import JSONResponse
+
 
 class ErrorResponse:
     """Standardized error response structure."""
@@ -279,13 +281,16 @@ class MethodNotAllowedErrorResponse(ErrorResponse):
 def create_error_response_from_exception(exc: Exception,
                                        request_id: str = None) -> ErrorResponse:
     """Create appropriate error response from exception type."""
-    from .custom_exceptions import (
-        ValidationError, ModelNotFoundError, ProviderUnavailableError,
-        QuotaExceededError, UnsupportedOperationError, ConfigurationError,
-        StreamingError, TimeoutError, PayloadTooLargeError, ConcurrentRequestError,
-        APIValidationError, APINotFoundError, APIAuthenticationError,
-        APIAuthorizationError, APIRateLimitError, APIUnavailableError
-    )
+    from .custom_exceptions import (APIAuthenticationError,
+                                    APIAuthorizationError, APINotFoundError,
+                                    APIRateLimitError, APIUnavailableError,
+                                    APIValidationError, ConcurrentRequestError,
+                                    ConfigurationError, ModelNotFoundError,
+                                    PayloadTooLargeError,
+                                    ProviderUnavailableError,
+                                    QuotaExceededError, StreamingError,
+                                    TimeoutError, UnsupportedOperationError,
+                                    ValidationError)
 
     # Map exception types to response classes
     exception_mapping = {

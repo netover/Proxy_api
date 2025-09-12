@@ -1,7 +1,9 @@
-from typing import Dict, Any
 import time
-from src.providers.dynamic_base import DynamicProvider
+from typing import Any, Dict
+
 from src.core.metrics import metrics_collector
+from src.providers.dynamic_base import DynamicProvider
+
 
 class DynamicOpenAIProvider(DynamicProvider):
     """Dynamic OpenAI provider implementation"""

@@ -1,0 +1,160 @@
+version: '3.8'
+
+services:
+  # Main LLM Proxy API Service
+  llm-proxy:
+    build: .
+    container_name: llm-proxy-api
+    ports:
+      - "8000:8000"
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8000
+      - CONTEXT_SERVICE_URL=http://context-service:8001
+      - HEALTH_WORKER_URL=http://health-worker:8002
+    env_file:
+      - .env
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+      - ./logs:/app/logs
+      - ./data:/app/data
+      - ./cache:/app/cache
+    depends_on:
+      - context-service
+      - health-worker
+    networks:
+      - llm-proxy-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Context Condensation Service
+  context-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: context-service
+    ports:
+      - "8001:8001"
+    environment:
+      - CONTEXT_SERVICE_URL=http://localhost:8001
+      - HEALTH_CHECK_INTERVAL=60
+      - CACHE_SIZE=1000
+      - CACHE_TTL=3600
+      - CACHE_PERSIST=false
+      - ADAPTIVE_ENABLED=true
+      - TRUNCATION_THRESHOLD=10000
+    env_file:
+      - .env
+    volumes:
+      - ./context_service:/app/context_service
+      - ./logs:/app/logs
+      - ./cache:/app/cache
+    working_dir: /app/context_service
+    command: ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8001", "--workers", "2"]
+    networks:
+      - llm-proxy-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # Health Monitoring Service
+  health-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: health-worker
+    ports:
+      - "8002:8002"
+    environment:
+      - HEALTH_WORKER_URL=http://localhost:8002
+      - HEALTH_CHECK_INTERVAL=60
+    env_file:
+      - .env
+    volumes:
+      - ./health_worker:/app/health_worker
+      - ./logs:/app/logs
+    working_dir: /app/health_worker
+    command: ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8002", "--workers", "1"]
+    networks:
+      - llm-proxy-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # Redis for caching (optional)
+  redis:
+    image: redis:7-alpine
+    container_name: llm-proxy-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - llm-proxy-network
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Prometheus for metrics (optional)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: llm-proxy-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    networks:
+      - llm-proxy-network
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+
+  # Grafana for dashboards (optional)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: llm-proxy-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana-dashboard.json:/etc/grafana/provisioning/dashboards/llm-proxy-dashboard.json:ro
+    networks:
+      - llm-proxy-network
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+
+networks:
+  llm-proxy-network:
+    driver: bridge
+
+volumes:
+  redis_data:
+  prometheus_data:
+  grafana_data:

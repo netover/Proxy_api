@@ -1,0 +1,363 @@
+name: Performance Testing
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  schedule:
+    # Run performance tests weekly on Sundays at 2 AM UTC
+    - cron: '0 2 * * 0'
+  workflow_dispatch:
+    inputs:
+      test_type:
+        description: 'Type of performance test to run'
+        required: true
+        default: 'full'
+        type: choice
+        options:
+          - full
+          - benchmark
+          - load-test
+          - memory-profile
+
+jobs:
+  benchmark:
+    name: Performance Benchmarks
+    runs-on: ubuntu-latest
+    if: github.event.inputs.test_type != 'load-test' && github.event.inputs.test_type != 'memory-profile' || github.event_name != 'workflow_dispatch'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest-benchmark
+
+      - name: Run performance benchmarks
+        run: |
+          python -m pytest tests/ -k "benchmark" -v --benchmark-only --benchmark-json=benchmark-results.json
+
+      - name: Generate benchmark report
+        run: |
+          python -c "
+          import json
+          import os
+
+          if os.path.exists('benchmark-results.json'):
+              with open('benchmark-results.json') as f:
+                  data = json.load(f)
+
+              print('# 📊 Performance Benchmark Results')
+              print()
+              print('| Test | Min (ms) | Max (ms) | Mean (ms) | StdDev | Rounds |')
+              print('|------|----------|----------|-----------|--------|--------|')
+
+              for benchmark in data.get('benchmarks', []):
+                  name = benchmark['name'].split('::')[-1]
+                  stats = benchmark['stats']
+                  print(f'| {name} | {stats[\"min\"]*1000:.2f} | {stats[\"max\"]*1000:.2f} | {stats[\"mean\"]*1000:.2f} | {stats[\"stddev\"]*1000:.2f} | {benchmark[\"rounds\"]} |')
+
+              print()
+              print('## Summary')
+              print(f'- Total benchmarks: {len(data.get(\"benchmarks\", []))}')
+              print(f'- Generated at: {data.get(\"datetime\", \"Unknown\")}')
+          else:
+              print('No benchmark results found')
+          " > benchmark-report.md
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v3
+        with:
+          name: benchmark-results
+          path: |
+            benchmark-results.json
+            benchmark-report.md
+          retention-days: 30
+
+  load-test:
+    name: Load Testing
+    runs-on: ubuntu-latest
+    if: github.event.inputs.test_type != 'benchmark' && github.event.inputs.test_type != 'memory-profile' || github.event_name != 'workflow_dispatch'
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Install k6
+        run: |
+          curl https://github.com/grafana/k6/releases/download/v0.45.0/k6-v0.45.0-linux-amd64.tar.gz -L | tar xvz
+          sudo mv k6-v0.45.0-linux-amd64/k6 /usr/local/bin/
+
+      - name: Start application for load testing
+        run: |
+          # Start the application in background
+          python main.py &
+          APP_PID=$!
+
+          # Wait for app to start
+          sleep 30
+
+          # Health check
+          if ! curl -f http://localhost:8000/health; then
+            echo "❌ Application failed to start"
+            kill $APP_PID 2>/dev/null || true
+            exit 1
+          fi
+
+          echo "✅ Application started successfully"
+          echo $APP_PID > app.pid
+
+      - name: Run load tests
+        run: |
+          # Run different load test scenarios
+          echo "🧪 Running light load test..."
+          k6 run tests/load_tests/light_load_30_users.js --out json=light-load-results.json
+
+          echo "🧪 Running medium load test..."
+          k6 run tests/load_tests/medium_load_100_users.test.js --out json=medium-load-results.json
+
+          echo "🧪 Running heavy load test..."
+          k6 run tests/load_tests/heavy_load_400_users.test.js --out json=heavy-load-results.json
+
+      - name: Generate load test report
+        run: |
+          python -c "
+          import json
+          import os
+
+          print('# 🚀 Load Test Results')
+          print()
+
+          test_files = ['light-load-results.json', 'medium-load-results.json', 'heavy-load-results.json']
+          scenarios = ['Light Load (30 users)', 'Medium Load (100 users)', 'Heavy Load (400 users)']
+
+          print('| Scenario | Requests | Duration | Avg Response (ms) | P95 Response (ms) | Error Rate |')
+          print('|----------|----------|----------|-------------------|-------------------|------------|')
+
+          for i, file in enumerate(test_files):
+              if os.path.exists(file):
+                  try:
+                      with open(file) as f:
+                          data = json.load(f)
+
+                      metrics = data.get('metrics', {})
+                      http_req_duration = metrics.get('http_req_duration', {})
+                      http_req_failed = metrics.get('http_req_failed', {})
+
+                      avg_response = http_req_duration.get('avg', 0) or 0
+                      p95_response = http_req_duration.get('p(95)', 0) or 0
+                      error_rate = (http_req_failed.get('rate', 0) or 0) * 100
+                      requests = metrics.get('http_reqs', {}).get('count', 0) or 0
+                      duration = metrics.get('duration', 0) or 0
+
+                      print(f'| {scenarios[i]} | {requests} | {duration/1000:.1f}s | {avg_response:.1f} | {p95_response:.1f} | {error_rate:.2f}% |')
+                  except:
+                      print(f'| {scenarios[i]} | N/A | N/A | N/A | N/A | N/A |')
+              else:
+                  print(f'| {scenarios[i]} | N/A | N/A | N/A | N/A | N/A |')
+
+          print()
+          print('## Recommendations')
+          print('- Monitor response times and error rates')
+          print('- Scale infrastructure based on load test results')
+          print('- Optimize slow endpoints identified in tests')
+          " > load-test-report.md
+
+      - name: Stop application
+        run: |
+          if [ -f app.pid ]; then
+            kill $(cat app.pid) 2>/dev/null || true
+            rm app.pid
+          fi
+
+      - name: Upload load test results
+        uses: actions/upload-artifact@v3
+        with:
+          name: load-test-results
+          path: |
+            *-load-results.json
+            load-test-report.md
+          retention-days: 30
+
+  memory-profile:
+    name: Memory Profiling
+    runs-on: ubuntu-latest
+    if: github.event.inputs.test_type != 'benchmark' && github.event.inputs.test_type != 'load-test' || github.event_name != 'workflow_dispatch'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install memory-profiler psutil
+
+      - name: Run memory profiling tests
+        run: |
+          python -m pytest tests/ -k "memory" -v --memory-profile --memory-output=memory-profile-results.json
+
+      - name: Generate memory report
+        run: |
+          python -c "
+          import json
+          import os
+
+          if os.path.exists('memory-profile-results.json'):
+              with open('memory-profile-results.json') as f:
+                  data = json.load(f)
+
+              print('# 🧠 Memory Profiling Results')
+              print()
+
+              if 'tests' in data:
+                  print('| Test | Peak Memory (MB) | Memory Increase (MB) |')
+                  print('|------|------------------|----------------------|')
+
+                  for test in data['tests']:
+                      name = test.get('name', 'Unknown')
+                      peak = test.get('peak_memory', 0) / (1024 * 1024)  # Convert to MB
+                      increase = test.get('memory_increase', 0) / (1024 * 1024)
+
+                      print(f'| {name} | {peak:.2f} | {increase:.2f} |')
+
+                  print()
+                  print('## Memory Analysis')
+                  print('- Peak memory usage indicates maximum RAM required')
+                  print('- Memory increase shows memory growth during test execution')
+                  print('- High memory usage may indicate memory leaks or inefficient algorithms')
+              else:
+                  print('No memory profiling data available')
+          else:
+              print('Memory profiling results not found')
+          " > memory-profile-report.md
+
+      - name: Upload memory profiling results
+        uses: actions/upload-artifact@v3
+        with:
+          name: memory-profile-results
+          path: |
+            memory-profile-results.json
+            memory-profile-report.md
+          retention-days: 30
+
+  performance-summary:
+    name: Performance Summary
+    runs-on: ubuntu-latest
+    needs: [benchmark, load-test, memory-profile]
+    if: always()
+    steps:
+      - name: Generate performance summary
+        run: |
+          echo "# 📈 Performance Testing Summary" > performance-summary.md
+          echo "" >> performance-summary.md
+          echo "## Test Results" >> performance-summary.md
+          echo "" >> performance-summary.md
+
+          # Benchmark status
+          if [ "${{ needs.benchmark.result }}" == "success" ]; then
+            echo "- ✅ Performance benchmarks: PASSED" >> performance-summary.md
+          elif [ "${{ needs.benchmark.result }}" == "skipped" ]; then
+            echo "- ⏭️  Performance benchmarks: SKIPPED" >> performance-summary.md
+          else
+            echo "- ❌ Performance benchmarks: FAILED" >> performance-summary.md
+          fi
+
+          # Load test status
+          if [ "${{ needs.load-test.result }}" == "success" ]; then
+            echo "- ✅ Load testing: PASSED" >> performance-summary.md
+          elif [ "${{ needs.load-test.result }}" == "skipped" ]; then
+            echo "- ⏭️  Load testing: SKIPPED" >> performance-summary.md
+          else
+            echo "- ❌ Load testing: FAILED" >> performance-summary.md
+          fi
+
+          # Memory profile status
+          if [ "${{ needs.memory-profile.result }}" == "success" ]; then
+            echo "- ✅ Memory profiling: PASSED" >> performance-summary.md
+          elif [ "${{ needs.memory-profile.result }}" == "skipped" ]; then
+            echo "- ⏭️  Memory profiling: SKIPPED" >> performance-summary.md
+          else
+            echo "- ❌ Memory profiling: FAILED" >> performance-summary.md
+          fi
+
+          echo "" >> performance-summary.md
+          echo "## Performance Recommendations" >> performance-summary.md
+          echo "" >> performance-summary.md
+          echo "1. Review benchmark results for performance regressions" >> performance-summary.md
+          echo "2. Analyze load test results for scalability issues" >> performance-summary.md
+          echo "3. Monitor memory usage for potential leaks" >> performance-summary.md
+          echo "4. Optimize slow-performing functions identified in benchmarks" >> performance-summary.md
+          echo "5. Consider infrastructure scaling based on load test results" >> performance-summary.md
+
+          cat performance-summary.md
+
+      - name: Upload performance summary
+        uses: actions/upload-artifact@v3
+        with:
+          name: performance-summary
+          path: performance-summary.md
+          retention-days: 30
+
+      - name: Comment performance results on PR
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+
+            if (fs.existsSync('performance-summary.md')) {
+              const summary = fs.readFileSync('performance-summary.md', 'utf8');
+
+              github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: summary
+              });
+            }

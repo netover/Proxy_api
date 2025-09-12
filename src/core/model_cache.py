@@ -1,13 +1,11 @@
 """Model discovery caching layer with TTL support and persistence."""
 
+import hashlib
 import json
-import logging
-import os
 import threading
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Dict, List, Optional, Any
-import hashlib
+from typing import Any, Dict, List, Optional
 
 try:
     from cachetools import TTLCache
@@ -91,6 +89,7 @@ except ImportError:
 
 from ..models.model_info import ModelInfo
 from .logging import ContextualLogger
+from .metrics import metrics_collector
 
 logger = ContextualLogger(__name__)
 
@@ -137,6 +136,11 @@ class ModelCache:
         # Thread-safe cache implementation
         self._cache = TTLCache(maxsize=max_size, ttl=ttl)
         self._lock = threading.RLock()
+
+        # Performance metrics
+        self._hits = 0
+        self._misses = 0
+        self._total_requests = 0
         
         # Ensure cache directory exists
         if self.persist:
@@ -236,17 +240,28 @@ class ModelCache:
         cache_key = self._generate_cache_key(provider_name, base_url)
         
         with self._lock:
+            self._total_requests += 1
             try:
                 models = self._cache[cache_key]
+                self._hits += 1
                 logger.debug("Cache hit for models",
-                           provider=provider_name,
-                           model_count=len(models),
-                           cache_key=cache_key)
+                            provider=provider_name,
+                            model_count=len(models),
+                            cache_key=cache_key)
+
+                # Update metrics collector
+                self._update_cache_metrics()
+
                 return models
             except KeyError:
+                self._misses += 1
                 logger.debug("Cache miss for models",
-                           provider=provider_name,
-                           cache_key=cache_key)
+                            provider=provider_name,
+                            cache_key=cache_key)
+
+                # Update metrics collector
+                self._update_cache_metrics()
+
                 return None
     
     def set_models(
@@ -350,21 +365,45 @@ class ModelCache:
         with self._lock:
             return cache_key in self._cache
     
+    def _update_cache_metrics(self):
+        """Update cache metrics in the global metrics collector"""
+        try:
+            hit_rate = (self._hits / self._total_requests) if self._total_requests > 0 else 0.0
+
+            cache_stats = {
+                'hit_rate': hit_rate,
+                'total_requests': self._total_requests,
+                'cache_hits': self._hits,
+                'cache_misses': self._misses,
+                'entries': len(self._cache),
+                'memory_usage_mb': 0.0,  # Could be calculated if needed
+                'max_memory_mb': 0.0,
+                'evictions': 0  # Track this in set_models if needed
+            }
+
+            metrics_collector.update_cache_metrics(cache_stats)
+        except Exception as e:
+            logger.debug("Failed to update cache metrics", error=str(e))
+
     def get_stats(self) -> Dict[str, Any]:
         """
         Get cache statistics.
-        
+
         Returns:
             Dictionary with cache statistics
         """
         with self._lock:
+            hit_rate = (self._hits / self._total_requests) if self._total_requests > 0 else 0.0
             return {
                 'size': len(self._cache),
                 'max_size': self.max_size,
                 'ttl': self.ttl,
                 'persist': self.persist,
                 'cache_dir': str(self.cache_dir),
-                'hit_ratio': 0.0  # Could be extended with hit/miss tracking
+                'hit_ratio': hit_rate,
+                'total_requests': self._total_requests,
+                'hits': self._hits,
+                'misses': self._misses
             }
     
     def cleanup_expired(self) -> int:

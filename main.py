@@ -4,8 +4,10 @@ High-performance proxy with intelligent routing and fallback capabilities.
 """
 
 import asyncio
-import uvicorn
 import re
+
+import uvicorn
+
 # Use orjson for faster JSON serialization if available, fallback to json
 try:
     import orjson
@@ -19,27 +21,24 @@ except ImportError:
     json_dumps = json.dumps
     json_loads = json.loads
 import os
-from contextlib import asynccontextmanager
-from typing import Dict, Any, List, Optional, Union
+import threading
 import time
 import uuid
-import threading
+from contextlib import asynccontextmanager
 from http import HTTPStatus
-from datetime import datetime, timezone
-
-# FastAPI imports
-from fastapi import FastAPI, HTTPException, Depends, Request, BackgroundTasks
-from fastapi.responses import JSONResponse, StreamingResponse
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.middleware.gzip import GZipMiddleware
-
-# Rate limiting
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
-from slowapi.errors import RateLimitExceeded
+from typing import Any, Dict, List, Optional, Union
 
 # HTTP client
 import httpx
+# FastAPI imports
+from fastapi import BackgroundTasks, FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.responses import JSONResponse, StreamingResponse
+# Rate limiting
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 
 # HTTP Timeouts - Critical fix to prevent hanging requests
 DEFAULT_TIMEOUT = httpx.Timeout(10.0, connect=5.0, read=30.0)
@@ -51,40 +50,35 @@ try:
 except ImportError:
     psutil = None
 
+# New API router imports
+from src.api.router import (main_router, root_router, setup_exception_handlers,
+                            setup_middleware)
+from src.core.app_state import app_state
+from src.core.auth import APIKeyAuth
+from src.core.chaos_engineering import chaos_monkey
+from src.core.circuit_breaker import get_circuit_breaker
 # Core imports
 from src.core.config import settings
-from src.core.logging import setup_logging, ContextualLogger
-from src.core.unified_config import config_manager
-from src.core.metrics import metrics_collector
-from src.core.auth import verify_api_key, APIKeyAuth
-from src.core.unified_config import ProviderConfig
-from src.core.exceptions import (
-    ProviderError, InvalidRequestError, AuthenticationError,
-    RateLimitError, ServiceUnavailableError, NotImplementedError
-)
-from src.core.app_state import app_state
-from src.core.telemetry import telemetry, TracedSpan, traced
-from src.core.template_manager import template_manager
-from src.models.requests import ChatCompletionRequest, TextCompletionRequest, EmbeddingRequest
-from src.services.provider_loader import get_provider_factories
-from src.core.circuit_breaker import get_circuit_breaker
-from src.core.chaos_engineering import chaos_monkey
-from src.utils.context_condenser import condense_context
-from src.core.provider_factory import provider_factory
-
-# New API router imports
-from src.api.router import main_router, root_router, setup_middleware, setup_exception_handlers
-
+from src.core.exceptions import ProviderError, ServiceUnavailableError
+from src.core.provider_factory import ProviderStatus
 # Performance optimization imports
-from src.core.http_client import get_http_client
-from src.core.consolidated_cache import get_consolidated_cache_manager, initialize_consolidated_cache, shutdown_consolidated_cache
-from src.core.memory_manager import get_memory_manager, initialize_memory_manager, shutdown_memory_manager
+from src.core.http_client_v2 import get_advanced_http_client
+from src.core.retry_strategies import RetryConfig
+from src.core.logging import ContextualLogger, setup_logging
+from src.core.memory_manager import get_memory_manager, shutdown_memory_manager
+from src.core.alerting import alert_manager
+from src.core.metrics import metrics_collector
+from src.core.provider_factory import provider_factory
+from src.core.smart_cache import (get_response_cache, get_summary_cache,
+                                  shutdown_caches)
+from src.core.telemetry import TracedSpan, telemetry, traced
+from src.core.unified_config import ProviderConfig, config_manager
 
-
-
-# Setup logging
+# Setup logging with environment variable support
+import os
+log_level = os.getenv("LOG_LEVEL", "DEBUG" if settings.debug else "INFO").upper()
 setup_logging(
-    log_level="DEBUG" if settings.debug else "INFO",
+    log_level=log_level,
     log_file=settings.log_file
 )
 logger = ContextualLogger(__name__)
@@ -108,17 +102,49 @@ def safe_background_task(func):
 # Utility Functions
 @traced("get_provider", attributes={"operation": "provider_initialization"})
 async def get_provider(provider_config: ProviderConfig) -> Any:
-    """Get or create provider instance with caching"""
-    # Use the centralized provider factory
-    try:
-        provider = await provider_factory.get_provider(provider_config.name)
-        if provider is None:
-            # If not cached, create a new instance
+    """Get or create provider instance with enhanced caching and validation"""
+    provider_name = provider_config.name
+
+    # First, try to get cached provider
+    provider = await provider_factory.get_provider(provider_name)
+
+    if provider is not None:
+        # Validate cached provider health
+        if provider.status in [ProviderStatus.HEALTHY, ProviderStatus.DEGRADED]:
+            logger.debug(f"Using cached healthy provider: {provider_name}")
+            return provider
+        else:
+            logger.warning(f"Cached provider {provider_name} is unhealthy (status: {provider.status}), refreshing...")
+            # Remove unhealthy provider from cache
+            if provider_name in provider_factory._providers:
+                del provider_factory._providers[provider_name]
+
+    # Create new provider instance with retry logic
+    max_retries = 2
+    last_exception = None
+
+    for attempt in range(max_retries + 1):
+        try:
             provider = await provider_factory.create_provider(provider_config)
-        return provider
-    except Exception as e:
-        logger.error(f"Failed to get provider {provider_config.name}: {e}")
-        raise ProviderError(f"Failed to initialize provider {provider_config.name}")
+            logger.info(f"Successfully created provider: {provider_name} (attempt {attempt + 1})")
+            return provider
+
+        except ValueError as e:
+            # Configuration errors (disabled provider, etc.) - don't retry
+            logger.error(f"Configuration error for provider {provider_name}: {e}")
+            raise ProviderError(f"Provider configuration error: {e}")
+
+        except Exception as e:
+            last_exception = e
+            if attempt < max_retries:
+                wait_time = 2 ** attempt  # Exponential backoff
+                logger.warning(f"Failed to create provider {provider_name} (attempt {attempt + 1}/{max_retries + 1}): {e}. Retrying in {wait_time}s...")
+                await asyncio.sleep(wait_time)
+            else:
+                logger.error(f"Failed to create provider {provider_name} after {max_retries + 1} attempts: {e}")
+
+    # All retries failed
+    raise ProviderError(f"Failed to initialize provider {provider_name} after retries: {last_exception}")
 
 
 def get_providers_for_model(request: Request, model: str) -> List[ProviderConfig]:
@@ -368,7 +394,9 @@ async def lifespan(app: FastAPI):
     
         # Initialize HTTP client
         with TracedSpan("http_client.initialize") as span:
-            app.state.http_client = await get_http_client()
+            http_client = get_advanced_http_client(retry_config=RetryConfig())
+            await http_client.initialize()
+            app.state.http_client = http_client
             span.set_attribute("http.client.initialized", True)
             logger.info("HTTP client initialized")
     
@@ -417,7 +445,13 @@ async def lifespan(app: FastAPI):
         chaos_monkey.configure(config.settings.get('chaos_engineering', {}))
         logger.info("Chaos engineering configured")
 
-        app.state.config_mtime = config_manager._last_modified
+        # Start alerting system
+        with TracedSpan("alerting.initialize") as span:
+            await alert_manager.start_monitoring()
+            span.set_attribute("alerting.initialized", True)
+            logger.info("Alerting system initialized and monitoring started")
+
+        app.state.config_mtime = app_state.config_manager._last_modified
 
         # Start web UI in background thread
         def start_web_ui():
@@ -460,6 +494,9 @@ async def lifespan(app: FastAPI):
         # Shutdown context condensation cache
         if hasattr(app.state, 'lru_cache') and app.state.lru_cache:
             shutdown_tasks.append(app.state.lru_cache.shutdown())
+
+        # Shutdown alerting system
+        shutdown_tasks.append(alert_manager.stop_monitoring())
 
         # Wait for all shutdown tasks to complete
         if shutdown_tasks:
@@ -737,5 +774,5 @@ if __name__ == "__main__":
         host=settings.host,
         port=settings.port,
         reload=settings.debug,
-        log_level="debug" if settings.debug else "info"
+        log_level=log_level.lower()
     )

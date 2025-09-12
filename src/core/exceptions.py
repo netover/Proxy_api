@@ -1,5 +1,5 @@
 from typing import Optional
-import httpx
+
 
 class ProviderError(Exception):
     """Base exception for all provider errors"""

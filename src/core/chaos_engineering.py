@@ -4,17 +4,18 @@ Provides fault injection, network simulation, and resilience testing capabilitie
 """
 
 import asyncio
-import time
-import random
 import json
-from typing import Dict, Any, List, Optional, Callable, Awaitable
+import random
+import time
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from enum import Enum
-from contextlib import asynccontextmanager
+from typing import Any, Awaitable, Callable, Dict, List, Optional
+
 import httpx
 
 from .logging import ContextualLogger
-from .telemetry import traced, TracedSpan
+from .telemetry import TracedSpan, traced
 
 logger = ContextualLogger(__name__)
 

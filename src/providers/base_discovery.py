@@ -1,11 +1,11 @@
 """Base discovery provider for model discovery capabilities."""
 
+import logging
 from abc import ABC, abstractmethod
 from typing import List, Optional
-import logging
 
-from ..models.model_info import ModelInfo
 from ..core.exceptions import ProviderError, ValidationError
+from ..models.model_info import ModelInfo
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +59,6 @@ class BaseDiscoveryProvider(ABC):
             >>> for model in models:
             ...     print(f"{model.id} by {model.owned_by}")
         """
-        pass
     
     @abstractmethod
     async def retrieve_model(self, model_id: str) -> Optional[ModelInfo]:
@@ -86,7 +85,6 @@ class BaseDiscoveryProvider(ABC):
             ... else:
             ...     print("Model not found")
         """
-        pass
     
     async def validate_model(self, model_id: str) -> bool:
         """

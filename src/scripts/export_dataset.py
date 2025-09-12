@@ -12,9 +12,9 @@ Usage:
 import argparse
 import json
 import sys
-from pathlib import Path
-from typing import Dict, Any, List, Optional
 from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Dict, Optional
 
 try:
     from tqdm import tqdm
@@ -24,9 +24,9 @@ except ImportError:
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.core.logging import ContextualLogger, setup_logging
 from src.core.config import settings
-from src.services.logging import iterate_logs, extract_completion, validate_record, filter_successful_records
+from src.core.logging import ContextualLogger, setup_logging
+from src.services.logging import iterate_logs, validate_record
 
 logger = ContextualLogger(__name__)
 

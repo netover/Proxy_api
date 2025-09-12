@@ -4,16 +4,19 @@ Uses deployment endpoint with api-key auth and OpenAI-compatible payload
 Supports api_version query param
 """
 
-from typing import Dict, Any, Union, AsyncGenerator
 import json
 import time
-import httpx
+from typing import Any, AsyncGenerator, Dict, Union
 from urllib.parse import urlencode
+
+import httpx
+
+from src.core.exceptions import (APIConnectionError, AuthenticationError,
+                                 InvalidRequestError, RateLimitError)
+from src.core.logging import ContextualLogger
+from src.core.metrics import metrics_collector
 from src.core.provider_factory import BaseProvider
 from src.core.unified_config import ProviderConfig
-from src.core.metrics import metrics_collector
-from src.core.logging import ContextualLogger
-from src.core.exceptions import InvalidRequestError, AuthenticationError, RateLimitError, APIConnectionError
 
 
 class AzureOpenAIProvider(BaseProvider):
@@ -21,9 +24,12 @@ class AzureOpenAIProvider(BaseProvider):
 
     def __init__(self, config: ProviderConfig):
         super().__init__(config)
-        self.base_url = config.base_url or f"https://{config.get('resource', 'your-resource')}.openai.azure.com"
-        self.deployment_id = config.get('deployment_id', 'your-deployment')
-        self.api_version = config.get('api_version', '2023-12-01-preview')
+        # For Azure, we expect the base_url to be properly configured
+        # If not provided, we'll use a placeholder that should be overridden
+        self.base_url = str(config.base_url) if config.base_url else "https://your-resource.openai.azure.com"
+        # Use first model as deployment_id if not specified in custom_headers
+        self.deployment_id = config.custom_headers.get('deployment_id', config.models[0] if config.models else 'your-deployment')
+        self.api_version = config.custom_headers.get('api_version', '2023-12-01-preview')
         self.logger = ContextualLogger(f"provider.{config.name}")
 
     async def _perform_health_check(self) -> Dict[str, Any]:

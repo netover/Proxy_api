@@ -4,15 +4,18 @@ Uses /v1/complete endpoint with prompt-based payload per official docs
 No streaming support; limitations: grok-beta model, no embeddings
 """
 
-from typing import Dict, Any
-import json
 import time
+from typing import Any, Dict
+
 import httpx
+
+from src.core.exceptions import (APIConnectionError, AuthenticationError,
+                                 InvalidRequestError, RateLimitError)
+from src.core.logging import ContextualLogger
+from src.core.metrics import metrics_collector
 from src.core.provider_factory import BaseProvider
 from src.core.unified_config import ProviderConfig
-from src.core.metrics import metrics_collector
-from src.core.logging import ContextualLogger
-from src.core.exceptions import InvalidRequestError, AuthenticationError, RateLimitError, APIConnectionError
+
 
 class GrokProvider(BaseProvider):
     """Grok (xAI) provider with /v1/complete interface"""

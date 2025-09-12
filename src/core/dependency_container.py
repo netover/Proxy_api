@@ -5,16 +5,13 @@ Provides a lightweight dependency injection system that integrates
 with the existing core infrastructure.
 """
 
-from typing import Any, Dict, Type, TypeVar, Callable
-import inspect
-from functools import wraps
+from typing import Any, Callable, Dict, TypeVar
 
 T = TypeVar('T')
 
 
 class DependencyError(Exception):
     """Raised when dependency injection fails."""
-    pass
 
 
 class DependencyContainer:

@@ -1,11 +1,16 @@
-from typing import Dict, Optional, Any
-from pydantic import BaseModel, Field
-from pathlib import Path
 import json
-import os
-from datetime import datetime
 import threading
 from contextlib import contextmanager
+from datetime import datetime
+from pathlib import Path
+from typing import Dict, Optional
+
+from pydantic import BaseModel, Field
+
+from .logging import ContextualLogger
+
+logger = ContextualLogger(__name__)
+
 
 class ModelSelection(BaseModel):
     """Represents a model selection for a specific provider"""

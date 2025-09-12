@@ -4,19 +4,16 @@ High-performance HTTP client with connection pooling, retries, and monitoring.
 """
 
 import asyncio
-import time
-from typing import Dict, Any, Optional, Union, Callable
-import httpx
-from contextlib import asynccontextmanager
 import logging
+import time
+from contextlib import asynccontextmanager
+from typing import Any, Dict, Optional
+
+import httpx
 
 # Import retry strategies
-from src.core.retry_strategies import (
-    RetryConfig, RetryStrategy, create_retry_strategy,
-    ErrorType, retry_strategy_registry
-)
-from src.core.exceptions import ProviderError, RateLimitError
 from src.core.metrics import metrics_collector
+
 logger = logging.getLogger(__name__)
 
 
@@ -277,17 +274,19 @@ HTTPClient = OptimizedHTTPClient
 
 # Global client instance for reuse
 _http_client: Optional[OptimizedHTTPClient] = None
+_http_client_lock = asyncio.Lock()
 
 
 async def get_http_client() -> OptimizedHTTPClient:
     """Get or create global HTTP client instance"""
     global _http_client
 
-    if _http_client is None or _http_client._closed:
-        _http_client = OptimizedHTTPClient()
+    async with _http_client_lock:
+        if _http_client is None or _http_client._closed:
+            _http_client = OptimizedHTTPClient()
 
-    if _http_client._client is None:
-        await _http_client.initialize()
+        if _http_client._client is None:
+            await _http_client.initialize()
 
     return _http_client
 

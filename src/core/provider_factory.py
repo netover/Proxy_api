@@ -1,30 +1,31 @@
-import os
-import importlib
 import asyncio
-from typing import Dict, List, Type, Optional, Any, Set
-from typing import Dict, List, Type, Optional, Any
-from abc import ABC, abstractmethod
+import importlib
+import os
+import time
 import weakref
-from contextlib import asynccontextmanager
-import logging
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-import time
-import httpx
-import random
-from enum import Enum
+from typing import Any, Dict, List, Optional, Set, Type
 
-from src.core.unified_config import ProviderConfig, ProviderType, config_manager
-from src.core.metrics import metrics_collector
+import httpx
+
+from src.core.http_client_v2 import (AdvancedHTTPClient,
+                                     get_advanced_http_client)
 from src.core.logging import ContextualLogger
+from src.core.metrics import metrics_collector
+from src.core.unified_config import (ProviderConfig, ProviderType,
+                                     config_manager)
 from src.models.model_info import ModelInfo
-from src.core.http_client_v2 import get_advanced_http_client, AdvancedHTTPClient
 
 logger = ContextualLogger(__name__)
 
 class ProviderStatus(Enum):
     HEALTHY = "healthy"
     DEGRADED = "degraded"
+    UNHEALTHY = "unhealthy"
+    DISABLED = "disabled"
+
 class ProviderCapability(Enum):
     """Capabilities supported by providers"""
     CHAT_COMPLETION = "chat_completion"
@@ -35,8 +36,6 @@ class ProviderCapability(Enum):
     IMAGE_GENERATION = "image_generation"
     VIDEO_GENERATION = "video_generation"
     TOOL_CALLING = "tool_calling"
-    UNHEALTHY = "unhealthy"
-    DISABLED = "disabled"
 
 @dataclass
 class ProviderInfo:
@@ -93,21 +92,6 @@ class BaseProvider(ABC):
             capabilities.add(ProviderCapability.MODEL_DISCOVERY)
 
         return capabilities
-        self.logger = ContextualLogger(f"provider.{config.name}")
-
-        # Status tracking
-        self._status = ProviderStatus.HEALTHY
-        self._last_health_check = 0.0
-        self._error_count = 0
-        self._last_error: Optional[str] = None
-
-        # Initialize API key
-        self.api_key = os.getenv(config.api_key_env)
-        if not self.api_key:
-            raise ValueError(f"API key not found for {config.name}: {config.api_key_env}")
-
-        # Use centralized HTTP client with connection pooling
-        self._http_client: Optional[AdvancedHTTPClient] = None
     
     @property
     async def http_client(self) -> AdvancedHTTPClient:
@@ -237,22 +221,18 @@ class BaseProvider(ABC):
     @abstractmethod
     async def _perform_health_check(self) -> Dict[str, Any]:
         """Provider-specific health check implementation"""
-        pass
     
     @abstractmethod
     async def create_completion(self, request: Dict[str, Any]) -> Dict[str, Any]:
         """Create chat completion"""
-        pass
     
     @abstractmethod
     async def create_text_completion(self, request: Dict[str, Any]) -> Dict[str, Any]:
         """Create text completion"""
-        pass
     
     @abstractmethod
     async def create_embeddings(self, request: Dict[str, Any]) -> Dict[str, Any]:
         """Create embeddings"""
-        pass
     
     async def make_request(self,
                           method: str,
@@ -301,6 +281,7 @@ class ProviderFactory:
     PROVIDER_MAPPING = {
         ProviderType.OPENAI: ("src.providers.openai", "OpenAIProvider"),
         ProviderType.ANTHROPIC: ("src.providers.anthropic", "AnthropicProvider"),
+        ProviderType.AZURE_OPENAI: ("src.providers.azure_openai", "AzureOpenAIProvider"),
         ProviderType.PERPLEXITY: ("src.providers.perplexity", "PerplexityProvider"),
         ProviderType.GROK: ("src.providers.grok", "GrokProvider"),
         ProviderType.BLACKBOX: ("src.providers.blackbox", "BlackboxProvider"),

@@ -1,9 +1,10 @@
-from typing import Dict, Any, Union, AsyncGenerator
-import asyncio
 import json
-from src.providers.dynamic_base import DynamicProvider
-from src.core.metrics import metrics_collector
 import time
+from typing import Any, AsyncGenerator, Dict, Union
+
+from src.core.metrics import metrics_collector
+from src.providers.dynamic_base import DynamicProvider
+
 
 class DynamicBlackboxProvider(DynamicProvider):
     """Dynamic Blackbox.ai provider implementation"""

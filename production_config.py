@@ -86,7 +86,7 @@ PRODUCTION_CONFIG = {
 
     # Logging Configuration
     "logging": {
-        "level": os.getenv("LOG_LEVEL", "INFO"),
+        "level": os.getenv("LOG_LEVEL", "WARNING" if IS_PRODUCTION else "INFO"),
         "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         "file": LOGS_DIR / "app.log",
         "max_file_size": int(os.getenv("LOG_MAX_SIZE", "100")),  # MB
@@ -125,11 +125,6 @@ PRODUCTION_CONFIG = {
 # Environment-specific overrides
 if IS_PRODUCTION:
     PRODUCTION_CONFIG.update({
-        "logging": {
-            **PRODUCTION_CONFIG["logging"],
-            "level": "WARNING",
-            "json_format": True,
-        },
         "cache": {
             **PRODUCTION_CONFIG["cache"],
             "max_memory_mb": 1024,  # 1GB for production
@@ -138,15 +133,6 @@ if IS_PRODUCTION:
             **PRODUCTION_CONFIG["http_client"],
             "max_connections": 5000,
             "max_keepalive_connections": 500,
-        }
-    })
-
-elif IS_STAGING:
-    PRODUCTION_CONFIG.update({
-        "logging": {
-            **PRODUCTION_CONFIG["logging"],
-            "level": "INFO",
-            "json_format": True,
         }
     })
 

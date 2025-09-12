@@ -1,16 +1,16 @@
-from fastapi import APIRouter, Depends, Request
 import time
-from typing import List
 
-from src.core.auth import verify_api_key
-from src.core.rate_limiter import rate_limiter
-from src.core.provider_factory import ProviderStatus
-from src.core.model_discovery import ModelDiscoveryService, ProviderConfig
-from src.core.unified_config import config_manager
-from src.core.provider_discovery import provider_discovery
+from fastapi import APIRouter, Request, Depends
+
 from src.core.cache_monitor import cache_monitor
 from src.core.logging import ContextualLogger
-from ..model_endpoints import router as model_router  # Import the existing model endpoints
+from src.core.model_discovery import ModelDiscoveryService, ProviderConfig
+from src.core.provider_discovery import provider_discovery
+from src.core.provider_factory import ProviderStatus
+from src.core.rate_limiter import token_bucket_rate_limit
+
+from ..model_endpoints import \
+    router as model_router  # Import the existing model endpoints
 
 logger = ContextualLogger(__name__)
 
@@ -20,7 +20,7 @@ router = APIRouter()
 router.include_router(model_router)
 
 @router.get("/models")
-async def list_models(request: Request):
+async def list_models(request: Request, _: None = Depends(token_bucket_rate_limit)):
     """List all available models across providers with caching"""
     start_time = time.time()
     logger.info("Listing models request started")
@@ -79,26 +79,6 @@ async def list_models(request: Request):
                         "forced": provider.forced
                     })
 
-    return {
-        "object": "list",
-        "data": models
-    }
-
-    models = []
-    for provider in provider_info:
-        if provider.status in [ProviderStatus.HEALTHY, ProviderStatus.DEGRADED]:
-            for model in provider.models:
-                models.append({
-                    "id": model,
-                    "object": "model",
-                    "created": int(time.time()),
-                    "owned_by": provider.name,
-                    "provider_type": provider.type.value,
-                    "status": provider.status.value,
-                    "enabled": provider.enabled,
-                    "forced": provider.forced
-                })
-
     response_time = time.time() - start_time
     logger.info("Models listing completed",
                model_count=len(models),
@@ -111,7 +91,7 @@ async def list_models(request: Request):
     }
 
 @router.get("/providers")
-async def list_providers(request: Request):
+async def list_providers(request: Request, _: None = Depends(token_bucket_rate_limit)):
     """List all configured providers with detailed information and caching"""
     from src.core.unified_config import config_manager
     config = config_manager.load_config()
@@ -145,7 +125,7 @@ async def list_providers(request: Request):
     }
 
 @router.get("/cache/stats")
-async def get_cache_stats(request: Request):
+async def get_cache_stats(request: Request, _: None = Depends(token_bucket_rate_limit)):
     """Get comprehensive cache statistics for monitoring hit rates"""
     start_time = time.time()
     logger.info("Cache stats request started")

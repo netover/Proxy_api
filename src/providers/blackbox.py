@@ -1,18 +1,21 @@
-from typing import Dict, Any, Optional, Set
+from typing import Any, Dict, Set
+
 """
 Blackbox.ai provider implementation
 Unified API for chat, image, video, and tool calling
 """
 
-import json
 import time
-from typing import Dict, Any, Optional
+from typing import Any, Dict
+
 import httpx
-from src.core.unified_config import ProviderConfig
-from src.core.metrics import metrics_collector
+
+from src.core.exceptions import (APIConnectionError, AuthenticationError,
+                                 InvalidRequestError, RateLimitError)
 from src.core.logging import ContextualLogger
+from src.core.metrics import metrics_collector
 from src.core.provider_factory import BaseProvider, ProviderCapability
-from src.core.exceptions import InvalidRequestError, AuthenticationError, RateLimitError, APIConnectionError
+from src.core.unified_config import ProviderConfig
 
 
 class BlackboxProvider(BaseProvider):
@@ -21,7 +24,6 @@ class BlackboxProvider(BaseProvider):
     def __init__(self, config: ProviderConfig):
         super().__init__(config)
         self.base_url = config.base_url or "https://api.blackbox.ai"
-        self.logger = ContextualLogger(f"provider.{config.name}")
         self.logger = ContextualLogger(f"provider.{config.name}")
 
     def _get_capabilities(self) -> Set[ProviderCapability]:

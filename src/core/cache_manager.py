@@ -8,21 +8,19 @@ backward compatibility with existing code during the transition period.
 import asyncio
 import logging
 import os
-from typing import Dict, List, Optional, Any
-from datetime import datetime, timedelta
 import threading
 from concurrent.futures import ThreadPoolExecutor
-import time
+from datetime import datetime
+from typing import Any, Dict, List, Optional
 
-# Unified cache system imports
-from .unified_cache import UnifiedCache, get_unified_cache
-from .cache_warmer import CacheWarmer, record_cache_access
+from ..models.model_info import ModelInfo
 from .cache_monitor import CacheMonitor
-
+from .cache_warmer import CacheWarmer, record_cache_access
 # Legacy imports for backward compatibility
 from .model_cache import ModelCache
 from .model_discovery import ModelDiscoveryService, ProviderConfig
-from ..models.model_info import ModelInfo
+# Unified cache system imports
+from .unified_cache import UnifiedCache
 from .unified_config import config_manager
 
 logger = logging.getLogger(__name__)
@@ -708,7 +706,6 @@ class CacheManager:
     def __exit__(self, exc_type, exc_val, exc_tb):
         """Context manager exit."""
         # Note: async close needs to be called explicitly
-        pass
 
 
 # Global cache manager instance

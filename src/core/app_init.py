@@ -6,15 +6,13 @@ that leverages existing core components to replace the monolithic main.py struct
 """
 
 import asyncio
-import logging
 import signal
 import sys
-from typing import Dict, Any, Optional
-from contextlib import asynccontextmanager
+from typing import Any, Dict
 
 from .config import settings
-from .logging import setup_logging
 from .exceptions import InitializationError
+from .logging import setup_logging
 
 
 class ApplicationInitializer:
@@ -102,10 +100,9 @@ class ApplicationInitializer:
             self.logger.info("🔄 Initializing parallel execution system...")
 
             # Import parallel execution components
-            from .provider_discovery import provider_discovery
             from .circuit_breaker_pool import circuit_breaker_pool
             from .load_balancer import load_balancer
-            from .parallel_fallback import parallel_fallback_engine
+            from .provider_discovery import provider_discovery
 
             # Start provider discovery monitoring
             await provider_discovery.start_monitoring()
@@ -140,10 +137,10 @@ class ApplicationInitializer:
             self.logger.info("🔄 Shutting down parallel execution system...")
 
             # Import and shutdown components
-            from .provider_discovery import provider_discovery
             from .circuit_breaker_pool import circuit_breaker_pool
             from .load_balancer import load_balancer
             from .parallel_fallback import parallel_fallback_engine
+            from .provider_discovery import provider_discovery
 
             # Shutdown in reverse order
             await parallel_fallback_engine.shutdown()

@@ -1,24 +1,19 @@
-from fastapi import APIRouter, HTTPException, Depends, Request, BackgroundTasks
-from fastapi.responses import StreamingResponse
-from typing import Dict, Any, List, Optional, Union, AsyncGenerator
-import asyncio
-import json
 import time
-from contextlib import asynccontextmanager
+from typing import Any, AsyncGenerator, Dict, List, Union
 
-from src.core.provider_factory import ProviderStatus
-from src.core.auth import verify_api_key
-from src.core.metrics import metrics_collector
-from src.core.logging import ContextualLogger
-from src.core.rate_limiter import rate_limiter
-from src.core.exceptions import InvalidRequestError, NotImplementedError, ServiceUnavailableError
-from src.models.requests import (
-    ChatCompletionRequest,
-    TextCompletionRequest,
-    EmbeddingRequest,
-    ImageGenerationRequest
-)
+from fastapi import APIRouter, BackgroundTasks, Depends, Request
+from fastapi.responses import StreamingResponse
+
 from src.api.model_endpoints import router as model_router
+from src.core.auth import verify_api_key
+from src.core.exceptions import (InvalidRequestError, NotImplementedError,
+                                 ServiceUnavailableError)
+from src.core.logging import ContextualLogger
+from src.core.metrics import metrics_collector
+from src.core.provider_factory import ProviderStatus
+from src.core.rate_limiter import rate_limiter
+from src.models.requests import (ChatCompletionRequest, EmbeddingRequest,
+                                 ImageGenerationRequest, TextCompletionRequest)
 
 logger = ContextualLogger(__name__)
 router = APIRouter()
@@ -226,7 +221,7 @@ def create_router():
 
 # Optimized endpoints with reduced duplication
 @router.post("/v1/chat/completions")
-@rate_limiter.limit("100/minute")
+@rate_limiter.limit(route="/v1/chat/completions")
 async def chat_completions(
     request: Request,
     completion_request: ChatCompletionRequest,
@@ -245,7 +240,7 @@ async def chat_completions(
     return result
 
 @router.post("/v1/completions")
-@rate_limiter.limit("100/minute")
+@rate_limiter.limit(route="/v1/completions")
 async def text_completions(
     request: Request,
     completion_request: TextCompletionRequest,
@@ -264,7 +259,7 @@ async def text_completions(
     return result
 
 @router.post("/v1/embeddings")
-@rate_limiter.limit("200/minute")
+@rate_limiter.limit(route="/v1/embeddings")
 async def embeddings(
     request: Request,
     embedding_request: EmbeddingRequest,
@@ -280,7 +275,7 @@ async def embeddings(
     )
 
 @router.post("/v1/images/generations")
-@rate_limiter.limit("50/minute")
+@rate_limiter.limit(route="/v1/images/generations")
 async def image_generations(
     request: Request,
     image_request: ImageGenerationRequest,
@@ -297,6 +292,7 @@ async def image_generations(
 
 # Enhanced utility endpoints
 @router.get("/v1/models")
+@rate_limiter.limit(route="/v1/models")
 async def list_models(request: Request):
     """List all available models across providers"""
     app_state = request.app.state.app_state
@@ -364,6 +360,7 @@ async def health_check(request: Request):
 router.include_router(model_router)
 
 @router.get("/metrics")
+@rate_limiter.limit(route="/v1/metrics")
 async def get_metrics(
     request: Request,
     _: bool = Depends(verify_api_key)
@@ -398,6 +395,7 @@ async def get_metrics(
     }
 
 @router.get("/providers")
+@rate_limiter.limit(route="/v1/providers")
 async def list_providers(
     request: Request,
     _: bool = Depends(verify_api_key)

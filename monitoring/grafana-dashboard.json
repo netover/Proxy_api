@@ -41,8 +41,16 @@
         "type": "graph",
         "targets": [
           {
-            "expr": "rate(http_requests_total{job=~\"llm-proxy|context-service|health-worker\"}[5m])",
-            "legendFormat": "{{job}} - {{method}} {{status}}"
+            "expr": "rate(proxy_api_requests_total{job=\"llm-proxy\"}[5m])",
+            "legendFormat": "Total Requests"
+          },
+          {
+            "expr": "rate(proxy_api_requests_successful_total{job=\"llm-proxy\"}[5m])",
+            "legendFormat": "Successful Requests"
+          },
+          {
+            "expr": "rate(proxy_api_requests_failed_total{job=\"llm-proxy\"}[5m])",
+            "legendFormat": "Failed Requests"
           }
         ]
       },
@@ -52,8 +60,12 @@
         "type": "graph",
         "targets": [
           {
-            "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job=~\"llm-proxy|context-service|health-worker\"}[5m]))",
-            "legendFormat": "{{job}} - 95th percentile"
+            "expr": "proxy_api_response_time_avg{job=\"llm-proxy\"}",
+            "legendFormat": "Average Response Time"
+          },
+          {
+            "expr": "proxy_api_model_response_time_avg{job=\"llm-proxy\"}",
+            "legendFormat": "{{model}} Response Time"
           }
         ]
       },
@@ -85,12 +97,16 @@
         "type": "graph",
         "targets": [
           {
-            "expr": "context_cache_size",
+            "expr": "proxy_api_cache_entries_total{job=\"llm-proxy\"}",
             "legendFormat": "Cache entries"
           },
           {
-            "expr": "context_cache_hit_rate",
+            "expr": "proxy_api_cache_hit_rate{job=\"llm-proxy\"}",
             "legendFormat": "Hit rate %"
+          },
+          {
+            "expr": "proxy_api_cache_memory_usage_mb{job=\"llm-proxy\"}",
+            "legendFormat": "Memory usage (MB)"
           }
         ]
       }

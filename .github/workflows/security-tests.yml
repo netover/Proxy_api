@@ -1,0 +1,321 @@
+name: Security Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # Run security tests daily at 2 AM UTC
+    - cron: '0 2 * * *'
+
+jobs:
+  security-scan:
+    name: Security Vulnerability Scan
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install bandit safety pytest pytest-asyncio
+
+    - name: Run Bandit security scan
+      run: |
+        bandit -r src/ -f json -o bandit-results.json || true
+        bandit -r src/ --exit-zero -f txt
+
+    - name: Run Safety dependency scan
+      run: |
+        safety check --json > safety-results.json || true
+        safety check || true
+
+    - name: Run security unit tests
+      run: |
+        python -m pytest tests/security/ -v --tb=short --junitxml=security-test-results.xml
+
+    - name: Run comprehensive security test suite
+      run: |
+        python tests/security/run_security_tests.py --output comprehensive-security-results.json
+
+    - name: Analyze security results
+      id: analyze
+      run: |
+        # Count critical and high severity issues
+        if [ -f bandit-results.json ]; then
+          CRITICAL_VULNS=$(python -c "
+          import json
+          try:
+              with open('bandit-results.json') as f:
+                  data = json.load(f)
+              critical = sum(1 for issue in data.get('results', []) if issue.get('issue_severity') == 'HIGH')
+              print(critical)
+          except:
+              print(0)
+          " 2>/dev/null || echo 0)
+        else
+          CRITICAL_VULNS=0
+        fi
+
+        if [ -f safety-results.json ]; then
+          SAFETY_CRITICAL=$(python -c "
+          import json
+          try:
+              with open('safety-results.json') as f:
+                  data = json.load(f)
+              critical = sum(1 for vuln in data if vuln.get('severity') in ['critical', 'high'])
+              print(critical)
+          except:
+              print(0)
+          " 2>/dev/null || echo 0)
+        else
+          SAFETY_CRITICAL=0
+        fi
+
+        TOTAL_CRITICAL=$((CRITICAL_VULNS + SAFETY_CRITICAL))
+
+        echo "critical_vulnerabilities=$TOTAL_CRITICAL" >> $GITHUB_OUTPUT
+        echo "Found $TOTAL_CRITICAL critical/high severity vulnerabilities"
+
+    - name: Upload security scan results
+      uses: actions/upload-artifact@v3
+      with:
+        name: security-scan-results
+        path: |
+          bandit-results.json
+          safety-results.json
+          security-test-results.xml
+          comprehensive-security-results.json
+        retention-days: 30
+
+    - name: Comment PR with security results
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const fs = require('fs');
+
+          let comment = '## 🔒 Security Test Results\n\n';
+
+          // Read Bandit results
+          if (fs.existsSync('bandit-results.json')) {
+            const banditData = JSON.parse(fs.readFileSync('bandit-results.json', 'utf8'));
+            const highIssues = banditData.results.filter(issue => issue.issue_severity === 'HIGH').length;
+            const mediumIssues = banditData.results.filter(issue => issue.issue_severity === 'MEDIUM').length;
+
+            comment += `### Bandit Code Security Scan\n`;
+            comment += `- High severity: ${highIssues}\n`;
+            comment += `- Medium severity: ${mediumIssues}\n\n`;
+          }
+
+          // Read Safety results
+          if (fs.existsSync('safety-results.json')) {
+            const safetyData = JSON.parse(fs.readFileSync('safety-results.json', 'utf8'));
+            const criticalDeps = safetyData.filter(vuln => vuln.severity === 'critical').length;
+            const highDeps = safetyData.filter(vuln => vuln.severity === 'high').length;
+
+            comment += `### Safety Dependency Scan\n`;
+            comment += `- Critical vulnerabilities: ${criticalDeps}\n`;
+            comment += `- High vulnerabilities: ${highDeps}\n\n`;
+          }
+
+          comment += '📋 [View detailed results](' + '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})';
+
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: comment
+          });
+
+    - name: Fail on critical vulnerabilities
+      if: steps.analyze.outputs.critical_vulnerabilities > 0
+      run: |
+        echo "❌ Critical security vulnerabilities found: ${{ steps.analyze.outputs.critical_vulnerabilities }}"
+        echo "Please review the security scan results and address critical issues before merging."
+        exit 1
+
+  dependency-audit:
+    name: Dependency Audit
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Audit dependencies with pip-audit
+      run: |
+        python -m pip install pip-audit
+        pip-audit --format json > pip-audit-results.json || true
+        pip-audit || true
+
+    - name: Upload dependency audit results
+      uses: actions/upload-artifact@v3
+      with:
+        name: dependency-audit-results
+        path: pip-audit-results.json
+        retention-days: 30
+
+  secrets-scan:
+    name: Secrets Detection
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Scan for secrets
+      uses: gitleaks/gitleaks-action@v2
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  sast-scan:
+    name: Static Application Security Testing
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Run Semgrep SAST scan
+      uses: semgrep/semgrep-action@v1
+      with:
+        config: p/security-audit
+        output: semgrep-results.json
+      env:
+        SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
+
+    - name: Upload SAST results
+      uses: actions/upload-artifact@v3
+      with:
+        name: sast-results
+        path: semgrep-results.json
+        retention-days: 30
+
+  container-security:
+    name: Container Security Scan
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Build Docker image
+      run: |
+        docker build -t llm-proxy-api:test .
+
+    - name: Scan Docker image
+      uses: anchore/scan-action@v3
+      with:
+        image: llm-proxy-api:test
+        fail-build: false
+        output-format: json
+        output-file: container-scan-results.json
+
+    - name: Upload container scan results
+      uses: actions/upload-artifact@v3
+      with:
+        name: container-scan-results
+        path: container-scan-results.json
+        retention-days: 30
+
+  security-summary:
+    name: Security Summary
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [security-scan, dependency-audit, secrets-scan, sast-scan]
+
+    steps:
+    - name: Generate security summary
+      run: |
+        echo "# 🔒 Security Test Summary" > security-summary.md
+        echo "" >> security-summary.md
+        echo "## Test Results" >> security-summary.md
+        echo "" >> security-summary.md
+
+        # Security scan status
+        if [ "${{ needs.security-scan.result }}" == "success" ]; then
+          echo "- ✅ Security vulnerability scan: PASSED" >> security-summary.md
+        else
+          echo "- ❌ Security vulnerability scan: FAILED" >> security-summary.md
+        fi
+
+        # Dependency audit status
+        if [ "${{ needs.dependency-audit.result }}" == "success" ]; then
+          echo "- ✅ Dependency audit: PASSED" >> security-summary.md
+        elif [ "${{ needs.dependency-audit.result }}" == "skipped" ]; then
+          echo "- ⏭️  Dependency audit: SKIPPED (not scheduled)" >> security-summary.md
+        else
+          echo "- ❌ Dependency audit: FAILED" >> security-summary.md
+        fi
+
+        # Secrets scan status
+        if [ "${{ needs.secrets-scan.result }}" == "success" ]; then
+          echo "- ✅ Secrets detection: PASSED" >> security-summary.md
+        else
+          echo "- ❌ Secrets detection: FAILED" >> security-summary.md
+        fi
+
+        # SAST scan status
+        if [ "${{ needs.sast-scan.result }}" == "success" ]; then
+          echo "- ✅ SAST scan: PASSED" >> security-summary.md
+        else
+          echo "- ❌ SAST scan: FAILED" >> security-summary.md
+        fi
+
+        echo "" >> security-summary.md
+        echo "## Recommendations" >> security-summary.md
+        echo "" >> security-summary.md
+        echo "1. Review all security scan results in the artifacts" >> security-summary.md
+        echo "2. Address any critical or high-severity findings" >> security-summary.md
+        echo "3. Ensure secrets are not committed to the repository" >> security-summary.md
+        echo "4. Keep dependencies updated to latest secure versions" >> security-summary.md
+        echo "5. Run security tests regularly, not just on PRs" >> security-summary.md
+
+        cat security-summary.md
+
+    - name: Upload security summary
+      uses: actions/upload-artifact@v3
+      with:
+        name: security-summary
+        path: security-summary.md
+        retention-days: 30
+
+    - name: Comment summary on PR
+      if: github.event_name == 'pull_request' && always()
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const fs = require('fs');
+
+          if (fs.existsSync('security-summary.md')) {
+            const summary = fs.readFileSync('security-summary.md', 'utf8');
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: summary
+            });
+          }

@@ -14,7 +14,8 @@ Features:
 """
 
 import warnings
-from typing import Dict, Any, List, Optional, Union
+from typing import Any, Dict, List, Optional
+
 from .consolidated_cache import get_consolidated_cache_manager_sync
 from .logging import ContextualLogger
 
@@ -98,7 +99,6 @@ class LegacyModelCache:
         """Close cache (legacy interface)"""
         # Note: We don't actually close the consolidated cache manager
         # as it may be used by other components
-        pass
 
     def __enter__(self):
         """Context manager entry"""
@@ -197,12 +197,10 @@ class LegacySmartCache:
     async def start(self) -> None:
         """Start cache (legacy async interface)"""
         # Already started by consolidated cache manager
-        pass
 
     async def stop(self) -> None:
         """Stop cache (legacy async interface)"""
         # Don't actually stop the consolidated cache manager
-        pass
 
     async def get_or_set(self, key: str, getter_func, ttl: Optional[int] = None) -> Any:
         """Get or set value (legacy async interface)"""
@@ -290,12 +288,10 @@ class LegacyCacheManager:
     def start_background_refresh(self) -> None:
         """Start background refresh (legacy interface)"""
         # Not implemented in legacy compatibility mode
-        pass
 
     def stop_background_refresh(self) -> None:
         """Stop background refresh (legacy interface)"""
         # Not implemented in legacy compatibility mode
-        pass
 
     def invalidate_provider(self, provider_name: str, base_url: str) -> bool:
         """Invalidate provider cache (legacy interface)"""

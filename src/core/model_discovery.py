@@ -1,17 +1,16 @@
 """Model discovery service for OpenAI-compatible providers."""
 
 import asyncio
-import logging
-from typing import List, Optional
-import aiohttp
-from datetime import datetime
 import hashlib
+from typing import List, Optional
+
+import aiohttp
 
 from ..models.model_info import ModelInfo
 from .exceptions import ProviderError, ValidationError
 from .http_client import HTTPClient
-from .unified_cache import get_unified_cache
 from .logging import ContextualLogger
+from .unified_cache import get_unified_cache
 
 logger = ContextualLogger(__name__)
 
@@ -59,6 +58,7 @@ class ProviderConfig:
             f"ProviderConfig("
             f"name='{self.name}', "
             f"base_url='{self.base_url}', "
+            f"api_key='***masked***', "
             f"organization={self.organization}, "
             f"timeout={self.timeout}, "
             f"max_retries={self.max_retries}"

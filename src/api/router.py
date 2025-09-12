@@ -5,23 +5,25 @@ This module creates the centralized API router that combines all controllers,
 applies middleware, and handles errors consistently across the application.
 """
 
-from fastapi import APIRouter, Request, Response
-from fastapi.exceptions import RequestValidationError
-from starlette.middleware.base import BaseHTTPMiddleware
-from contextlib import asynccontextmanager
 import time
 
-from .controllers.chat_controller import router as chat_router
-from .controllers.model_controller import router as model_router
-from .controllers.health_controller import router as health_router
+from fastapi import APIRouter, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import HTMLResponse, JSONResponse
+from starlette.middleware.base import BaseHTTPMiddleware
+
+from .controllers.alerting_controller import router as alerting_router
 from .controllers.analytics_controller import router as analytics_router
-from .validation.middleware import middleware_pipeline
-from .errors.error_handlers import (
-    global_exception_handler,
-    validation_exception_handler,
-    http_exception_handler
-)
+from .controllers.chat_controller import router as chat_router
+from .controllers.config_controller import router as config_router
+from .controllers.health_controller import router as health_router
+from .controllers.model_controller import router as model_router
+from src.core.rate_limiter import rate_limiter
 from .errors.custom_exceptions import APIException
+from .errors.error_handlers import (global_exception_handler,
+                                    http_exception_handler,
+                                    validation_exception_handler)
+from .validation.middleware import middleware_pipeline
 
 # Create main API router
 main_router = APIRouter(prefix="/v1")
@@ -31,6 +33,8 @@ main_router.include_router(chat_router, tags=["chat"])
 main_router.include_router(model_router, tags=["models"])
 main_router.include_router(health_router, tags=["health"])
 main_router.include_router(analytics_router, tags=["analytics"])
+main_router.include_router(alerting_router, tags=["alerting"])
+main_router.include_router(config_router, prefix="/config", tags=["config"])
 
 class APIGatewayMiddleware(BaseHTTPMiddleware):
     """Main API gateway middleware that orchestrates all middleware processing."""
@@ -67,7 +71,8 @@ def create_api_router():
 root_router = APIRouter()
 
 @root_router.get("/health")
-async def root_health_check():
+@rate_limiter.limit(route="/health")
+async def root_health_check(request: Request):
     """Basic health check at root level."""
     return {
         "status": "healthy",
@@ -86,13 +91,35 @@ async def root_info():
             "chat": "/v1/chat/completions",
             "models": "/v1/models",
             "health": "/v1/health",
-            "analytics": "/v1/metrics"
+            "analytics": "/v1/metrics",
+            "alerting": "/v1/alerts",
+            "monitoring": "/monitoring",
+            "config": "/v1/config/reload"
         }
     }
 
+@root_router.get("/monitoring")
+async def monitoring_dashboard():
+    """Serve the monitoring dashboard."""
+    try:
+        with open("templates/monitoring_dashboard.html", "r", encoding="utf-8") as f:
+            content = f.read()
+        return HTMLResponse(content=content, status_code=200)
+    except FileNotFoundError:
+        return JSONResponse(
+            status_code=404,
+            content={"error": "Monitoring dashboard template not found"}
+        )
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"error": f"Failed to load monitoring dashboard: {str(e)}"}
+        )
+
 # Additional utility endpoints
 @main_router.get("/status")
-async def api_status():
+@rate_limiter.limit(route="/v1/status")
+async def api_status(request: Request):
     """Detailed API status information."""
     return {
         "status": "operational",

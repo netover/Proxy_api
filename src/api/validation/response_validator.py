@@ -7,8 +7,8 @@ and sanitization for all outgoing API responses.
 
 import json
 import logging
-from typing import Dict, Any, List, Optional, Union
 from datetime import datetime
+from typing import Any, Dict
 
 logger = logging.getLogger(__name__)
 

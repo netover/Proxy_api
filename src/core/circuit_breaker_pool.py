@@ -5,16 +5,14 @@ Individual circuit breakers per provider with adaptive timeouts
 
 import asyncio
 import time
-import math
-from typing import Dict, List, Any, Optional, Callable, Awaitable, Tuple
 from dataclasses import dataclass, field
 from enum import Enum
-from collections import defaultdict
+from typing import Any, Awaitable, Callable, Dict, List, Optional
 
+from .circuit_breaker import (CircuitBreakerOpenException,
+                              ProductionCircuitBreaker)
 from .logging import ContextualLogger
-from .circuit_breaker import ProductionCircuitBreaker, CircuitBreakerOpenException
-from .provider_discovery import provider_discovery, ProviderHealth
-from .unified_config import config_manager
+from .provider_discovery import provider_discovery
 
 logger = ContextualLogger(__name__)
 

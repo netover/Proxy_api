@@ -6,12 +6,20 @@ In production, this would be a full OpenTelemetry setup.
 """
 
 import logging
+import time
 from contextlib import contextmanager
 from functools import wraps
-from typing import Dict, Any, Optional, Callable
-import time
+from typing import Any, Callable, Dict, Optional
 
 logger = logging.getLogger(__name__)
+
+# Import metrics collector for integration
+try:
+    from .metrics import metrics_collector
+    METRICS_AVAILABLE = True
+except ImportError:
+    METRICS_AVAILABLE = False
+    logger.warning("Metrics collector not available for telemetry integration")
 
 class TelemetryManager:
     """Simple telemetry manager for testing."""
@@ -42,11 +50,9 @@ class TelemetryManager:
 
     def instrument_fastapi(self, app) -> None:
         """Instrument FastAPI (mock implementation)."""
-        pass
 
     def instrument_httpx(self) -> None:
         """Instrument HTTPX (mock implementation)."""
-        pass
 
 class MockTracer:
     """Mock tracer for testing."""
@@ -73,11 +79,34 @@ class MockSpan:
         self.attributes['error'] = str(error)
 
     def __enter__(self):
+        self._start_time = time.time()
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if exc_val:
             self.record_error(exc_val)
+
+        # Record span completion in metrics if available
+        if METRICS_AVAILABLE and hasattr(self, '_start_time'):
+            duration = time.time() - self._start_time
+            success = exc_type is None
+
+            # Extract provider and model info from span name if available
+            provider_name = self.attributes.get('provider', 'unknown')
+            model_name = self.attributes.get('model')
+
+            # Record in metrics collector
+            try:
+                metrics_collector.record_request(
+                    provider_name=provider_name,
+                    success=success,
+                    response_time=duration * 1000,  # Convert to milliseconds
+                    tokens=self.attributes.get('tokens', 0),
+                    error_type=str(exc_val) if exc_val else None,
+                    model_name=model_name
+                )
+            except Exception as e:
+                logger.debug(f"Failed to record telemetry metrics: {e}")
 
 @contextmanager
 def TracedSpan(name: str, attributes: Optional[Dict[str, Any]] = None):

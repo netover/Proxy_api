@@ -5,22 +5,17 @@ This module provides standardized error handling, logging, and response
 formatting for all API errors.
 """
 
-import logging
 import traceback
-from typing import Dict, Any, Optional
-from fastapi import Request, HTTPException
-from fastapi.responses import JSONResponse
-from fastapi.exceptions import RequestValidationError
+from typing import Any, Dict
 
+from fastapi import HTTPException, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+
+from src.core.exceptions import (AuthenticationError, AuthorizationError,
+                                 InvalidRequestError, NotFoundError,
+                                 RateLimitError, ServiceUnavailableError)
 from src.core.logging import ContextualLogger
-from src.core.exceptions import (
-    InvalidRequestError,
-    NotFoundError,
-    ServiceUnavailableError,
-    AuthenticationError,
-    AuthorizationError,
-    RateLimitError
-)
 
 logger = ContextualLogger(__name__)
 
@@ -168,7 +163,10 @@ class ErrorHandler:
             r'api[_-]?key[=:]\s*[^\s]+',
             r'password[=:]\s*[^\s]+',
             r'token[=:]\s*[^\s]+',
-            r'secret[=:]\s*[^\s]+'
+            r'secret[=:]\s*[^\s]+',
+            r'authorization[=:]\s*[^\s]+',
+            r'bearer\s+[^\s]+',
+            r'x-api-key[=:]\s*[^\s]+'
         ]
 
         import re
@@ -176,6 +174,38 @@ class ErrorHandler:
             message = re.sub(pattern, '[REDACTED]', message, flags=re.IGNORECASE)
 
         return message
+
+    def sanitize_provider_error_response(self, error_response: str) -> str:
+        """Sanitize provider error responses to prevent information leakage."""
+        if not error_response:
+            return "Provider error occurred"
+
+        # Parse JSON if possible and sanitize fields that might contain sensitive info
+        try:
+            import json
+            if isinstance(error_response, str):
+                parsed = json.loads(error_response)
+            else:
+                parsed = error_response
+
+            # Sanitize common fields that might contain sensitive information
+            if isinstance(parsed, dict):
+                for key in ['message', 'error', 'detail', 'description']:
+                    if key in parsed and isinstance(parsed[key], str):
+                        parsed[key] = self._sanitize_error_message(parsed[key])
+
+                # Remove potentially sensitive fields
+                sensitive_fields = ['trace', 'stack', 'debug', 'internal']
+                for field in sensitive_fields:
+                    if field in parsed:
+                        parsed[field] = '[REDACTED]'
+
+                return json.dumps(parsed)
+            else:
+                return self._sanitize_error_message(str(parsed))
+        except (json.JSONDecodeError, TypeError):
+            # If not JSON, just sanitize as string
+            return self._sanitize_error_message(str(error_response))
 
     async def handle_validation_error(self, request: Request, exc: RequestValidationError) -> JSONResponse:
         """Handle Pydantic validation errors specifically."""

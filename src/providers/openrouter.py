@@ -4,16 +4,18 @@ Unified endpoint for 280+ models from multiple providers
 OpenAI-compatible schema with 5-min in-memory cache for models
 """
 
-import json
-import time
 import asyncio
-from typing import Dict, Any, Optional
+import time
+from typing import Any, Dict
+
 import httpx
-from src.core.unified_config import ProviderConfig
-from src.core.metrics import metrics_collector
+
+from src.core.exceptions import (APIConnectionError, AuthenticationError,
+                                 InvalidRequestError, RateLimitError)
 from src.core.logging import ContextualLogger
+from src.core.metrics import metrics_collector
 from src.core.provider_factory import BaseProvider
-from src.core.exceptions import InvalidRequestError, AuthenticationError, RateLimitError, APIConnectionError
+from src.core.unified_config import ProviderConfig
 
 
 class OpenRouterProvider(BaseProvider):

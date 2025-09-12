@@ -1,10 +1,9 @@
-import os
-import sys
 from pathlib import Path
 from typing import List, Optional
+
+import yaml
 from pydantic import field_validator
 from pydantic_settings import BaseSettings
-import yaml
 
 # Define the project's base directory (the parent of the 'src' directory)
 BASE_DIR = Path(__file__).resolve().parent.parent.parent

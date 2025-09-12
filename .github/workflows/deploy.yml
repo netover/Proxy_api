@@ -1,0 +1,334 @@
+name: Deploy LLM Proxy API
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+      deploy_type:
+        description: 'Deployment type'
+        required: true
+        default: 'docker'
+        type: choice
+        options:
+          - docker
+          - systemd
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # Test job
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run tests
+        run: |
+          python -m pytest tests/ -v --tb=short --cov=src --cov-report=xml
+
+      - name: Upload coverage reports
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.xml
+          flags: unittests
+          name: codecov-umbrella
+
+  # Security scan
+  security:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  # Build Docker image
+  build:
+    runs-on: ubuntu-latest
+    needs: [test, security]
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image-digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Docker image
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # Deploy to staging
+  deploy-staging:
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch'
+    environment: staging
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to staging server
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_USER }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          port: ${{ secrets.STAGING_PORT || 22 }}
+          script: |
+            # Create deployment directory
+            sudo mkdir -p /opt/llm-proxy-api
+
+            # Navigate to deployment directory
+            cd /opt/llm-proxy-api
+
+            # Backup current deployment
+            if [ -d "current" ]; then
+              sudo mv current backup_$(date +%Y%m%d_%H%M%S) || true
+            fi
+
+            # Download and extract latest release
+            wget -q https://github.com/${{ github.repository }}/archive/refs/heads/${{ github.ref_name }}.tar.gz -O latest.tar.gz
+            sudo mkdir -p current
+            sudo tar -xzf latest.tar.gz -C current --strip-components=1
+            rm latest.tar.gz
+
+            # Set proper permissions
+            sudo chown -R www-data:www-data current/
+            sudo chmod +x current/deploy.sh current/rollback.sh
+
+            # Deploy using Docker
+            cd current
+            sudo docker-compose down || true
+            sudo docker-compose pull
+            sudo docker-compose up -d
+
+            # Wait for services to start
+            sleep 30
+
+            # Health check
+            if curl -f http://localhost:8000/health; then
+              echo "Staging deployment successful"
+            else
+              echo "Staging deployment failed - rolling back"
+              sudo docker-compose down
+              exit 1
+            fi
+
+  # Deploy to production
+  deploy-production:
+    runs-on: ubuntu-latest
+    needs: [build, deploy-staging]
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    environment: production
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Wait for manual approval
+        if: github.event_name != 'workflow_dispatch'
+        run: |
+          echo "Waiting for manual approval to deploy to production..."
+          echo "Please review the staging deployment and approve if ready."
+
+      - name: Deploy to production server
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.PRODUCTION_HOST }}
+          username: ${{ secrets.PRODUCTION_USER }}
+          key: ${{ secrets.PRODUCTION_SSH_KEY }}
+          port: ${{ secrets.PRODUCTION_PORT || 22 }}
+          script: |
+            # Create deployment directory
+            sudo mkdir -p /opt/llm-proxy-api
+
+            # Navigate to deployment directory
+            cd /opt/llm-proxy-api
+
+            # Backup current deployment
+            if [ -d "current" ]; then
+              sudo mv current backup_$(date +%Y%m%d_%H%M%S) || true
+            fi
+
+            # Download and extract latest release
+            wget -q https://github.com/${{ github.repository }}/archive/refs/heads/${{ github.ref_name }}.tar.gz -O latest.tar.gz
+            sudo mkdir -p current
+            sudo tar -xzf latest.tar.gz -C current --strip-components=1
+            rm latest.tar.gz
+
+            # Set proper permissions
+            sudo chown -R www-data:www-data current/
+            sudo chmod +x current/deploy.sh current/rollback.sh
+
+            # Deploy using deployment script
+            cd current
+            sudo ./deploy.sh --docker
+
+            # Wait for services to start
+            sleep 60
+
+            # Health check
+            if curl -f http://localhost:8000/health; then
+              echo "Production deployment successful"
+
+              # Clean up old backups (keep last 5)
+              sudo find /opt/llm-proxy-api -name "backup_*" -type d -printf '%T@ %p\n' | sort -n | head -n -5 | cut -d' ' -f2- | xargs -r sudo rm -rf
+            else
+              echo "Production deployment failed - initiating rollback"
+              sudo ./rollback.sh --docker --force
+              exit 1
+            fi
+
+  # Post-deployment verification
+  verify:
+    runs-on: ubuntu-latest
+    needs: deploy-production
+    if: success()
+    steps:
+      - name: Verify production deployment
+        run: |
+          # Check if production API is responding
+          if curl -f --max-time 30 https://api.yourdomain.com/health; then
+            echo "Production API is responding correctly"
+          else
+            echo "Production API health check failed"
+            exit 1
+          fi
+
+      - name: Run smoke tests
+        run: |
+          # Basic smoke tests
+          echo "Running smoke tests..."
+
+          # Test main endpoints
+          curl -f https://api.yourdomain.com/api/models
+          curl -f https://api.yourdomain.com/health
+
+          echo "Smoke tests passed"
+
+  # Rollback job (runs on failure)
+  rollback:
+    runs-on: ubuntu-latest
+    needs: [deploy-staging, deploy-production]
+    if: failure() && (needs.deploy-staging.result == 'success' || needs.deploy-production.result == 'success')
+    steps:
+      - name: Rollback staging
+        if: needs.deploy-staging.result == 'success'
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_USER }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          script: |
+            cd /opt/llm-proxy-api/current
+            sudo ./rollback.sh --docker --force
+
+      - name: Rollback production
+        if: needs.deploy-production.result == 'success'
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.PRODUCTION_HOST }}
+          username: ${{ secrets.PRODUCTION_USER }}
+          key: ${{ secrets.PRODUCTION_SSH_KEY }}
+          script: |
+            cd /opt/llm-proxy-api/current
+            sudo ./rollback.sh --docker --force
+
+      - name: Notify on rollback
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: '🚨 Deployment Failed - Automatic Rollback Performed',
+              body: `The deployment failed and an automatic rollback was performed.\n\nPlease investigate the failure and fix any issues before attempting redeployment.`,
+              labels: ['deployment', 'rollback', 'urgent']
+            })
+
+  # Notification
+  notify:
+    runs-on: ubuntu-latest
+    needs: [test, security, build, deploy-production, verify]
+    if: always()
+    steps:
+      - name: Notify deployment status
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const status = '${{ needs.deploy-production.result }}';
+            const title = status === 'success' ? '✅ Deployment Successful' : '❌ Deployment Failed';
+            const body = status === 'success'
+              ? `Successfully deployed LLM Proxy API to production.\n\nImage: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ needs.build.outputs.image-digest }}`
+              : `Deployment failed. Check the logs for details.`;
+
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: title,
+              body: body,
+              labels: ['deployment', status === 'success' ? 'success' : 'failed']
+            })

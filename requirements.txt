@@ -5,6 +5,7 @@ uvicorn[standard]>=0.30.0 # Performance + HTTP/2 support, security updates
 # Data Validation and Settings (COMPATIBILITY UPDATED)
 pydantic>=2.8.0         # Latest stable with performance improvements
 pydantic-settings>=2.3.0 # Compatibility fix for pydantic 2.8+
+jsonschema>=4.21.0      # JSON Schema validation for configuration
 
 # Configuration and HTTP (SECURITY UPDATED)
 PyYAML>=6.0.2         # Security patch for CVE-2024-35327
@@ -35,6 +36,13 @@ jinja2>=3.1.0
 pytest>=8.4.2         # Test framework
 pytest-asyncio>=0.21.0 # Async testing support
 numpy>=1.24.0         # Numerical computing for performance testing
+
+# Security Testing
+bandit>=1.7.0         # Python security linting and vulnerability detection
+safety>=3.0.0         # Dependency vulnerability scanning
+requests>=2.31.0      # HTTP library for security testing
+sqlparse>=0.4.0       # SQL parsing for injection testing
+bleach>=6.1.0         # HTML sanitization testing
 
 # Web UI (SECURITY UPDATED)
 Flask>=3.0.0          # Security updates, modern features

@@ -5,15 +5,16 @@ This module provides middleware components for request preprocessing,
 response postprocessing, logging, security, and performance monitoring.
 """
 
-import time
-import logging
+import json
 import re
-from typing import Dict, Any, Callable, Optional
+import time
+from typing import Callable
+
 from fastapi import Request, Response
 from fastapi.responses import JSONResponse
-import json
 
 from src.core.logging import ContextualLogger
+
 from .request_validator import request_validator
 from .response_validator import response_validator
 
@@ -118,7 +119,8 @@ class MiddlewarePipeline:
 
     async def _create_error_response(self, exception: Exception, request_id: str) -> JSONResponse:
         """Create standardized error response."""
-        from src.core.exceptions import InvalidRequestError, ServiceUnavailableError
+        from src.core.exceptions import (InvalidRequestError,
+                                         ServiceUnavailableError)
 
         if isinstance(exception, InvalidRequestError):
             status_code = 400

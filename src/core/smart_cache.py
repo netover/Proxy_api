@@ -4,13 +4,13 @@ Intelligent caching with TTL, size limits, and memory management.
 """
 
 import asyncio
-import time
 import hashlib
-from typing import Dict, Any, Optional, Union, List
-from collections import OrderedDict
 import logging
+import time
+from collections import OrderedDict
 from dataclasses import dataclass, field
 from threading import Lock
+from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
 

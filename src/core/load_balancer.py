@@ -4,19 +4,17 @@ Intelligent provider selection with cost-aware routing
 """
 
 import asyncio
-import time
-import random
 import heapq
-from typing import Dict, List, Any, Optional, Callable, Tuple, Set
+import math
+import random
+import time
+from collections import defaultdict
 from dataclasses import dataclass, field
 from enum import Enum
-from collections import defaultdict, Counter
-import math
+from typing import Any, Dict, List, Optional, Set
 
 from .logging import ContextualLogger
-from .provider_discovery import provider_discovery, ProviderHealth
-from .circuit_breaker_pool import circuit_breaker_pool
-from .unified_config import config_manager
+from .provider_discovery import ProviderHealth, provider_discovery
 
 logger = ContextualLogger(__name__)
 
@@ -267,7 +265,6 @@ class LoadBalancer:
         """Update cost information for a provider"""
         # In a real implementation, this would fetch from a cost API
         # For now, use static configuration
-        pass
 
     async def record_request_start(self, provider_name: str, request_id: str):
         """Record the start of a request"""
@@ -430,7 +427,6 @@ class LoadBalancer:
         """Update cost information for all providers"""
         # In a real implementation, this would fetch current pricing
         # For now, this is a placeholder
-        pass
 
     async def _cleanup_stale_requests(self):
         """Clean up stale request tracking"""

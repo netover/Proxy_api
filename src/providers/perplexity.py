@@ -4,15 +4,14 @@ Uses /v1/ask endpoint for search-enabled completions
 No streaming support
 """
 
-import json
 import time
-from typing import Dict, Any
-import httpx
-from src.core.unified_config import ProviderConfig
-from src.core.metrics import metrics_collector
+from typing import Any, Dict
+
+from src.core.exceptions import APIConnectionError, InvalidRequestError
 from src.core.logging import ContextualLogger
+from src.core.metrics import metrics_collector
 from src.core.provider_factory import BaseProvider
-from src.core.exceptions import InvalidRequestError, AuthenticationError, RateLimitError, APIConnectionError
+from src.core.unified_config import ProviderConfig
 
 
 class PerplexityProvider(BaseProvider):

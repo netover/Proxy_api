@@ -1,7 +1,9 @@
-from typing import Dict, List, Optional, Any
+from typing import Any, Dict, List, Optional
+
+from ..core.exceptions import ConfigurationError, ValidationError
+from ..core.model_config import model_config_manager
 from ..core.unified_config import config_manager
-from ..core.model_config import model_config_manager, ModelSelection
-from ..core.exceptions import ValidationError, ConfigurationError
+
 
 class ModelConfigService:
     """Service layer for model configuration management with validation and error handling"""

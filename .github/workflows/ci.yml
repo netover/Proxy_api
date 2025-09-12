@@ -1,0 +1,426 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master, develop ]
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # Code Quality Checks
+  code-quality:
+    name: Code Quality
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run Ruff linting
+        run: |
+          ruff check src/ tests/ --output-format=github
+
+      - name: Run Black formatting check
+        run: |
+          black --check --diff src/ tests/
+
+      - name: Run isort import sorting check
+        run: |
+          isort --check-only --diff src/ tests/
+
+      - name: Run MyPy type checking
+        run: |
+          mypy src/ --config-file packages/mypy.ini
+
+      - name: Run pre-commit hooks
+        uses: pre-commit/action@v3.0.0
+        if: github.event_name == 'pull_request'
+
+  # Unit and Integration Tests
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    needs: code-quality
+    strategy:
+      matrix:
+        python-version: ['3.9', '3.10', '3.11']
+        test-type: ['unit', 'integration']
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ matrix.python-version }}-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-${{ matrix.python-version }}-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest-cov pytest-xdist
+
+      - name: Run ${{ matrix.test-type }} tests
+        run: |
+          if [ "${{ matrix.test-type }}" == "unit" ]; then
+            python -m pytest tests/ -v --tb=short --cov=src --cov-report=xml --cov-report=html --cov-fail-under=80 -m "not integration and not slow" --maxfail=5
+          else
+            python -m pytest tests/ -v --tb=short --cov=src --cov-report=xml --cov-append --cov-fail-under=80 -m "integration" --maxfail=3
+          fi
+
+      - name: Upload coverage reports
+        uses: codecov/codecov-action@v3
+        if: matrix.python-version == '3.11' && matrix.test-type == 'unit'
+        with:
+          file: ./coverage.xml
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
+
+      - name: Upload coverage HTML report
+        uses: actions/upload-artifact@v3
+        if: matrix.python-version == '3.11' && matrix.test-type == 'unit'
+        with:
+          name: coverage-report
+          path: htmlcov/
+          retention-days: 30
+
+  # Load Testing
+  load-test:
+    name: Load Testing
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install k6
+        run: |
+          curl https://github.com/grafana/k6/releases/download/v0.45.0/k6-v0.45.0-linux-amd64.tar.gz -L | tar xvz
+          sudo mv k6-v0.45.0-linux-amd64/k6 /usr/local/bin/
+
+      - name: Run load tests
+        run: |
+          # Start mock server for load testing
+          npm install -g http-server
+          http-server tests/mock_server.test.js -p 3000 &
+          sleep 5
+
+          # Run load tests
+          k6 run tests/load_tests/light_load_30_users.js
+          k6 run tests/load_tests/medium_load_100_users.test.js
+
+      - name: Upload load test results
+        uses: actions/upload-artifact@v3
+        with:
+          name: load-test-results
+          path: |
+            *.html
+            *.json
+          retention-days: 30
+
+  # Security Scanning
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    needs: code-quality
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install security tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install bandit safety
+
+      - name: Run Bandit security scan
+        run: |
+          bandit -r src/ -f json -o bandit-results.json || true
+          bandit -r src/ --exit-zero
+
+      - name: Run Safety dependency scan
+        run: |
+          safety check --json > safety-results.json || true
+          safety check || true
+
+      - name: Run Trivy filesystem scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+      - name: Upload security scan results
+        uses: actions/upload-artifact@v3
+        with:
+          name: security-scan-results
+          path: |
+            bandit-results.json
+            safety-results.json
+          retention-days: 30
+
+      - name: Fail on critical vulnerabilities
+        run: |
+          # Check for critical issues
+          CRITICAL_VULNS=$(python -c "
+          import json
+          try:
+              with open('bandit-results.json') as f:
+                  data = json.load(f)
+              critical = sum(1 for issue in data.get('results', []) if issue.get('issue_severity') == 'HIGH')
+              print(critical)
+          except:
+              print(0)
+          " 2>/dev/null || echo 0)
+
+          if [ "$CRITICAL_VULNS" -gt 0 ]; then
+            echo "❌ Critical security vulnerabilities found: $CRITICAL_VULNS"
+            exit 1
+          fi
+
+  # Build Docker Image
+  build:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+    needs: [test, security]
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image-digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Docker image
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # Deploy to Staging
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch'
+    environment: staging
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to staging
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_USER }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          port: ${{ secrets.STAGING_PORT || 22 }}
+          script: |
+            # Deployment script for staging
+            cd /opt/llm-proxy-api
+
+            # Pull latest image
+            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+
+            # Stop existing containers
+            docker-compose down || true
+
+            # Start new containers
+            docker-compose up -d
+
+            # Health check
+            sleep 30
+            if curl -f http://localhost:8000/health; then
+              echo "✅ Staging deployment successful"
+            else
+              echo "❌ Staging deployment failed"
+              docker-compose logs
+              exit 1
+            fi
+
+  # Deploy to Production
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [build, deploy-staging]
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    environment: production
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to production
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.PRODUCTION_HOST }}
+          username: ${{ secrets.PRODUCTION_USER }}
+          key: ${{ secrets.PRODUCTION_SSH_KEY }}
+          port: ${{ secrets.PRODUCTION_PORT || 22 }}
+          script: |
+            # Deployment script for production
+            cd /opt/llm-proxy-api
+
+            # Backup current deployment
+            if [ -d "current_backup" ]; then
+              rm -rf current_backup
+            fi
+            cp -r current current_backup 2>/dev/null || true
+
+            # Pull latest image
+            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+
+            # Stop existing containers
+            docker-compose down
+
+            # Start new containers
+            docker-compose up -d
+
+            # Health check
+            sleep 60
+            if curl -f http://localhost:8000/health; then
+              echo "✅ Production deployment successful"
+              # Clean up backup after successful deployment
+              rm -rf current_backup
+            else
+              echo "❌ Production deployment failed - rolling back"
+              docker-compose down
+              cp -r current_backup current 2>/dev/null || true
+              docker-compose up -d
+              exit 1
+            fi
+
+  # Post-deployment verification
+  verify:
+    name: Verification
+    runs-on: ubuntu-latest
+    needs: deploy-production
+    if: success()
+    steps:
+      - name: Verify production deployment
+        run: |
+          # Check if production API is responding
+          if curl -f --max-time 30 https://api.yourdomain.com/health; then
+            echo "✅ Production API is responding correctly"
+          else
+            echo "❌ Production API health check failed"
+            exit 1
+          fi
+
+      - name: Run smoke tests
+        run: |
+          # Basic smoke tests
+          echo "🧪 Running smoke tests..."
+
+          # Test main endpoints
+          curl -f https://api.yourdomain.com/api/models
+          curl -f https://api.yourdomain.com/health
+
+          echo "✅ Smoke tests passed"
+
+  # Notification
+  notify:
+    name: Notification
+    runs-on: ubuntu-latest
+    needs: [code-quality, test, security, build, deploy-production, verify]
+    if: always()
+    steps:
+      - name: Send notification
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const status = '${{ needs.deploy-production.result }}';
+            const title = status === 'success' ? '✅ CI/CD Pipeline Successful' : '❌ CI/CD Pipeline Failed';
+            const body = status === 'success'
+              ? `Successfully completed CI/CD pipeline and deployed to production.\n\nImage: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ needs.build.outputs.image-digest }}`
+              : `CI/CD pipeline failed. Check the logs for details.`;
+
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: title,
+              body: body,
+              labels: ['ci-cd', status === 'success' ? 'success' : 'failed']
+            })

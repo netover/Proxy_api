@@ -1,7 +1,9 @@
-from typing import Dict, Any
-from src.providers.dynamic_base import DynamicProvider
-from src.core.metrics import metrics_collector
 import time
+from typing import Any, Dict
+
+from src.core.metrics import metrics_collector
+from src.providers.dynamic_base import DynamicProvider
+
 
 class DynamicOpenRouterProvider(DynamicProvider):
     """Dynamic OpenRouter provider implementation"""

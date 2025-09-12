@@ -27,62 +27,74 @@ let totalRequests = 0;
 let successfulRequests = 0;
 let failedRequests = 0;
 let responseTimes = [];
+let failedResponseTimes = [];
+let networkErrorTimes = [];
 let startTime = Date.now();
 
 function makeRequest() {
-  const payload = JSON.stringify({
-    model: models[Math.floor(Math.random() * models.length)],
-    messages: [
-      {
-        role: 'user',
-        content: testMessages[Math.floor(Math.random() * testMessages.length)]
-      }
-    ],
-    max_tokens: 100,
-    temperature: 0.7
-  });
+   const payload = JSON.stringify({
+     model: models[Math.floor(Math.random() * models.length)],
+     messages: [
+       {
+         role: 'user',
+         content: testMessages[Math.floor(Math.random() * testMessages.length)]
+       }
+     ],
+     max_tokens: 100,
+     temperature: 0.7
+   });
 
-  const options = {
-    hostname: 'localhost',
-    port: 8000,
-    path: '/v1/chat/completions',
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${API_KEY}`,
-      'Content-Length': Buffer.byteLength(payload)
-    }
-  };
+   const options = {
+     hostname: 'localhost',
+     port: 8000,
+     path: '/v1/chat/completions',
+     method: 'POST',
+     headers: {
+       'Content-Type': 'application/json',
+       'Authorization': `Bearer ${API_KEY}`,
+       'Content-Length': Buffer.byteLength(payload)
+     }
+   };
 
-  const reqStart = Date.now();
+   const reqStart = Date.now();
 
-  const req = http.request(options, (res) => {
-    let data = '';
-    res.on('data', (chunk) => {
-      data += chunk;
-    });
+   const req = http.request(options, (res) => {
+     let data = '';
+     res.on('data', (chunk) => {
+       data += chunk;
+     });
 
-    res.on('end', () => {
-      const reqEnd = Date.now();
-      const responseTime = reqEnd - reqStart;
-      responseTimes.push(responseTime);
-      totalRequests++;
+     res.on('end', () => {
+       const reqEnd = Date.now();
+       const responseTime = reqEnd - reqStart;
 
-      if (res.statusCode === 200) {
-        successfulRequests++;
-      } else {
-        failedRequests++;
-      }
-    });
-  });
+       // Only record timing for successful requests to avoid network bias
+       if (res.statusCode === 200) {
+         responseTimes.push(responseTime);
+         successfulRequests++;
+       } else {
+         failedRequests++;
+         // Record failed request timing separately for analysis
+         if (!failedResponseTimes) failedResponseTimes = [];
+         failedResponseTimes.push(responseTime);
+       }
 
-  req.on('error', (err) => {
-    failedRequests++;
-    totalRequests++;
-  });
+       totalRequests++;
+     });
+   });
 
-  req.write(payload);
-  req.end();
+   req.on('error', (err) => {
+     failedRequests++;
+     totalRequests++;
+     // Record network error timing
+     const reqEnd = Date.now();
+     const responseTime = reqEnd - reqStart;
+     if (!networkErrorTimes) networkErrorTimes = [];
+     networkErrorTimes.push(responseTime);
+   });
+
+   req.write(payload);
+   req.end();
 }
 
 function makeHealthCheck() {
@@ -158,27 +170,55 @@ const reportInterval = setInterval(() => {
 
 // Final report
 setTimeout(() => {
-  clearInterval(reportInterval);
+   clearInterval(reportInterval);
 
-  const totalTime = Date.now() - startTime;
-  const avgResponseTime = responseTimes.length > 0 ?
-    responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length : 0;
-  const minResponseTime = responseTimes.length > 0 ? Math.min(...responseTimes) : 0;
-  const maxResponseTime = responseTimes.length > 0 ? Math.max(...responseTimes) : 0;
-  const rps = totalRequests / (totalTime / 1000);
-  const successRate = totalRequests > 0 ? (successfulRequests / totalRequests) * 100 : 0;
+   const totalTime = Date.now() - startTime;
+   const avgResponseTime = responseTimes.length > 0 ?
+     responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length : 0;
+   const minResponseTime = responseTimes.length > 0 ? Math.min(...responseTimes) : 0;
+   const maxResponseTime = responseTimes.length > 0 ? Math.max(...responseTimes) : 0;
+   const rps = totalRequests / (totalTime / 1000);
+   const successRate = totalRequests > 0 ? (successfulRequests / totalRequests) * 100 : 0;
 
-  console.log('\n=== LOAD TEST RESULTS ===');
-  console.log(`Total Requests: ${totalRequests}`);
-  console.log(`Successful Requests: ${successfulRequests}`);
-  console.log(`Failed Requests: ${failedRequests}`);
-  console.log(`Success Rate: ${successRate.toFixed(2)}%`);
-  console.log(`Average Response Time: ${avgResponseTime.toFixed(2)}ms`);
-  console.log(`Min Response Time: ${minResponseTime}ms`);
-  console.log(`Max Response Time: ${maxResponseTime}ms`);
-  console.log(`Requests per Second: ${rps.toFixed(2)}`);
-  console.log(`Test Duration: ${totalTime}ms`);
-  console.log('========================');
+   // Calculate percentiles for better latency analysis
+   const sortedTimes = [...responseTimes].sort((a, b) => a - b);
+   const p50 = sortedTimes.length > 0 ? sortedTimes[Math.floor(sortedTimes.length * 0.5)] : 0;
+   const p95 = sortedTimes.length > 0 ? sortedTimes[Math.floor(sortedTimes.length * 0.95)] : 0;
+   const p99 = sortedTimes.length > 0 ? sortedTimes[Math.floor(sortedTimes.length * 0.99)] : 0;
 
-  process.exit(0);
+   console.log('\n=== LOAD TEST RESULTS ===');
+   console.log(`Total Requests: ${totalRequests}`);
+   console.log(`Successful Requests: ${successfulRequests}`);
+   console.log(`Failed Requests: ${failedRequests}`);
+   console.log(`Success Rate: ${successRate.toFixed(2)}%`);
+   console.log(`Requests per Second: ${rps.toFixed(2)}`);
+   console.log(`Test Duration: ${totalTime}ms`);
+   console.log('');
+
+   console.log('=== RESPONSE TIME ANALYSIS (Successful Requests Only) ===');
+   console.log(`Sample Size: ${responseTimes.length} requests`);
+   console.log(`Average Response Time: ${avgResponseTime.toFixed(2)}ms`);
+   console.log(`Min Response Time: ${minResponseTime}ms`);
+   console.log(`Max Response Time: ${maxResponseTime}ms`);
+   console.log(`50th Percentile (P50): ${p50.toFixed(2)}ms`);
+   console.log(`95th Percentile (P95): ${p95.toFixed(2)}ms`);
+   console.log(`99th Percentile (P99): ${p99.toFixed(2)}ms`);
+
+   if (failedResponseTimes && failedResponseTimes.length > 0) {
+     const avgFailedTime = failedResponseTimes.reduce((a, b) => a + b, 0) / failedResponseTimes.length;
+     console.log(`\nFailed Requests Average Time: ${avgFailedTime.toFixed(2)}ms (${failedResponseTimes.length} samples)`);
+   }
+
+   if (networkErrorTimes && networkErrorTimes.length > 0) {
+     const avgNetworkErrorTime = networkErrorTimes.reduce((a, b) => a + b, 0) / networkErrorTimes.length;
+     console.log(`Network Errors Average Time: ${avgNetworkErrorTime.toFixed(2)}ms (${networkErrorTimes.length} samples)`);
+   }
+
+   console.log('\n=== ACCURACY NOTES ===');
+   console.log('- Response times exclude network latency for failed requests');
+   console.log('- Percentiles provide better latency distribution understanding');
+   console.log('- Separate tracking of different failure types for analysis');
+   console.log('========================');
+
+   process.exit(0);
 }, TEST_DURATION + 1000);

@@ -11,19 +11,20 @@ Features:
 """
 
 import asyncio
-import time
-import yaml
-import json
 import hashlib
-from pathlib import Path
-from typing import Dict, Any, Optional, List, Set
-from dataclasses import dataclass
-from concurrent.futures import ThreadPoolExecutor
-from functools import partial
+import json
 import logging
+import time
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Set
+
+import yaml
+
 try:
-    from watchdog.observers import Observer
     from watchdog.events import FileSystemEventHandler
+    from watchdog.observers import Observer
     WATCHDOG_AVAILABLE = True
 except ImportError:
     WATCHDOG_AVAILABLE = False
@@ -214,6 +215,18 @@ class OptimizedConfigLoader:
 
         return await loop.run_in_executor(self._executor, _sync_load)
 
+    async def _load_file_with_validation_async(self, file_path: Path) -> Dict[str, Any]:
+        """Load configuration file with schema validation"""
+        from .config_schema import config_validator
+
+        # Load the file
+        data = await self._load_file_async(file_path)
+
+        # Validate against schema
+        config_validator.validate_config(data, file_path)
+
+        return data
+
     async def load_critical_config(self) -> Dict[str, Any]:
         """Load only critical configuration sections"""
         cache_key = f"critical:{self.config_path}"
@@ -265,7 +278,7 @@ class OptimizedConfigLoader:
         return None
 
     async def load_full_config(self) -> Dict[str, Any]:
-        """Load complete configuration with caching"""
+        """Load complete configuration with caching and validation"""
         # Check if file has changed
         current_hash = self._calculate_file_hash(self.config_path)
         if self._file_hash != current_hash:
@@ -285,8 +298,8 @@ class OptimizedConfigLoader:
             ))
             return cached
 
-        # Load fresh
-        config = await self._load_file_async(self.config_path)
+        # Load fresh with validation
+        config = await self._load_file_with_validation_async(self.config_path)
         self.cache.set(self.config_path, config)
         self._full_config = config
         self._loaded_sections.update(config.keys())

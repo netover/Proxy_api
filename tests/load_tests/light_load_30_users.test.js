@@ -6,6 +6,7 @@
  */
 
 export let options = {
+  target: 'http://localhost:8000',
   scenarios: [
     {
       name: 'Chat Completion Light Load',
