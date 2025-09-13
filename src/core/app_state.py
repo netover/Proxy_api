@@ -4,7 +4,7 @@ from typing import Optional
 from src.core.logging import ContextualLogger
 from src.core.provider_factory import ProviderFactory
 from src.core.rate_limiter import rate_limiter
-from src.core.unified_config import ConfigManager
+from src.core.unified_config import ConfigManager, UnifiedConfig
 
 logger = ContextualLogger(__name__)
 
@@ -14,6 +14,7 @@ class AppState:
     def __init__(self):
         self.config_manager: Optional[ConfigManager] = None
         self.provider_factory: Optional[ProviderFactory] = None
+        self.config: Optional[UnifiedConfig] = None
         self.initialized = False
     
     async def initialize(self, config_path: Optional[Path] = None):
@@ -32,11 +33,11 @@ class AppState:
             self.provider_factory = ProviderFactory()
             
             # 3. Load configuration
-            config = self.config_manager.load_config()
-            logger.info(f"Loaded config with {len(config.providers)} providers")
+            self.config = self.config_manager.load_config()
+            logger.info(f"Loaded config with {len(self.config.providers)} providers")
             
             # 4. Initialize providers
-            await self.provider_factory.initialize_providers(config.providers)
+            await self.provider_factory.initialize_providers(self.config.providers)
             logger.info("Providers initialized successfully")
             
             # 5. Configure rate limiter

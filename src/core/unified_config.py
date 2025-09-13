@@ -148,7 +148,7 @@ class GlobalSettings(BaseModel):
         case_sensitive = False
         env_file = ".env"
 
-class ProxyConfig(BaseModel):
+class UnifiedConfig(BaseModel):
     """Complete proxy configuration"""
     settings: GlobalSettings
     providers: List[ProviderConfig] = Field(..., min_items=1)
@@ -195,7 +195,7 @@ class ConfigManager:
 
     def __init__(self, config_path: Optional[Path] = None):
         self.config_path = config_path or Path("config.yaml")
-        self._config: Optional[ProxyConfig] = None
+        self._config: Optional[UnifiedConfig] = None
         self._critical_config: Optional[Dict[str, Any]] = None
         self._lazy_loaded_sections: Dict[str, Any] = {}
         self._event_loop = None
@@ -210,7 +210,7 @@ class ConfigManager:
                 asyncio.set_event_loop(self._event_loop)
         return self._event_loop
 
-    def load_config(self, force_reload: bool = False) -> ProxyConfig:
+    def load_config(self, force_reload: bool = False) -> UnifiedConfig:
         """Load configuration with optimized loading, caching, and validation"""
         start_time = time.time()
         success = False
@@ -247,7 +247,7 @@ class ConfigManager:
                 providers_count=providers_count
             )
 
-    async def _load_config_async(self, force_reload: bool = False) -> ProxyConfig:
+    async def _load_config_async(self, force_reload: bool = False) -> UnifiedConfig:
         """Async configuration loading with lazy loading and validation"""
         try:
             # Load critical sections first
@@ -268,7 +268,7 @@ class ConfigManager:
             config_validator.validate_config(critical_config_data, self.config_path)
 
             # Create configuration with critical data
-            self._config = ProxyConfig(
+            self._config = UnifiedConfig(
                 settings=GlobalSettings(**settings_data),
                 providers=[ProviderConfig(**p) for p in providers_data]
             )
@@ -279,7 +279,7 @@ class ConfigManager:
             # Fallback to sync loading
             return self._load_config_sync(force_reload)
 
-    def _load_config_sync(self, force_reload: bool = False) -> ProxyConfig:
+    def _load_config_sync(self, force_reload: bool = False) -> UnifiedConfig:
         """Synchronous fallback for configuration loading with validation"""
         try:
             # Use optimized loader's sync interface
@@ -300,7 +300,7 @@ class ConfigManager:
             settings_data = config_data
 
             # Create configuration
-            self._config = ProxyConfig(
+            self._config = UnifiedConfig(
                 settings=GlobalSettings(**settings_data),
                 providers=[ProviderConfig(**p) for p in providers_data]
             )
@@ -312,9 +312,9 @@ class ConfigManager:
         except Exception as e:
             raise ValueError(f"Failed to load configuration: {e}")
     
-    def _create_default_config(self) -> ProxyConfig:
+    def _create_default_config(self) -> UnifiedConfig:
         """Create default configuration if none exists"""
-        default_config = ProxyConfig(
+        default_config = UnifiedConfig(
             settings=GlobalSettings(
                 api_keys=["your-api-key-here"],
                 debug=True,
@@ -336,7 +336,7 @@ class ConfigManager:
         self.save_config(default_config)
         return default_config
     
-    def save_config(self, config: ProxyConfig) -> None:
+    def save_config(self, config: UnifiedConfig) -> None:
         """Save configuration to file"""
         # Create a serializable dictionary using built-in serialization
         config_dict = {

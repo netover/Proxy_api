@@ -212,6 +212,9 @@ logging:
 # Health Check Configuration
 health_check:
   interval: 30
+
+services:
+  context_service_url: "http://localhost:8001"
   timeout: 5
   providers: true
   context_service: true

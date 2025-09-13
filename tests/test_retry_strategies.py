@@ -8,9 +8,9 @@ import time
 
 from src.core.retry_strategies import (
     RetryConfig, ProviderRetryConfig, ErrorType,
-    ExponentialBackoffStrategy, ImmediateRetryStrategy, AdaptiveRetryStrategy,
-    RateLimitError, APIConnectionError, ServiceUnavailableError
+    ExponentialBackoffStrategy, ImmediateRetryStrategy, AdaptiveRetryStrategy
 )
+from src.core.exceptions import RateLimitError, APIConnectionError, ServiceUnavailableError
 
 
 class TestRetryStrategies:

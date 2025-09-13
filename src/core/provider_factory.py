@@ -326,29 +326,47 @@ class ProviderFactory:
             raise ValueError(f"Failed to load provider {provider_type}: {e}")
     
     async def create_provider(self, config: ProviderConfig) -> BaseProvider:
-        """Create a new provider instance"""
+        """Create a new provider instance with retry logic"""
         if not config.enabled:
             raise ValueError(f"Provider {config.name} is disabled")
-        
+
         provider_class = self._load_provider_class(config.type)
+        last_exception = None
+        max_retries = 2  # Or get from config
+
+        for attempt in range(max_retries + 1):
+            try:
+                provider = provider_class(config)
+                self._all_instances.add(provider)
+
+                # Perform initial health check
+                health_result = await provider.health_check()
+
+                logger.info(f"Created provider: {config.name} (attempt {attempt + 1})",
+                           type=config.type.value,
+                           status=health_result.get("status"),
+                           models=len(config.models))
+
+                # If provider is unhealthy, we might still return it but log a warning
+                if health_result.get("status") == "unhealthy":
+                    logger.warning(f"Provider {config.name} created but is initially unhealthy.")
+
+                return provider
+
+            except Exception as e:
+                last_exception = e
+                if attempt < max_retries:
+                    wait_time = 2 ** attempt  # Exponential backoff
+                    logger.warning(
+                        f"Failed to create provider {config.name} (attempt {attempt + 1}/{max_retries + 1}): {e}. "
+                        f"Retrying in {wait_time}s..."
+                    )
+                    await asyncio.sleep(wait_time)
+                else:
+                    logger.error(f"Failed to create provider {config.name} after {max_retries + 1} attempts: {e}")
         
-        try:
-            provider = provider_class(config)
-            self._all_instances.add(provider)
-            
-            # Perform initial health check
-            health_result = await provider.health_check()
-            
-            logger.info(f"Created provider: {config.name}", 
-                       type=config.type.value,
-                       status=health_result.get("status"),
-                       models=len(config.models))
-            
-            return provider
-            
-        except Exception as e:
-            logger.error(f"Failed to create provider {config.name}: {e}")
-            raise
+        # All retries failed
+        raise last_exception
     
     async def get_provider(self, name: str) -> Optional[BaseProvider]:
         """Get cached provider by name"""

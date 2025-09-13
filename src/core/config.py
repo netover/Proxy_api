@@ -95,6 +95,7 @@ class Settings(BaseSettings):
         env_prefix = "PROXY_API_"
         case_sensitive = False
         env_file = ".env"
+        extra = "allow"
 
 from src.core.app_config import ProviderConfig
 

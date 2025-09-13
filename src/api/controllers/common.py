@@ -1,14 +1,21 @@
+import re
 import time
+import uuid
+from http import HTTPStatus
 from typing import Any, AsyncGenerator, Dict, List, Union
 
 from fastapi import BackgroundTasks, Request
+from fastapi.responses import JSONResponse
 
+from src.api.controllers.context_controller import background_condense
+from src.core.circuit_breaker import get_circuit_breaker
 from src.core.exceptions import (InvalidRequestError, NotImplementedError,
                                  ServiceUnavailableError)
 from src.core.logging import ContextualLogger
 from src.core.metrics import metrics_collector
 from src.models.requests import (ChatCompletionRequest, EmbeddingRequest,
                                  TextCompletionRequest)
+from src.utils.tasks import safe_background_task
 
 logger = ContextualLogger(__name__)
 
@@ -48,8 +55,7 @@ class RequestRouter:
 
         if forced_provider and forced_provider.name in [p.name for p in providers]:
             # Use forced provider exclusively
-            forced_instance = next(p for p in providers if p.name == forced_provider.name)
-            providers = [forced_instance]
+            providers = [p for p in providers if p.name == forced_provider.name]
             logger.info(f"Using forced provider: {forced_provider.name}")
 
         # Track attempts for metrics
@@ -63,17 +69,22 @@ class RequestRouter:
             try:
                 logger.info(f"Attempting {operation} with provider {provider.name} (attempt {i+1}/{len(providers)})")
 
+                circuit_breaker = get_circuit_breaker(f"provider_{provider.name}")
+
                 # Choose the appropriate method based on operation
                 if operation == "chat_completion":
-                    result = await provider.create_completion(request_data.dict(exclude_unset=True) if hasattr(request_data, 'dict') else request_data)
+                    method = provider.create_completion
                 elif operation == "text_completion":
-                    result = await provider.create_text_completion(request_data.dict(exclude_unset=True) if hasattr(request_data, 'dict') else request_data)
+                    method = provider.create_text_completion
                 elif operation == "embeddings":
-                    result = await provider.create_embeddings(request_data.dict(exclude_unset=True) if hasattr(request_data, 'dict') else request_data)
+                    method = provider.create_embeddings
                 elif operation == "image_generation":
-                    result = await provider.create_image(request_data)
+                    method = provider.create_image
                 else:
                     raise ValueError(f"Unknown operation: {operation}")
+
+                req_dict = request_data.dict(exclude_unset=True) if hasattr(request_data, 'dict') else request_data
+                result = await circuit_breaker.execute(lambda: method(req_dict))
 
                 attempt_time = time.time() - attempt_start
 
@@ -140,6 +151,32 @@ class RequestRouter:
                             error=str(e),
                             error_type=type(e).__name__,
                             response_time=attempt_time)
+
+                # Handle context length errors
+                msg = str(e)
+                config = request.app.state.app_state.config
+                if any(re.search(pattern, msg, re.IGNORECASE) for pattern in config.settings.condensation.error_patterns):
+                    if not req_dict.get("stream", False):
+                        request_id = str(uuid.uuid4())
+                        chunks = [m["content"] for m in req_dict.get("messages", [])]
+                        background_tasks.add_task(safe_background_task(background_condense), request_id, request, chunks)
+
+                        return JSONResponse(
+                            status_code=HTTPStatus.ACCEPTED,
+                            content={
+                                "status": "processing",
+                                "request_id": request_id,
+                                "message": f"Context error detected; summarization in progress. Poll /summary/{request_id} for result.",
+                                "estimated_time": "5-10 seconds"
+                            }
+                        )
+                    # Truncate for streaming
+                    req_dict["messages"] = req_dict["messages"][-len(req_dict["messages"])//2:]
+                    req_dict["stream"] = False
+                    # Re-attempt with the same provider
+                    # This is a bit tricky, maybe just continue to the next provider is better.
+                    # For now, let's just log it and continue.
+                    logger.warning(f"Truncating context for streaming request and retrying with next provider.")
 
                 # Continue to next provider
                 continue

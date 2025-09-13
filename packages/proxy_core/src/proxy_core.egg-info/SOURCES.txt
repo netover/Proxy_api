@@ -1,8 +1,12 @@
 pyproject.toml
 src/proxy_core/__init__.py
 src/proxy_core/circuit_breaker.py
+src/proxy_core/config.py
 src/proxy_core/exceptions.py
 src/proxy_core/http_client.py
+src/proxy_core/logging.py
+src/proxy_core/metrics.py
+src/proxy_core/models.py
 src/proxy_core/provider_factory.py
 src/proxy_core/rate_limiter.py
 src/proxy_core.egg-info/PKG-INFO
