@@ -41,7 +41,7 @@ class AppState:
             logger.info("Providers initialized successfully")
             
             # 5. Configure rate limiter
-            rate_limiter.configure_limits(config.settings.rate_limit_rpm)
+            rate_limiter.configure_from_config(self.config)
             
             self.initialized = True
             logger.info("AppState initialization complete")

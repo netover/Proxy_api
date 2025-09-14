@@ -65,6 +65,12 @@ class BaseProvider(ABC):
         # Initialize provider capabilities
         self._capabilities = self._get_capabilities()
 
+        # Initialize status attributes
+        self._status = ProviderStatus.HEALTHY
+        self._error_count = 0
+        self._last_health_check = 0.0
+        self._last_error: Optional[str] = None
+
     @property
     def capabilities(self) -> Set[ProviderCapability]:
         """Get provider capabilities"""

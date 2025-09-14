@@ -144,6 +144,9 @@ class GlobalSettings(BaseModel):
     circuit_breaker_threshold: int = Field(default=5, ge=1, le=50)
     circuit_breaker_timeout: int = Field(default=60, ge=1, le=3600)
     
+    # Optional Features
+    chaos_engineering: Optional[Dict[str, Any]] = Field(default=None, description="Chaos engineering settings")
+
     # Paths
     log_level: str = Field(default="INFO", pattern=r'^(DEBUG|INFO|WARNING|ERROR|CRITICAL)$')
     log_file: Optional[Path] = Field(default=None)
@@ -209,6 +212,7 @@ class ConfigManager:
         self._critical_config: Optional[Dict[str, Any]] = None
         self._lazy_loaded_sections: Dict[str, Any] = {}
         self._event_loop = None
+        self._last_modified: float = 0.0
 
     def _get_event_loop(self):
         """Get or create event loop for async operations"""

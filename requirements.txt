@@ -45,7 +45,6 @@ sqlparse>=0.4.0       # SQL parsing for injection testing
 bleach>=6.1.0         # HTML sanitization testing
 
 # Web UI (SECURITY UPDATED)
-Flask>=3.0.0          # Security updates, modern features
 python-dotenv>=0.19   # Environment file management
 
 # Optional Dependencies (NEW)

@@ -11,6 +11,9 @@ from contextlib import asynccontextmanager
 
 import uvicorn
 from fastapi import FastAPI, Request
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -123,8 +126,9 @@ async def lifespan(app: FastAPI):
         logger.info("Rate limiter configured and initialized")
 
         # Configure chaos engineering
-        chaos_monkey.configure(config.settings.get('chaos_engineering', {}))
-        logger.info("Chaos engineering configured")
+        if config.settings.chaos_engineering:
+            chaos_monkey.configure(config.settings.chaos_engineering)
+            logger.info("Chaos engineering configured")
 
         # Start alerting system
         with TracedSpan("alerting.initialize") as span:
@@ -133,22 +137,6 @@ async def lifespan(app: FastAPI):
             logger.info("Alerting system initialized and monitoring started")
 
         app.state.config_mtime = app_state.config_manager._last_modified
-
-        # Start web UI in background thread
-        def start_web_ui():
-            try:
-                from web_ui import app as web_app
-                logger.info("Starting web UI on port 10000")
-                web_app.run(host='0.0.0.0', port=10000, debug=False, use_reloader=False)
-            except Exception as e:
-                logger.error(f"Failed to start web UI: {e}")
-
-        # TODO: The web UI should be run as a separate process in production.
-        # Running as a daemon thread is not recommended for production systems
-        # as it can be terminated abruptly on shutdown.
-        web_ui_thread = threading.Thread(target=start_web_ui, daemon=True)
-        web_ui_thread.start()
-        logger.info("Web UI thread started")
 
         logger.info("All systems initialized successfully")
 
@@ -227,6 +215,18 @@ app = FastAPI(
     description="High-performance LLM proxy with intelligent routing and fallback",
     lifespan=lifespan
 )
+
+# Mount static files and templates for the Web UI
+app.mount("/static", StaticFiles(directory="static"), name="static")
+templates = Jinja2Templates(directory="templates")
+
+# Serve the index.html as the root page
+# This must be defined BEFORE the API routers are included to have priority.
+@app.get("/", response_class=HTMLResponse)
+async def read_root(request: Request):
+    # Pass environment variables to the template
+    context = {"request": request, "env_vars": os.environ}
+    return templates.TemplateResponse("index.html", context)
 
 # Include new API routers
 app.include_router(root_router)
