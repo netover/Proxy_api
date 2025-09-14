@@ -66,6 +66,7 @@ keys/
 *.pem
 *.crt
 *.p12
+.flask_secret_key
 
 # Documentation build
 docs/_build/

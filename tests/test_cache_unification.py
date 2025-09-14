@@ -22,7 +22,7 @@ from unittest.mock import Mock, patch, AsyncMock
 from src.core.unified_cache import UnifiedCache, get_unified_cache, CacheEntry
 from src.core.cache_migration import CacheMigrationService, MigrationConfig
 from src.core.cache_warmer import CacheWarmer
-from src.core.cache_monitor import CacheMonitor, MonitorConfig
+from src.core.cache_monitor import CacheMonitor
 from src.models.model_info import ModelInfo
 from src.core.model_discovery import ProviderConfig
 
@@ -79,12 +79,8 @@ async def cache_warmer(unified_cache):
 async def cache_monitor(unified_cache):
     """Create cache monitor instance for testing"""
     monitor = CacheMonitor(
-        cache=unified_cache,
-        config=MonitorConfig(
-            consistency_check_interval=1,  # Fast checks for testing
-            performance_check_interval=1,
-            enable_auto_repair=True
-        )
+        target_hit_rate=0.9,
+        check_interval=1
     )
     await monitor.start()
 
