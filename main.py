@@ -40,6 +40,7 @@ from src.core.provider_factory import provider_factory
 from src.core.retry_strategies import RetryConfig
 from src.core.smart_cache import (get_response_cache, get_summary_cache,
                                   shutdown_caches)
+from src.core.cache_redis import RedisCacheAdapter
 from src.core.telemetry import TracedSpan, telemetry
 
 # Setup logging with environment variable support
@@ -92,30 +93,47 @@ async def lifespan(app: FastAPI):
     
         # Initialize caches
         with TracedSpan("cache.initialize") as span:
-            app.state.response_cache = await get_response_cache()
-            app.state.summary_cache_obj = await get_summary_cache()
-            span.set_attribute("cache.response.initialized", True)
-            span.set_attribute("cache.summary.initialized", True)
-            logger.info("Smart caches initialized")
-    
+            if hasattr(config.settings, "redis") and config.settings.redis.enabled:
+                logger.info("Redis cache is enabled. Initializing RedisCacheAdapter.")
+                redis_settings = config.settings.redis
+
+                # Create a single Redis adapter and share it
+                redis_adapter = RedisCacheAdapter(settings=redis_settings)
+                await redis_adapter.start()
+
+                # Assign the same adapter to all cache state variables
+                app.state.response_cache = redis_adapter
+                app.state.summary_cache_obj = redis_adapter
+                app.state.lru_cache = redis_adapter
+
+                span.set_attribute("cache.backend", "redis")
+                logger.info("Redis cache adapter initialized and assigned.")
+
+            else:
+                logger.info("Redis cache is disabled. Falling back to in-memory caches.")
+                app.state.response_cache = await get_response_cache()
+                app.state.summary_cache_obj = await get_summary_cache()
+
+                from src.utils.context_condenser import AsyncLRUCache
+                persist_file = 'cache.json' if config.settings.condensation.cache_persist else None
+                app.state.lru_cache = AsyncLRUCache(
+                    maxsize=config.settings.condensation.cache_size,
+                    persist_file=persist_file,
+                    redis_url=None  # Ensure redis_url is not used
+                )
+                if persist_file:
+                    await app.state.lru_cache.initialize()
+
+                span.set_attribute("cache.backend", "in_memory")
+
+            span.set_attribute("cache.initialized", True)
+            logger.info("Caches initialized")
+
         # Initialize memory manager
         with TracedSpan("memory_manager.initialize") as span:
             app.state.memory_manager = await get_memory_manager()
             span.set_attribute("memory_manager.initialized", True)
             logger.info("Memory manager initialized")
-
-        # Initialize context condensation cache with persistence
-        from src.utils.context_condenser import AsyncLRUCache
-        persist_file = 'cache.json' if config.settings.condensation.cache_persist else None
-        redis_url = getattr(config.settings.condensation, 'cache_redis_url', None)
-        app.state.lru_cache = AsyncLRUCache(
-            maxsize=config.settings.condensation.cache_size,
-            persist_file=persist_file,
-            redis_url=redis_url
-        )
-        if persist_file:
-            await app.state.lru_cache.initialize()
-        logger.info("Context condensation cache initialized")
 
         # Legacy cache support (for backward compatibility)
         app.state.cache = {}
@@ -167,12 +185,21 @@ async def lifespan(app: FastAPI):
         if hasattr(app.state, 'memory_manager'):
             shutdown_tasks.append(shutdown_memory_manager())
 
+        # Unified cache shutdown logic
+        # The response_cache is the primary cache object to check
         if hasattr(app.state, 'response_cache'):
-            shutdown_tasks.append(shutdown_caches())
-
-        # Shutdown context condensation cache
-        if hasattr(app.state, 'lru_cache') and app.state.lru_cache:
-            shutdown_tasks.append(app.state.lru_cache.shutdown())
+            # If it's a Redis adapter, it's the single instance for all caches
+            if isinstance(app.state.response_cache, RedisCacheAdapter):
+                shutdown_tasks.append(app.state.response_cache.stop())
+                logger.info("Queued Redis cache shutdown.")
+            else:
+                # Otherwise, it's the in-memory caches
+                shutdown_tasks.append(shutdown_caches())
+                logger.info("Queued in-memory smart cache shutdown.")
+                # Also shut down the separate in-memory LRU cache if it exists
+                if hasattr(app.state, 'lru_cache') and hasattr(app.state.lru_cache, 'shutdown'):
+                     shutdown_tasks.append(app.state.lru_cache.shutdown())
+                     logger.info("Queued in-memory LRU cache shutdown.")
 
         # Shutdown alerting system
         shutdown_tasks.append(alert_manager.stop_monitoring())

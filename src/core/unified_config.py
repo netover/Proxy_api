@@ -111,6 +111,14 @@ class CacheSettings(BaseModel):
             return Path.cwd() / v
         return v
 
+class RedisSettings(BaseModel):
+    """Redis connection settings"""
+    enabled: bool = Field(default=False, description="Enable Redis for caching")
+    host: str = Field(default="localhost", description="Redis server host")
+    port: int = Field(default=6379, ge=1, le=65535, description="Redis server port")
+    db: int = Field(default=0, ge=0, description="Redis database number")
+    password: Optional[str] = Field(default=None, description="Redis password")
+
 class GlobalSettings(BaseModel):
     """Global application settings"""
     # App info
@@ -142,6 +150,7 @@ class GlobalSettings(BaseModel):
     config_file: Path = Field(default=Path("config.yaml"))
     condensation: CondensationSettings = Field(default_factory=CondensationSettings, description="Settings for context condensation optimizations")
     cache: CacheSettings = Field(default_factory=CacheSettings, description="Settings for model discovery caching")
+    redis: RedisSettings = Field(default_factory=RedisSettings, description="Redis cache settings")
     
     class Config:
         env_prefix = "PROXY_API_"

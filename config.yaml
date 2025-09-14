@@ -166,7 +166,6 @@ condensation:
   cache_size: 1000
   cache_ttl: 3600
   cache_persist: true
-  cache_redis_url: "${REDIS_URL}"
   error_patterns:
     - "context length"
     - "maximum context"
@@ -201,6 +200,14 @@ http_client:
     max_connections: 100
     max_keepalive_connections: 30
     keepalive_timeout: 30
+
+# Redis Configuration (for caching)
+# redis:
+#   enabled: true
+#   host: "localhost"
+#   port: 6379
+#   db: 0
+#   password: "${REDIS_PASSWORD}" # Example of using env var for password
 
 # Logging
 logging:
