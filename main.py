@@ -143,22 +143,8 @@ async def lifespan(app: FastAPI):
 
         app.state.config_mtime = app_state.config_manager._last_modified
 
-        # Start web UI in background thread
-        def start_web_ui():
-            try:
-                from web_ui import app as web_app
-                logger.info("Starting web UI on port 10000")
-                web_app.run(host='0.0.0.0', port=10000, debug=False, use_reloader=False)
-            except Exception as e:
-                logger.error(f"Failed to start web UI: {e}")
-
-        # TODO: The web UI should be run as a separate process in production.
-        # Running as a daemon thread is not recommended for production systems
-        # as it can be terminated abruptly on shutdown.
-        web_ui_thread = threading.Thread(target=start_web_ui, daemon=True)
-        web_ui_thread.start()
-        logger.info("Web UI thread started")
-
+        # The web UI is now started as a separate process.
+        # See README.md for instructions.
         logger.info("All systems initialized successfully")
 
     except Exception as e:

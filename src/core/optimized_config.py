@@ -14,6 +14,8 @@ import asyncio
 import hashlib
 import json
 import logging
+import os
+import re
 import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
@@ -181,6 +183,18 @@ class OptimizedConfigLoader:
             logger.warning(f"Failed to setup file watching: {e}")
             self.observer = None
 
+    def _substitute_env_vars(self, data: Any) -> Any:
+        """Recursively substitute environment variables in config data."""
+        if isinstance(data, dict):
+            return {k: self._substitute_env_vars(v) for k, v in data.items()}
+        elif isinstance(data, list):
+            return [self._substitute_env_vars(i) for i in data]
+        elif isinstance(data, str):
+            # Regex to find all ${VAR_NAME} patterns
+            pattern = re.compile(r'\$\{(.*?)\}')
+            return pattern.sub(lambda match: os.getenv(match.group(1), ''), data)
+        return data
+
     def _calculate_file_hash(self, file_path: Path) -> str:
         """Calculate file hash for change detection"""
         with open(file_path, 'rb') as f:
@@ -196,9 +210,11 @@ class OptimizedConfigLoader:
 
             with open(file_path, 'r', encoding='utf-8') as f:
                 if file_path.suffix.lower() in ['.yaml', '.yml']:
-                    data = yaml.safe_load(f)
+                    raw_data = yaml.safe_load(f)
+                    data = self._substitute_env_vars(raw_data)
                 elif file_path.suffix.lower() == '.json':
-                    data = json.load(f)
+                    raw_data = json.load(f)
+                    data = self._substitute_env_vars(raw_data)
                 else:
                     raise ValueError(f"Unsupported config format: {file_path.suffix}")
 

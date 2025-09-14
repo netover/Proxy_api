@@ -1,4 +1,10 @@
 # LLM Proxy API Configuration
+#
+# This file supports environment variable substitution.
+# You can use ${VAR_NAME} to insert the value of an environment variable.
+# Example:
+#   api_key: "${MY_API_KEY}"
+#
 # Updated with OpenTelemetry, Chaos Engineering, and Load Testing features
 
 app:

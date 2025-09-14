@@ -8,7 +8,7 @@ import yaml
 import tempfile
 import os
 from pathlib import Path
-from src.core.unified_config import config_manager, ProxyConfig, ProviderConfig
+from src.core.unified_config import config_manager, UnifiedConfig, ProviderConfig
 from src.core.provider_factory import provider_factory
 from src.core.unified_config import ProviderType
 
@@ -127,7 +127,7 @@ async def test_provider_forcing():
                     {'name': 'p2', 'type': 'anthropic', 'base_url': 'https://api.anthropic.com', 'api_key_env': 'KEY2', 'models': ['m2'], 'forced': True}
                 ]
             }
-            ProxyConfig(**invalid_config)
+            UnifiedConfig(**invalid_config)
             assert False, "Should have raised validation error"
         except ValueError as e:
             assert "Only one provider can be forced" in str(e)

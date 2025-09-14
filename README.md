@@ -51,11 +51,14 @@ pip install -r requirements.txt
 export OPENAI_API_KEY="your-openai-key"
 export API_KEY="your-proxy-key"
 
-# Start the application
+# In one terminal, start the main proxy API
 python main.py
+
+# In another terminal, start the Web UI
+python web_ui.py
 ```
 
-**That's it!** Your proxy API is now running at `http://localhost:8000`.
+**That's it!** Your proxy API is now running at `http://localhost:8000` and the Web UI is at `http://localhost:10000`.
 
 ## 📦 Installation
 
@@ -93,8 +96,11 @@ pip install httpx[http2] aiofiles watchdog psutil
 cp config.yaml.example config.yaml
 # Edit config.yaml with your API keys
 
-# Start application
+# Start the main proxy API
 python main_dynamic.py
+
+# In a separate terminal, start the Web UI
+python web_ui.py
 ```
 
 ### Configuration
