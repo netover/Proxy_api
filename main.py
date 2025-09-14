@@ -11,9 +11,6 @@ from contextlib import asynccontextmanager
 
 import uvicorn
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse
-from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -41,9 +38,8 @@ from src.core.logging import ContextualLogger, setup_logging
 from src.core.memory_manager import get_memory_manager, shutdown_memory_manager
 from src.core.provider_factory import provider_factory
 from src.core.retry_strategies import RetryConfig
-from src.core.cache_factory import create_cache
-from src.core.smart_cache import SmartCache
-from src.core.cache_redis import RedisCacheAdapter
+from src.core.smart_cache import (get_response_cache, get_summary_cache,
+                                  shutdown_caches)
 from src.core.telemetry import TracedSpan, telemetry
 
 # Setup logging with environment variable support
@@ -94,22 +90,32 @@ async def lifespan(app: FastAPI):
             span.set_attribute("http.client.initialized", True)
             logger.info("HTTP client initialized")
     
-        # Initialize caches using the factory
+        # Initialize caches
         with TracedSpan("cache.initialize") as span:
-            app.state.response_cache = await create_cache(config, 'response')
-            app.state.summary_cache_obj = await create_cache(config, 'summary')
-            app.state.lru_cache = await create_cache(config, 'lru')
-
-            # For logging purposes, check the type of one of the caches
-            backend = "redis" if isinstance(app.state.response_cache, RedisCacheAdapter) else "in_memory"
-            span.set_attribute("cache.backend", backend)
-            logger.info(f"Caches initialized with '{backend}' backend.")
+            app.state.response_cache = await get_response_cache()
+            app.state.summary_cache_obj = await get_summary_cache()
+            span.set_attribute("cache.response.initialized", True)
+            span.set_attribute("cache.summary.initialized", True)
+            logger.info("Smart caches initialized")
 
         # Initialize memory manager
         with TracedSpan("memory_manager.initialize") as span:
             app.state.memory_manager = await get_memory_manager()
             span.set_attribute("memory_manager.initialized", True)
             logger.info("Memory manager initialized")
+
+        # Initialize context condensation cache with persistence
+        from src.utils.context_condenser import AsyncLRUCache
+        persist_file = 'cache.json' if config.settings.condensation.cache_persist else None
+        redis_url = getattr(config.settings.condensation, 'cache_redis_url', None)
+        app.state.lru_cache = AsyncLRUCache(
+            maxsize=config.settings.condensation.cache_size,
+            persist_file=persist_file,
+            redis_url=redis_url
+        )
+        if persist_file:
+            await app.state.lru_cache.initialize()
+        logger.info("Context condensation cache initialized")
 
         # Legacy cache support (for backward compatibility)
         app.state.cache = {}
@@ -126,9 +132,8 @@ async def lifespan(app: FastAPI):
         logger.info("Rate limiter configured and initialized")
 
         # Configure chaos engineering
-        if config.settings.chaos_engineering:
-            chaos_monkey.configure(config.settings.chaos_engineering)
-            logger.info("Chaos engineering configured")
+        chaos_monkey.configure(config.settings.get('chaos_engineering', {}))
+        logger.info("Chaos engineering configured")
 
         # Start alerting system
         with TracedSpan("alerting.initialize") as span:
@@ -137,6 +142,22 @@ async def lifespan(app: FastAPI):
             logger.info("Alerting system initialized and monitoring started")
 
         app.state.config_mtime = app_state.config_manager._last_modified
+
+        # Start web UI in background thread
+        def start_web_ui():
+            try:
+                from web_ui import app as web_app
+                logger.info("Starting web UI on port 10000")
+                web_app.run(host='0.0.0.0', port=10000, debug=False, use_reloader=False)
+            except Exception as e:
+                logger.error(f"Failed to start web UI: {e}")
+
+        # TODO: The web UI should be run as a separate process in production.
+        # Running as a daemon thread is not recommended for production systems
+        # as it can be terminated abruptly on shutdown.
+        web_ui_thread = threading.Thread(target=start_web_ui, daemon=True)
+        web_ui_thread.start()
+        logger.info("Web UI thread started")
 
         logger.info("All systems initialized successfully")
 
@@ -160,26 +181,12 @@ async def lifespan(app: FastAPI):
         if hasattr(app.state, 'memory_manager'):
             shutdown_tasks.append(shutdown_memory_manager())
 
-        # Unified cache shutdown logic
-        caches_to_shutdown = set()
         if hasattr(app.state, 'response_cache'):
-            caches_to_shutdown.add(app.state.response_cache)
-        if hasattr(app.state, 'summary_cache_obj'):
-            caches_to_shutdown.add(app.state.summary_cache_obj)
-        if hasattr(app.state, 'lru_cache'):
-            caches_to_shutdown.add(app.state.lru_cache)
+            shutdown_tasks.append(shutdown_caches())
 
-        from src.core.smart_cache import shutdown_caches
-        smart_cache_shutdown_queued = False
-
-        for cache in caches_to_shutdown:
-            if hasattr(cache, 'stop'):  # For RedisCacheAdapter
-                shutdown_tasks.append(cache.stop())
-            elif hasattr(cache, 'shutdown'):  # For AsyncLRUCache
-                shutdown_tasks.append(cache.shutdown())
-            elif isinstance(cache, SmartCache) and not smart_cache_shutdown_queued:
-                shutdown_tasks.append(shutdown_caches())
-                smart_cache_shutdown_queued = True
+        # Shutdown context condensation cache
+        if hasattr(app.state, 'lru_cache') and app.state.lru_cache:
+            shutdown_tasks.append(app.state.lru_cache.shutdown())
 
         # Shutdown alerting system
         shutdown_tasks.append(alert_manager.stop_monitoring())
@@ -215,18 +222,6 @@ app = FastAPI(
     description="High-performance LLM proxy with intelligent routing and fallback",
     lifespan=lifespan
 )
-
-# Mount static files and templates for the Web UI
-app.mount("/static", StaticFiles(directory="static"), name="static")
-templates = Jinja2Templates(directory="templates")
-
-# Serve the index.html as the root page
-# This must be defined BEFORE the API routers are included to have priority.
-@app.get("/", response_class=HTMLResponse)
-async def read_root(request: Request):
-    # Pass environment variables to the template
-    context = {"request": request, "env_vars": os.environ}
-    return templates.TemplateResponse("index.html", context)
 
 # Include new API routers
 app.include_router(root_router)

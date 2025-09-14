@@ -5,7 +5,6 @@ Supports api_version query param
 """
 
 import json
-import os
 import time
 from typing import Any, AsyncGenerator, Dict, Union
 from urllib.parse import urlencode
@@ -31,9 +30,6 @@ class AzureOpenAIProvider(BaseProvider):
         # Use first model as deployment_id if not specified in custom_headers
         self.deployment_id = config.custom_headers.get('deployment_id', config.models[0] if config.models else 'your-deployment')
         self.api_version = config.custom_headers.get('api_version', '2023-12-01-preview')
-        self.api_key = os.getenv(config.api_key_env)
-        if not self.api_key:
-            raise AuthenticationError(f"API key environment variable not set: {config.api_key_env}")
         self.logger = ContextualLogger(f"provider.{config.name}")
 
     async def _perform_health_check(self) -> Dict[str, Any]:

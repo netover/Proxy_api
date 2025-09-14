@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import yaml
-from pydantic import BaseModel, Field, HttpUrl, field_validator, model_validator
+from pydantic import BaseModel, Field, HttpUrl, field_validator, validator
 
 from .logging import ContextualLogger
 from .metrics import metrics_collector
@@ -67,12 +67,12 @@ class ProviderConfig(BaseModel):
                 raise ValueError(f"Invalid header name: {key}")
         return v
     
-    @model_validator(mode='after')
-    def validate_forced_consistency(self) -> 'ProviderConfig':
+    @validator('forced', pre=True, always=True)
+    def validate_forced_consistency(cls, v, values):
         """Ensure forced providers are also enabled"""
-        if self.forced and not self.enabled:
-            raise ValueError('Forced providers must also be enabled')
-        return self
+        if v and not values.get('enabled', True):
+            raise ValueError('Forced providers must be enabled')
+        return v
 
 class CondensationSettings(BaseModel):
     """Condensation-specific settings for context summarization"""
@@ -111,14 +111,6 @@ class CacheSettings(BaseModel):
             return Path.cwd() / v
         return v
 
-class RedisSettings(BaseModel):
-    """Redis connection settings"""
-    enabled: bool = Field(default=False, description="Enable Redis for caching")
-    host: str = Field(default="localhost", description="Redis server host")
-    port: int = Field(default=6379, ge=1, le=65535, description="Redis server port")
-    db: int = Field(default=0, ge=0, description="Redis database number")
-    password: Optional[str] = Field(default=None, description="Redis password")
-
 class GlobalSettings(BaseModel):
     """Global application settings"""
     # App info
@@ -144,22 +136,17 @@ class GlobalSettings(BaseModel):
     circuit_breaker_threshold: int = Field(default=5, ge=1, le=50)
     circuit_breaker_timeout: int = Field(default=60, ge=1, le=3600)
     
-    # Optional Features
-    chaos_engineering: Optional[Dict[str, Any]] = Field(default=None, description="Chaos engineering settings")
-
     # Paths
     log_level: str = Field(default="INFO", pattern=r'^(DEBUG|INFO|WARNING|ERROR|CRITICAL)$')
     log_file: Optional[Path] = Field(default=None)
     config_file: Path = Field(default=Path("config.yaml"))
     condensation: CondensationSettings = Field(default_factory=CondensationSettings, description="Settings for context condensation optimizations")
     cache: CacheSettings = Field(default_factory=CacheSettings, description="Settings for model discovery caching")
-    redis: RedisSettings = Field(default_factory=RedisSettings, description="Redis cache settings")
     
-    model_config = {
-        "env_prefix": "PROXY_API_",
-        "case_sensitive": False,
-        "env_file": ".env",
-    }
+    class Config:
+        env_prefix = "PROXY_API_"
+        case_sensitive = False
+        env_file = ".env"
 
 class UnifiedConfig(BaseModel):
     """Complete proxy configuration"""
@@ -212,7 +199,6 @@ class ConfigManager:
         self._critical_config: Optional[Dict[str, Any]] = None
         self._lazy_loaded_sections: Dict[str, Any] = {}
         self._event_loop = None
-        self._last_modified: float = 0.0
 
     def _get_event_loop(self):
         """Get or create event loop for async operations"""

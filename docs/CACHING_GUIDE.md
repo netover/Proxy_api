@@ -349,41 +349,51 @@ alerting:
 
 ## Configuration
 
-The caching system is configured via the main `config.yaml` file. The application can use either a default in-memory cache or a more robust, scalable Redis-backed cache.
-
-### In-Memory Cache (Default)
-
-If Redis is not configured, the system defaults to a high-performance in-memory cache. You can configure its properties under the `caching` section:
+### Basic Configuration
 
 ```yaml
-# Example in-memory cache configuration from config.yaml
+# Basic cache configuration
 caching:
   enabled: true
-  response_cache:
-    max_size_mb: 100
-    ttl: 1800        # 30 minutes
-    compression: true
-  summary_cache:
-    max_size_mb: 50
-    ttl: 3600        # 1 hour
-    compression: true
+  default_ttl: 1800
+  max_memory_mb: 512
+  enable_disk_cache: true
+  cache_dir: "./cache"
+  enable_compression: true
+  compression_level: 6
 ```
 
-### Redis Cache (Recommended for Production)
-
-For production and multi-instance deployments, it is highly recommended to use Redis as a distributed caching backend. This provides scalability, persistence, and resilience.
-
-To enable Redis, add the `redis` block to your `config.yaml`. When this section is present and `enabled` is `true`, it will override the default in-memory caches.
+### Advanced Configuration
 
 ```yaml
-# Example Redis configuration in config.yaml
-redis:
+# Advanced cache configuration
+caching:
   enabled: true
-  host: "localhost"
-  port: 6379
-  db: 0
-  password: "${REDIS_PASSWORD}" # Supports environment variable substitution
-```
+
+  # Memory cache settings
+  memory_cache:
+    max_size: 10000
+    default_ttl: 1800
+    enable_lru: true
+    enable_compression: true
+    compression_threshold: 1024  # Compress items > 1KB
+
+  # Disk cache settings
+  disk_cache:
+    enabled: true
+    max_size_mb: 1024
+    cache_dir: "/var/cache/llm-proxy"
+    enable_compression: true
+    compression_level: 6
+    cleanup_interval: 3600  # Clean every hour
+
+  # Redis cache settings (for distributed deployments)
+  redis_cache:
+    enabled: false
+    url: "redis://localhost:6379"
+    key_prefix: "llm_proxy:"
+    ttl: 1800
+    max_connections: 10
 
   # Warming settings
   warming:
@@ -401,6 +411,31 @@ redis:
     enable_detailed_stats: true
     alert_on_low_hit_rate: true
     hit_rate_threshold: 0.7
+```
+
+### Environment-Specific Configuration
+
+```yaml
+# Development
+development:
+  caching:
+    default_ttl: 300          # Shorter TTL for development
+    max_memory_mb: 256        # Smaller cache
+    enable_disk_cache: false  # Disable disk cache
+    warming:
+      enabled: false          # Disable warming
+
+# Production
+production:
+  caching:
+    default_ttl: 1800         # Longer TTL for production
+    max_memory_mb: 2048       # Larger cache
+    enable_disk_cache: true   # Enable disk cache
+    redis_cache:
+      enabled: true           # Enable Redis for distributed cache
+    warming:
+      enabled: true           # Enable warming
+      interval: 600           # Less frequent warming
 ```
 
 ## Troubleshooting
@@ -722,6 +757,27 @@ def optimize_ttl():
 ---
 
 ## 🔧 Advanced Features
+
+### Distributed Caching
+
+```yaml
+# Redis-based distributed cache
+redis_cache:
+  enabled: true
+  cluster_mode: false
+  hosts:
+    - host: "redis-1.example.com"
+      port: 6379
+    - host: "redis-2.example.com"
+      port: 6379
+  password: "${REDIS_PASSWORD}"
+  ssl: true
+  key_prefix: "llm_proxy:"
+  ttl: 1800
+  max_connections: 20
+  retry_on_failure: true
+  retry_delay: 1.0
+```
 
 ### Cache Analytics
 

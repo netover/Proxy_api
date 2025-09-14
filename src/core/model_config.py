@@ -5,7 +5,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, Optional
 
-from pydantic import BaseModel, Field, field_serializer
+from pydantic import BaseModel, Field
 
 from .logging import ContextualLogger
 
@@ -19,9 +19,10 @@ class ModelSelection(BaseModel):
     editable: bool = Field(default=True, description="Whether this selection can be modified")
     last_updated: datetime = Field(default_factory=datetime.utcnow)
 
-    @field_serializer('last_updated')
-    def serialize_dt(self, dt: datetime, _info):
-        return dt.isoformat()
+    class Config:
+        json_encoders = {
+            datetime: lambda v: v.isoformat()
+        }
 
 class ModelConfigManager:
     """Manages persistent model selections across providers"""

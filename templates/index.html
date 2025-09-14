@@ -10,9 +10,9 @@
     <!-- Title: Sets page title in tab/bookmark. Functionality: User-friendly name for config UI. Issue: Static; could be dynamic. Opt: Add meta description for SEO if public. -->
     <title>LLM Proxy Configuration</title>
     <!-- CSS link: Loads style.css from static folder via Flask url_for for path resolution. Functionality: Applies neumorphic styling. Issue: If /static not served or auth applied, 404 or blocked. Opt: Inline critical CSS for performance, add preload. -->
-    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <!-- Model Discovery JavaScript -->
-    <script src="/static/js/model_discovery.js" defer></script>
+    <script src="{{ url_for('static', filename='js/model_discovery.js') }}" defer></script>
 </head>
 <body>
     <!-- Body: Main content wrapper. Functionality: Contains all UI elements. Issue: No role or lang repeat. Opt: Add onload for JS init. -->
@@ -48,92 +48,139 @@
         <div id="config-section" class="tab-content">
             <h1>LLM Proxy Configuration</h1>
 
+        <!-- Flash messages: Jinja block to display Flask flashed messages with categories (error/success). Functionality: User feedback from server validation/saves. Issue: No auto-dismiss; static display. Opt: Add JS for fade-out, ARIA live region for dynamic updates. -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flash-messages" role="alert" aria-live="polite">  <!-- Add ARIA: role=alert for screen reader announcement, aria-live for dynamic. -->
+                {% for category, message in messages %}
+                    <div class="flash {{ category }}" role="status">{{ message }}</div>  <!-- ARIA: role=status for non-interactive messages. -->
+                {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
         <!-- Main form: Submits config data to server. Functionality: POST to save route with form data. Issue: No CSRF protection (vulnerable to attacks; use Flask-WTF). Action mismatch if route renamed. No client validation. Opt: Add CSRF token <input type="hidden" name="csrf_token" value="placeholder"> if WtfForms, inline JS for validation. -->
-        <form action="#" method="post" role="form" aria-label="LLM Proxy configuration form">  <!-- Removed Flask-specific url_for. Action is not critical for this verification. -->
+        <form action="{{ url_for('save_config') }}" method="post" role="form" aria-label="LLM Proxy configuration form">  <!-- Fix: Update action to save_config. Add ARIA: role=form, aria-label for screen readers. -->
 
-            <!-- Fieldset: Groups server settings semantically. Functionality: No border for style, legend for title. Issue: No ARIA. Opt: Add aria-labelledby to legend id. -->
-            <fieldset class="neumorphic-card">
-                <legend id="server-legend">Server Settings</legend>  <!-- Add id for ARIA reference. -->
-                <div class="form-group">
-                    <!-- Label: Associates with input via for/id. Functionality: Accessibility for screen readers. Issue: No required indicator. Opt: Add * for visual, aria-required. -->
-                    <label for="port" aria-describedby="port-help">Server Port <span aria-hidden="true">*</span></label>  <!-- Add required indicator, aria-describedby for help. -->
-                    <input type="number" id="port" name="port" value="{{ env_vars.get('PROXY_API_PORT', 8000) }}" class="neumorphic-input" aria-required="true" min="1" max="65535" required>  <!-- Add ARIA required, min/max for validation, HTML5 required. Note: Default 8000; server uses 10000 – sync via env. -->
-                    <small id="port-help" class="help-text">Port between 1 and 65535.</small>  <!-- Help text for validation. -->
-                </div>
-                <div class="form-group">
-                    <label for="api_key_header" aria-describedby="header-help">API Key Header</label>
-                    <input type="text" id="api_key_header" name="api_key_header" value="{{ env_vars.get('PROXY_API_API_KEY_HEADER', 'X-API-Key') }}" class="neumorphic-input" aria-describedby="header-help" pattern="[A-Za-z0-9_-]+" title="Alphanumeric, underscore, hyphen only.">  <!-- Add ARIA, pattern for validation. -->
-                    <small id="header-help" class="help-text">Header name for API key (e.g., X-API-Key).</small>
-                </div>
-            </fieldset>
+            <details class="config-section" open>
+                <summary>Server Settings</summary>
+                <fieldset class="neumorphic-card">
+                    <div class="form-group">
+                        <label for="port" aria-describedby="port-help">Server Port <span aria-hidden="true">*</span></label>
+                        <input type="number" id="port" name="port" value="{{ env_vars.get('PROXY_API_PORT', 8000) }}" class="neumorphic-input" aria-required="true" min="1" max="65535" required>
+                        <small id="port-help" class="help-text">Port between 1 and 65535.</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="api_key_header" aria-describedby="header-help">API Key Header</label>
+                        <input type="text" id="api_key_header" name="api_key_header" value="{{ env_vars.get('PROXY_API_API_KEY_HEADER', 'X-API-Key') }}" class="neumorphic-input" aria-describedby="header-help" pattern="[A-Za-z0-9_-]+" title="Alphanumeric, underscore, hyphen only.">
+                        <small id="header-help" class="help-text">Header name for API key (e.g., X-API-Key).</small>
+                    </div>
+                </fieldset>
+            </details>
 
-            <!-- Fieldset for providers: Groups all provider configs. Functionality: Loops over config.providers, renders editable cards. Issue: No add/remove buttons; static to existing only. No type select (hidden, can't change). Opt: Add JS for dynamic add/remove/reindex, select for type to update module/class/base_url. -->
-            <fieldset class="neumorphic-card">
-                <legend id="providers-legend">Providers</legend>
-                <div id="provider-list" aria-labelledby="providers-legend">  <!-- ARIA: aria-labelledby for section. -->
-                    {% for provider in config.get('providers', []) %}
-                    <div class="provider-card neumorphic-card-inset" role="group" aria-labelledby="provider-{{ loop.index0 }}-name">  <!-- ARIA: role=group for provider section. -->
-                        <div class="form-group">
-                            <label id="provider-{{ loop.index0 }}-name" for="name-{{ loop.index0 }}">Name <span aria-hidden="true">*</span></label>  <!-- ARIA: id for label, required. -->
-                            <input type="text" id="name-{{ loop.index0 }}" name="provider_name_{{ loop.index0 }}" value="{{ provider.name }}" class="neumorphic-input" aria-required="true" required>  <!-- ARIA required, HTML5 required. -->
-                        </div>
-                        <div class="form-group">
-                            <label for="key-{{ loop.index0 }}">API Key</label>
-                            <input type="password" id="key-{{ loop.index0 }}" name="api_key_value_{{ loop.index0 }}" value="" class="neumorphic-input" placeholder="Enter API Key" autocomplete="new-password">  <!-- Add autocomplete for security. -->
-                            <input type="hidden" name="api_key_env_{{ loop.index0 }}" value="{{ provider.api_key_env }}">
-                        </div>
-                        <div class="form-group">
-                            <label for="enabled-{{ loop.index0 }}">
-                                <input type="checkbox" id="enabled-{{ loop.index0 }}" name="enabled_{{ loop.index0 }}" value="true" {% if provider.enabled|default(true) %}checked{% endif %} class="neumorphic-input">
-                                Enabled
-                            </label>
-                            <span class="tooltip" title="Enable or disable this provider">ℹ️</span>
-                        </div>
-                        <div class="form-group">
-                            <label>
-                                <input type="radio" name="forced_provider" value="{{ provider.name }}" {% if provider.forced|default(false) %}checked{% endif %} class="neumorphic-input">
-                                Force this provider
-                            </label>
-                            <span class="tooltip" title="Force all requests to use this provider exclusively, bypassing normal priority and health checks">ℹ️</span>
-                        </div>
-                        <div class="form-group">
-                            <label for="models-{{ loop.index0 }}">Models <span aria-hidden="true">*</span></label>
-                            <div class="model-selection-container">
-                                <div class="model-controls">
-                                    <select id="models-dropdown-{{ loop.index0 }}" class="neumorphic-input model-dropdown" data-provider-index="{{ loop.index0 }}">
-                                        <option value="">Select from discovered models...</option>
-                                    </select>
-                                    <button type="button" class="neumorphic-btn model-refresh-btn" data-provider-index="{{ loop.index0 }}" title="Refresh available models">
-                                        🔄 Refresh
-                                    </button>
-                                </div>
-                                <div class="model-input-toggle">
-                                    <label>
-                                        <input type="checkbox" class="manual-input-toggle" data-provider-index="{{ loop.index0 }}">
-                                        Manual input
-                                    </label>
-                                </div>
-                                <textarea id="models-{{ loop.index0 }}" name="models_{{ loop.index0 }}" class="neumorphic-textarea model-textarea" rows="3" aria-required="true" required>{{ provider.models | join(', ') }}</textarea>
-                                <div class="model-validation-feedback" id="validation-{{ loop.index0 }}"></div>
-                                <div class="model-loading" id="loading-{{ loop.index0 }}" style="display: none;">
-                                    <div class="loading-spinner"></div>
-                                    <span>Loading models...</span>
+            <details class="config-section">
+                <summary>Security & API Keys</summary>
+                <fieldset class="neumorphic-card">
+                    <p class="placeholder-text">Configuration for main API keys will be added here.</p>
+                </fieldset>
+            </details>
+
+            <details class="config-section">
+                <summary>Rate Limiting</summary>
+                <fieldset class="neumorphic-card">
+                    <p class="placeholder-text">Configuration for global and per-route rate limits will be added here.</p>
+                </fieldset>
+            </details>
+
+            <details class="config-section">
+                <summary>Caching</summary>
+                <fieldset class="neumorphic-card">
+                    <p class="placeholder-text">Configuration for in-memory and Redis cache will be added here.</p>
+                </fieldset>
+            </details>
+
+            <details class="config-section">
+                <summary>Circuit Breaker</summary>
+                <fieldset class="neumorphic-card">
+                    <p class="placeholder-text">Configuration for circuit breaker settings will be added here.</p>
+                </fieldset>
+            </details>
+
+            <details class="config-section">
+                <summary>Context Condensation</summary>
+                <fieldset class="neumorphic-card">
+                    <p class="placeholder-text">Configuration for context condensation will be added here.</p>
+                </fieldset>
+            </details>
+
+            <details class="config-section" open>
+                <summary>Providers</summary>
+                <fieldset class="neumorphic-card">
+                    <div id="provider-list" aria-labelledby="providers-legend">
+                        {% for provider in config.get('providers', []) %}
+                        <div class="provider-card neumorphic-card-inset" role="group" aria-labelledby="provider-{{ loop.index0 }}-name">
+                            <div class="form-group">
+                                <label id="provider-{{ loop.index0 }}-name" for="name-{{ loop.index0 }}">Name <span aria-hidden="true">*</span></label>
+                                <input type="text" id="name-{{ loop.index0 }}" name="provider_name_{{ loop.index0 }}" value="{{ provider.name }}" class="neumorphic-input" aria-required="true" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="key-{{ loop.index0 }}">API Key</label>
+                                <input type="password" id="key-{{ loop.index0 }}" name="api_key_value_{{ loop.index0 }}" value="" class="neumorphic-input" placeholder="Enter API Key" autocomplete="new-password">
+                                <input type="hidden" name="api_key_env_{{ loop.index0 }}" value="{{ provider.api_key_env }}">
+                            </div>
+                            <div class="form-group">
+                                <label for="enabled-{{ loop.index0 }}">
+                                    <input type="checkbox" id="enabled-{{ loop.index0 }}" name="enabled_{{ loop.index0 }}" value="true" {% if provider.enabled|default(true) %}checked{% endif %} class="neumorphic-input">
+                                    Enabled
+                                </label>
+                                <span class="tooltip" title="Enable or disable this provider">ℹ️</span>
+                            </div>
+                            <div class="form-group">
+                                <label>
+                                    <input type="radio" name="forced_provider" value="{{ provider.name }}" {% if provider.forced|default(false) %}checked{% endif %} class="neumorphic-input">
+                                    Force this provider
+                                </label>
+                                <span class="tooltip" title="Force all requests to use this provider exclusively, bypassing normal priority and health checks">ℹ️</span>
+                            </div>
+                            <div class="form-group">
+                                <label for="models-{{ loop.index0 }}">Models <span aria-hidden="true">*</span></label>
+                                <div class="model-selection-container">
+                                    <div class="model-controls">
+                                        <select id="models-dropdown-{{ loop.index0 }}" class="neumorphic-input model-dropdown" data-provider-index="{{ loop.index0 }}">
+                                            <option value="">Select from discovered models...</option>
+                                        </select>
+                                        <button type="button" class="neumorphic-btn model-refresh-btn" data-provider-index="{{ loop.index0 }}" title="Refresh available models">
+                                            🔄 Refresh
+                                        </button>
+                                    </div>
+                                    <div class="model-input-toggle">
+                                        <label>
+                                            <input type="checkbox" class="manual-input-toggle" data-provider-index="{{ loop.index0 }}">
+                                            Manual input
+                                        </label>
+                                    </div>
+                                    <textarea id="models-{{ loop.index0 }}" name="models_{{ loop.index0 }}" class="neumorphic-textarea model-textarea" rows="3" aria-required="true" required>{{ provider.models | join(', ') }}</textarea>
+                                    <div class="model-validation-feedback" id="validation-{{ loop.index0 }}"></div>
+                                    <div class="model-loading" id="loading-{{ loop.index0 }}" style="display: none;">
+                                        <div class="loading-spinner"></div>
+                                        <span>Loading models...</span>
+                                    </div>
                                 </div>
                             </div>
+                            <div class="form-group">
+                                <label for="priority-{{ loop.index0 }}">Priority <span aria-hidden="true">*</span></label>
+                                <input type="number" id="priority-{{ loop.index0 }}" name="priority_{{ loop.index0 }}" value="{{ provider.priority }}" class="neumorphic-input" aria-required="true" min="0" required>
+                            </div>
+                            <!-- Hidden fields: Preserve backend data -->
+                            <input type="hidden" name="module_{{ loop.index0 }}" value="{{ provider.module|default('') }}">
+                            <input type="hidden" name="class_{{ loop.index0 }}" value="{{ provider.class|default('') }}">
+                            <input type="hidden" name="type_{{ loop.index0 }}" value="{{ provider.type }}">
+                            <input type="hidden" name="base_url_{{ loop.index0 }}" value="{{ provider.base_url|default('') }}">
                         </div>
-                        <div class="form-group">
-                            <label for="priority-{{ loop.index0 }}">Priority <span aria-hidden="true">*</span></label>
-                            <input type="number" id="priority-{{ loop.index0 }}" name="priority_{{ loop.index0 }}" value="{{ provider.priority }}" class="neumorphic-input" aria-required="true" min="0" required>
-                        </div>
-                        <!-- Hidden fields: Preserve backend data -->
-                        <input type="hidden" name="module_{{ loop.index0 }}" value="{{ provider.module|default('') }}">
-                        <input type="hidden" name="class_{{ loop.index0 }}" value="{{ provider.class|default('') }}">
-                        <input type="hidden" name="type_{{ loop.index0 }}" value="{{ provider.type }}">
-                        <input type="hidden" name="base_url_{{ loop.index0 }}" value="{{ provider.base_url|default('') }}">
+                        {% endfor %}
                     </div>
-                    {% endfor %}
-                </div>
-            </fieldset>
+                </fieldset>
+            </details>
 
             <!-- Form actions: Container for buttons. Functionality: Centers submit. Issue: No cancel/reset. Opt: Add reset button. -->
             <div class="form-actions">
