@@ -91,11 +91,12 @@ class Settings(BaseSettings):
     export_model_filter: Optional[str] = None
     export_log_level: str = "INFO"
 
-    class Config:
-        env_prefix = "PROXY_API_"
-        case_sensitive = False
-        env_file = ".env"
-        extra = "allow"
+    model_config = {
+        "env_prefix": "PROXY_API_",
+        "case_sensitive": False,
+        "env_file": ".env",
+        "extra": "allow",
+    }
 
 from src.core.app_config import ProviderConfig
 

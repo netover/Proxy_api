@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import yaml
-from pydantic import BaseModel, Field, HttpUrl, field_validator, validator
+from pydantic import BaseModel, Field, HttpUrl, field_validator, model_validator
 
 from .logging import ContextualLogger
 from .metrics import metrics_collector
@@ -67,12 +67,12 @@ class ProviderConfig(BaseModel):
                 raise ValueError(f"Invalid header name: {key}")
         return v
     
-    @validator('forced', pre=True, always=True)
-    def validate_forced_consistency(cls, v, values):
+    @model_validator(mode='after')
+    def validate_forced_consistency(self) -> 'ProviderConfig':
         """Ensure forced providers are also enabled"""
-        if v and not values.get('enabled', True):
-            raise ValueError('Forced providers must be enabled')
-        return v
+        if self.forced and not self.enabled:
+            raise ValueError('Forced providers must also be enabled')
+        return self
 
 class CondensationSettings(BaseModel):
     """Condensation-specific settings for context summarization"""
@@ -152,10 +152,11 @@ class GlobalSettings(BaseModel):
     cache: CacheSettings = Field(default_factory=CacheSettings, description="Settings for model discovery caching")
     redis: RedisSettings = Field(default_factory=RedisSettings, description="Redis cache settings")
     
-    class Config:
-        env_prefix = "PROXY_API_"
-        case_sensitive = False
-        env_file = ".env"
+    model_config = {
+        "env_prefix": "PROXY_API_",
+        "case_sensitive": False,
+        "env_file": ".env",
+    }
 
 class UnifiedConfig(BaseModel):
     """Complete proxy configuration"""

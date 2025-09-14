@@ -38,8 +38,8 @@ from src.core.logging import ContextualLogger, setup_logging
 from src.core.memory_manager import get_memory_manager, shutdown_memory_manager
 from src.core.provider_factory import provider_factory
 from src.core.retry_strategies import RetryConfig
-from src.core.smart_cache import (get_response_cache, get_summary_cache,
-                                  shutdown_caches)
+from src.core.cache_factory import create_cache
+from src.core.smart_cache import SmartCache
 from src.core.cache_redis import RedisCacheAdapter
 from src.core.telemetry import TracedSpan, telemetry
 
@@ -91,43 +91,16 @@ async def lifespan(app: FastAPI):
             span.set_attribute("http.client.initialized", True)
             logger.info("HTTP client initialized")
     
-        # Initialize caches
+        # Initialize caches using the factory
         with TracedSpan("cache.initialize") as span:
-            if hasattr(config.settings, "redis") and config.settings.redis.enabled:
-                logger.info("Redis cache is enabled. Initializing RedisCacheAdapter.")
-                redis_settings = config.settings.redis
+            app.state.response_cache = await create_cache(config, 'response')
+            app.state.summary_cache_obj = await create_cache(config, 'summary')
+            app.state.lru_cache = await create_cache(config, 'lru')
 
-                # Create a single Redis adapter and share it
-                redis_adapter = RedisCacheAdapter(settings=redis_settings)
-                await redis_adapter.start()
-
-                # Assign the same adapter to all cache state variables
-                app.state.response_cache = redis_adapter
-                app.state.summary_cache_obj = redis_adapter
-                app.state.lru_cache = redis_adapter
-
-                span.set_attribute("cache.backend", "redis")
-                logger.info("Redis cache adapter initialized and assigned.")
-
-            else:
-                logger.info("Redis cache is disabled. Falling back to in-memory caches.")
-                app.state.response_cache = await get_response_cache()
-                app.state.summary_cache_obj = await get_summary_cache()
-
-                from src.utils.context_condenser import AsyncLRUCache
-                persist_file = 'cache.json' if config.settings.condensation.cache_persist else None
-                app.state.lru_cache = AsyncLRUCache(
-                    maxsize=config.settings.condensation.cache_size,
-                    persist_file=persist_file,
-                    redis_url=None  # Ensure redis_url is not used
-                )
-                if persist_file:
-                    await app.state.lru_cache.initialize()
-
-                span.set_attribute("cache.backend", "in_memory")
-
-            span.set_attribute("cache.initialized", True)
-            logger.info("Caches initialized")
+            # For logging purposes, check the type of one of the caches
+            backend = "redis" if isinstance(app.state.response_cache, RedisCacheAdapter) else "in_memory"
+            span.set_attribute("cache.backend", backend)
+            logger.info(f"Caches initialized with '{backend}' backend.")
 
         # Initialize memory manager
         with TracedSpan("memory_manager.initialize") as span:
@@ -161,8 +134,22 @@ async def lifespan(app: FastAPI):
 
         app.state.config_mtime = app_state.config_manager._last_modified
 
-        # The web UI is now started as a separate process.
-        # See README.md for instructions.
+        # Start web UI in background thread
+        def start_web_ui():
+            try:
+                from web_ui import app as web_app
+                logger.info("Starting web UI on port 10000")
+                web_app.run(host='0.0.0.0', port=10000, debug=False, use_reloader=False)
+            except Exception as e:
+                logger.error(f"Failed to start web UI: {e}")
+
+        # TODO: The web UI should be run as a separate process in production.
+        # Running as a daemon thread is not recommended for production systems
+        # as it can be terminated abruptly on shutdown.
+        web_ui_thread = threading.Thread(target=start_web_ui, daemon=True)
+        web_ui_thread.start()
+        logger.info("Web UI thread started")
+
         logger.info("All systems initialized successfully")
 
     except Exception as e:
@@ -186,20 +173,25 @@ async def lifespan(app: FastAPI):
             shutdown_tasks.append(shutdown_memory_manager())
 
         # Unified cache shutdown logic
-        # The response_cache is the primary cache object to check
+        caches_to_shutdown = set()
         if hasattr(app.state, 'response_cache'):
-            # If it's a Redis adapter, it's the single instance for all caches
-            if isinstance(app.state.response_cache, RedisCacheAdapter):
-                shutdown_tasks.append(app.state.response_cache.stop())
-                logger.info("Queued Redis cache shutdown.")
-            else:
-                # Otherwise, it's the in-memory caches
+            caches_to_shutdown.add(app.state.response_cache)
+        if hasattr(app.state, 'summary_cache_obj'):
+            caches_to_shutdown.add(app.state.summary_cache_obj)
+        if hasattr(app.state, 'lru_cache'):
+            caches_to_shutdown.add(app.state.lru_cache)
+
+        from src.core.smart_cache import shutdown_caches
+        smart_cache_shutdown_queued = False
+
+        for cache in caches_to_shutdown:
+            if hasattr(cache, 'stop'):  # For RedisCacheAdapter
+                shutdown_tasks.append(cache.stop())
+            elif hasattr(cache, 'shutdown'):  # For AsyncLRUCache
+                shutdown_tasks.append(cache.shutdown())
+            elif isinstance(cache, SmartCache) and not smart_cache_shutdown_queued:
                 shutdown_tasks.append(shutdown_caches())
-                logger.info("Queued in-memory smart cache shutdown.")
-                # Also shut down the separate in-memory LRU cache if it exists
-                if hasattr(app.state, 'lru_cache') and hasattr(app.state.lru_cache, 'shutdown'):
-                     shutdown_tasks.append(app.state.lru_cache.shutdown())
-                     logger.info("Queued in-memory LRU cache shutdown.")
+                smart_cache_shutdown_queued = True
 
         # Shutdown alerting system
         shutdown_tasks.append(alert_manager.stop_monitoring())

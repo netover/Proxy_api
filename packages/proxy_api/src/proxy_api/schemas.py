@@ -1,7 +1,7 @@
 """API schemas and data models."""
 
 from typing import List, Optional, Dict, Any, Union
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 from enum import Enum
 
 
@@ -23,13 +23,15 @@ class ChatRequest(BaseModel):
     stop: Optional[Union[str, List[str]]] = Field(None, description="Stop sequences")
     stream: Optional[bool] = Field(False, description="Stream responses")
     
-    @validator('messages')
+    @field_validator('messages')
+    @classmethod
     def validate_messages(cls, v):
         if not v:
             raise ValueError('messages cannot be empty')
         return v
     
-    @validator('temperature')
+    @field_validator('temperature')
+    @classmethod
     def validate_temperature(cls, v):
         if v is not None and (v < 0 or v > 2):
             raise ValueError('temperature must be between 0 and 2')

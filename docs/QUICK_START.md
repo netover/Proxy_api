@@ -50,11 +50,8 @@ LOG_LEVEL=INFO
 ### 3. Executar o Servidor
 
 ```bash
-# Em um terminal, execute o servidor da API
+# Execute o servidor
 python main_dynamic.py
-
-# Em outro terminal, execute a interface web
-python web_ui.py
 ```
 
 **Saída esperada:**

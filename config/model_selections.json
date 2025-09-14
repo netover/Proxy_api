@@ -2,11 +2,11 @@
   "openai": {
     "model_name": "gpt-3.5-turbo",
     "editable": true,
-    "last_updated": "2025-09-12T03:54:29.931051"
+    "last_updated": "2025-09-14T20:45:12.551923"
   },
   "anthropic": {
     "model_name": "claude-3-sonnet",
     "editable": true,
-    "last_updated": "2025-09-12T03:54:29.925757"
+    "last_updated": "2025-09-14T20:45:12.545472"
   }
 }
