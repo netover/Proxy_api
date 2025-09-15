@@ -30,6 +30,10 @@ async def lifespan(app: FastAPI):
         await asyncio.wait_for(app_state.initialize(), timeout=30.0)
         app.state.app_state = app_state
         logger.info("AppState initialized successfully")
+    except ModuleNotFoundError as e:
+        logger.error(f"A required dependency is missing: {e}. Please install it.")
+        logger.error("The application cannot start without all configured dependencies.")
+        raise
     except asyncio.TimeoutError:
         logger.error("AppState initialization timed out after 30 seconds")
         raise

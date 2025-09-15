@@ -121,6 +121,16 @@ class GlobalSettings(BaseModel):
     # Server
     host: str = Field(default="127.0.0.1", pattern=r'^[\w\.\-]+$')
     port: int = Field(default=8000, ge=1, le=65535)
+
+    @field_validator('port', mode='before')
+    @classmethod
+    def validate_port(cls, v):
+        if isinstance(v, str):
+            try:
+                return int(v)
+            except ValueError:
+                raise ValueError(f"Invalid port number: '{v}' cannot be converted to an integer.")
+        return v
     
     # Security
     api_keys: List[str] = Field(default_factory=list, min_items=1)

@@ -1,0 +1,12 @@
+{
+  "openai": {
+    "model_name": "gpt-4",
+    "editable": true,
+    "last_updated": "2025-09-12T03:54:29.924968"
+  },
+  "anthropic": {
+    "model_name": "claude-3-sonnet",
+    "editable": true,
+    "last_updated": "2025-09-12T03:54:29.925757"
+  }
+}

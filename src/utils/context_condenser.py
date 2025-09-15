@@ -99,7 +99,7 @@ class AsyncLRUCache:
             try:
                 for key, value in self.cache.items():
                     redis_key = f"cache:{key}"
-                    await self.redis_client.set(redis_key, json.dumps(value))
+                    await self.redis_client.set(redis_key, json.dumps(value, default=str))
                 logger.debug(f"Saved {len(self.cache)} items to Redis")
             except Exception as e:
                 logger.error(f"Failed to save Redis cache: {e}")
@@ -109,7 +109,7 @@ class AsyncLRUCache:
                 return
             try:
                 with open(self.persist_file, 'w', encoding='utf-8') as f:
-                    json.dump(dict(self.cache), f, ensure_ascii=False)
+                    json.dump(dict(self.cache), f, ensure_ascii=False, default=str)
                 logger.debug(f"Saved {len(self.cache)} items to {self.persist_file}")
             except Exception as e:
                 logger.error(f"Failed to save persistent cache: {e}")

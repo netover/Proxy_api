@@ -1,3 +1,4 @@
+import asyncio
 from pathlib import Path
 from typing import Optional
 
@@ -16,39 +17,41 @@ class AppState:
         self.provider_factory: Optional[ProviderFactory] = None
         self.config: Optional[UnifiedConfig] = None
         self.initialized = False
+        self._init_lock = asyncio.Lock()
     
     async def initialize(self, config_path: Optional[Path] = None):
-        """Initialize all components in correct order"""
-        if self.initialized:
-            logger.info("AppState already initialized")
-            return
-            
-        try:
-            logger.info("Initializing AppState components")
-            
-            # 1. Config manager first
-            self.config_manager = ConfigManager(config_path)
-            
-            # 2. Provider factory with config
-            self.provider_factory = ProviderFactory()
-            
-            # 3. Load configuration
-            self.config = self.config_manager.load_config()
-            logger.info(f"Loaded config with {len(self.config.providers)} providers")
-            
-            # 4. Initialize providers
-            await self.provider_factory.initialize_providers(self.config.providers)
-            logger.info("Providers initialized successfully")
-            
-            # 5. Configure rate limiter
-            rate_limiter.configure_limits(config.settings.rate_limit_rpm)
-            
-            self.initialized = True
-            logger.info("AppState initialization complete")
-            
-        except Exception as e:
-            logger.error(f"Failed to initialize AppState: {e}")
-            raise
+        """Initialize all components in correct order, protected by a lock."""
+        async with self._init_lock:
+            if self.initialized:
+                logger.info("AppState already initialized")
+                return
+
+            try:
+                logger.info("Initializing AppState components")
+
+                # 1. Config manager first
+                self.config_manager = ConfigManager(config_path)
+
+                # 2. Provider factory with config
+                self.provider_factory = ProviderFactory()
+
+                # 3. Load configuration
+                self.config = self.config_manager.load_config()
+                logger.info(f"Loaded config with {len(self.config.providers)} providers")
+
+                # 4. Initialize providers
+                await self.provider_factory.initialize_providers(self.config.providers)
+                logger.info("Providers initialized successfully")
+
+                # 5. Configure rate limiter
+                rate_limiter.configure_limits(self.config.settings.rate_limit_rpm)
+
+                self.initialized = True
+                logger.info("AppState initialization complete")
+
+            except Exception as e:
+                logger.error(f"Failed to initialize AppState: {e}")
+                raise
     
     async def shutdown(self):
         """Cleanup all resources"""
