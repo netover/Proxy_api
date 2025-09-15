@@ -81,35 +81,130 @@
             <details class="config-section">
                 <summary>Security & API Keys</summary>
                 <fieldset class="neumorphic-card">
-                    <p class="placeholder-text">Configuration for main API keys will be added here.</p>
+                    <div class="form-group">
+                        <label for="api_keys">API Keys</label>
+                        <textarea id="api_keys" name="api_keys" class="neumorphic-textarea" rows="3" aria-describedby="api-keys-help">{{ config.get('settings', {}).get('api_keys', []) | join('\n') }}</textarea>
+                        <small id="api-keys-help" class="help-text">One API key per line. These keys grant access to the proxy.</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="cors_origins">CORS Origins</label>
+                        <textarea id="cors_origins" name="cors_origins" class="neumorphic-textarea" rows="2" aria-describedby="cors-help">{{ config.get('settings', {}).get('cors_origins', ['*']) | join('\n') }}</textarea>
+                        <small id="cors-help" class="help-text">Allowed origins for CORS. Use '*' for all. One per line.</small>
+                    </div>
                 </fieldset>
             </details>
 
             <details class="config-section">
                 <summary>Rate Limiting</summary>
                 <fieldset class="neumorphic-card">
-                    <p class="placeholder-text">Configuration for global and per-route rate limits will be added here.</p>
+                    <div class="form-group">
+                        <label for="rate_limit_rpm">Requests Per Minute</label>
+                        <input type="number" id="rate_limit_rpm" name="rate_limit_rpm" value="{{ config.get('settings', {}).get('rate_limit_rpm', 1000) }}" class="neumorphic-input" min="1">
+                        <small class="help-text">Global requests per minute limit.</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="rate_limit_window">Rate Limit Window (seconds)</label>
+                        <input type="number" id="rate_limit_window" name="rate_limit_window" value="{{ config.get('settings', {}).get('rate_limit_window', 60) }}" class="neumorphic-input" min="1">
+                        <small class="help-text">The time window for the rate limit.</small>
+                    </div>
                 </fieldset>
             </details>
 
             <details class="config-section">
-                <summary>Caching</summary>
+                <summary>Caching (Model Discovery)</summary>
                 <fieldset class="neumorphic-card">
-                    <p class="placeholder-text">Configuration for in-memory and Redis cache will be added here.</p>
+                    <div class="form-group">
+                        <label for="cache_enabled">
+                            <input type="checkbox" id="cache_enabled" name="cache_enabled" value="true" {% if config.get('settings', {}).get('cache', {}).get('cache_enabled', true) %}checked{% endif %} class="neumorphic-input">
+                            Enable Model Discovery Cache
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label for="cache_ttl">Cache TTL (seconds)</label>
+                        <input type="number" id="cache_ttl" name="cache_ttl" value="{{ config.get('settings', {}).get('cache', {}).get('cache_ttl', 300) }}" class="neumorphic-input" min="60">
+                        <small class="help-text">Time-to-live for cached model discovery results.</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="cache_persist">
+                            <input type="checkbox" id="cache_persist" name="cache_persist" value="true" {% if config.get('settings', {}).get('cache', {}).get('cache_persist', false) %}checked{% endif %} class="neumorphic-input">
+                            Enable Persistent Cache
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label for="cache_dir">Cache Directory</label>
+                        <input type="text" id="cache_dir" name="cache_dir" value="{{ config.get('settings', {}).get('cache', {}).get('cache_dir', '') }}" class="neumorphic-input" placeholder="e.g., /var/cache/llm_proxy">
+                        <small class="help-text">Directory for persistent cache (if enabled).</small>
+                    </div>
                 </fieldset>
             </details>
 
             <details class="config-section">
                 <summary>Circuit Breaker</summary>
                 <fieldset class="neumorphic-card">
-                    <p class="placeholder-text">Configuration for circuit breaker settings will be added here.</p>
+                    <div class="form-group">
+                        <label for="circuit_breaker_threshold">Failure Threshold</label>
+                        <input type="number" id="circuit_breaker_threshold" name="circuit_breaker_threshold" value="{{ config.get('settings', {}).get('circuit_breaker_threshold', 5) }}" class="neumorphic-input" min="1">
+                        <small class="help-text">Number of failures before the circuit opens.</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="circuit_breaker_timeout">Timeout (seconds)</label>
+                        <input type="number" id="circuit_breaker_timeout" name="circuit_breaker_timeout" value="{{ config.get('settings', {}).get('circuit_breaker_timeout', 60) }}" class="neumorphic-input" min="1">
+                        <small class="help-text">Time before trying to close the circuit.</small>
+                    </div>
                 </fieldset>
             </details>
 
             <details class="config-section">
                 <summary>Context Condensation</summary>
                 <fieldset class="neumorphic-card">
-                    <p class="placeholder-text">Configuration for context condensation will be added here.</p>
+                    <div class="form-group">
+                        <label for="condensation_cache_ttl">Cache TTL (seconds)</label>
+                        <input type="number" id="condensation_cache_ttl" name="condensation_cache_ttl" value="{{ config.get('settings', {}).get('condensation', {}).get('cache_ttl', 3600) }}" class="neumorphic-input">
+                    </div>
+                    <div class="form-group">
+                        <label for="condensation_cache_size">Cache Size</label>
+                        <input type="number" id="condensation_cache_size" name="condensation_cache_size" value="{{ config.get('settings', {}).get('condensation', {}).get('cache_size', 1000) }}" class="neumorphic-input">
+                    </div>
+                    <div class="form-group">
+                        <label for="truncation_threshold">Truncation Threshold</label>
+                        <input type="number" id="truncation_threshold" name="truncation_threshold" value="{{ config.get('settings', {}).get('condensation', {}).get('truncation_threshold', 2000) }}" class="neumorphic-input">
+                    </div>
+                    <div class="form-group">
+                        <label for="max_tokens_default">Default Max Tokens</label>
+                        <input type="number" id="max_tokens_default" name="max_tokens_default" value="{{ config.get('settings', {}).get('condensation', {}).get('max_tokens_default', 512) }}" class="neumorphic-input">
+                    </div>
+                    <div class="form-group">
+                        <label for="adaptive_factor">Adaptive Factor</label>
+                        <input type="number" step="0.01" id="adaptive_factor" name="adaptive_factor" value="{{ config.get('settings', {}).get('condensation', {}).get('adaptive_factor', 0.5) }}" class="neumorphic-input">
+                    </div>
+                    <div class="form-group">
+                        <label for="error_keywords">Error Keywords</label>
+                        <textarea id="error_keywords" name="error_keywords" class="neumorphic-textarea" rows="2">{{ config.get('settings', {}).get('condensation', {}).get('error_keywords', []) | join(', ') }}</textarea>
+                        <small class="help-text">Comma-separated keywords to detect long context errors.</small>
+                    </div>
+                     <div class="form-group">
+                        <label for="fallback_strategies">Fallback Strategies</label>
+                        <textarea id="fallback_strategies" name="fallback_strategies" class="neumorphic-textarea" rows="2">{{ config.get('settings', {}).get('condensation', {}).get('fallback_strategies', []) | join(', ') }}</textarea>
+                        <small class="help-text">Comma-separated list of strategies (e.g., truncate, secondary_provider).</small>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" name="condensation_cache_persist" value="true" {% if config.get('settings', {}).get('condensation', {}).get('cache_persist', false) %}checked{% endif %} class="neumorphic-input">
+                            Enable Persistent Cache
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" name="adaptive_enabled" value="true" {% if config.get('settings', {}).get('condensation', {}).get('adaptive_enabled', true) %}checked{% endif %} class="neumorphic-input">
+                            Enable Adaptive Token Limit
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" name="dynamic_reload" value="true" {% if config.get('settings', {}).get('condensation', {}).get('dynamic_reload', true) %}checked{% endif %} class="neumorphic-input">
+                            Enable Dynamic Reload
+                        </label>
+                    </div>
                 </fieldset>
             </details>
 
@@ -133,47 +228,55 @@
                                     <input type="checkbox" id="enabled-{{ loop.index0 }}" name="enabled_{{ loop.index0 }}" value="true" {% if provider.enabled|default(true) %}checked{% endif %} class="neumorphic-input">
                                     Enabled
                                 </label>
-                                <span class="tooltip" title="Enable or disable this provider">ℹ️</span>
                             </div>
                             <div class="form-group">
                                 <label>
                                     <input type="radio" name="forced_provider" value="{{ provider.name }}" {% if provider.forced|default(false) %}checked{% endif %} class="neumorphic-input">
                                     Force this provider
                                 </label>
-                                <span class="tooltip" title="Force all requests to use this provider exclusively, bypassing normal priority and health checks">ℹ️</span>
                             </div>
                             <div class="form-group">
-                                <label for="models-{{ loop.index0 }}">Models <span aria-hidden="true">*</span></label>
-                                <div class="model-selection-container">
-                                    <div class="model-controls">
-                                        <select id="models-dropdown-{{ loop.index0 }}" class="neumorphic-input model-dropdown" data-provider-index="{{ loop.index0 }}">
-                                            <option value="">Select from discovered models...</option>
-                                        </select>
-                                        <button type="button" class="neumorphic-btn model-refresh-btn" data-provider-index="{{ loop.index0 }}" title="Refresh available models">
-                                            🔄 Refresh
-                                        </button>
-                                    </div>
-                                    <div class="model-input-toggle">
-                                        <label>
-                                            <input type="checkbox" class="manual-input-toggle" data-provider-index="{{ loop.index0 }}">
-                                            Manual input
-                                        </label>
-                                    </div>
-                                    <textarea id="models-{{ loop.index0 }}" name="models_{{ loop.index0 }}" class="neumorphic-textarea model-textarea" rows="3" aria-required="true" required>{{ provider.models | join(', ') }}</textarea>
-                                    <div class="model-validation-feedback" id="validation-{{ loop.index0 }}"></div>
-                                    <div class="model-loading" id="loading-{{ loop.index0 }}" style="display: none;">
-                                        <div class="loading-spinner"></div>
-                                        <span>Loading models...</span>
-                                    </div>
-                                </div>
+                                <label for="models-{{ loop.index0 }}">Models</label>
+                                <textarea id="models-{{ loop.index0 }}" name="models_{{ loop.index0 }}" class="neumorphic-textarea" rows="2">{{ provider.models | join(', ') }}</textarea>
+                                <small class="help-text">Comma-separated list of models.</small>
                             </div>
                             <div class="form-group">
-                                <label for="priority-{{ loop.index0 }}">Priority <span aria-hidden="true">*</span></label>
-                                <input type="number" id="priority-{{ loop.index0 }}" name="priority_{{ loop.index0 }}" value="{{ provider.priority }}" class="neumorphic-input" aria-required="true" min="0" required>
+                                <label for="priority-{{ loop.index0 }}">Priority</label>
+                                <input type="number" id="priority-{{ loop.index0 }}" name="priority_{{ loop.index0 }}" value="{{ provider.priority | default(100) }}" class="neumorphic-input" min="1">
                             </div>
-                            <!-- Hidden fields: Preserve backend data -->
-                            <input type="hidden" name="module_{{ loop.index0 }}" value="{{ provider.module|default('') }}">
-                            <input type="hidden" name="class_{{ loop.index0 }}" value="{{ provider.class|default('') }}">
+                            <div class="form-group">
+                                <label for="timeout-{{ loop.index0 }}">Timeout (s)</label>
+                                <input type="number" id="timeout-{{ loop.index0 }}" name="timeout_{{ loop.index0 }}" value="{{ provider.timeout | default(30) }}" class="neumorphic-input" min="1">
+                            </div>
+                             <div class="form-group">
+                                <label for="max_retries-{{ loop.index0 }}">Max Retries</label>
+                                <input type="number" id="max_retries-{{ loop.index0 }}" name="max_retries_{{ loop.index0 }}" value="{{ provider.max_retries | default(3) }}" class="neumorphic-input" min="0">
+                            </div>
+                             <div class="form-group">
+                                <label for="retry_delay-{{ loop.index0 }}">Retry Delay (s)</label>
+                                <input type="number" step="0.1" id="retry_delay-{{ loop.index0 }}" name="retry_delay_{{ loop.index0 }}" value="{{ provider.retry_delay | default(1.0) }}" class="neumorphic-input" min="0.1">
+                            </div>
+                            <div class="form-group">
+                                <label for="rate_limit-{{ loop.index0 }}">Rate Limit (RPM)</label>
+                                <input type="number" id="rate_limit-{{ loop.index0 }}" name="rate_limit_{{ loop.index0 }}" value="{{ provider.rate_limit | default('') }}" class="neumorphic-input" placeholder="Optional" min="1">
+                            </div>
+                            <div class="form-group">
+                                <label for="max_connections-{{ loop.index0 }}">Max Connections</label>
+                                <input type="number" id="max_connections-{{ loop.index0 }}" name="max_connections_{{ loop.index0 }}" value="{{ provider.max_connections | default(1000) }}" class="neumorphic-input" min="1">
+                            </div>
+                            <div class="form-group">
+                                <label for="max_keepalive_connections-{{ loop.index0 }}">Max Keepalive Connections</label>
+                                <input type="number" id="max_keepalive_connections-{{ loop.index0 }}" name="max_keepalive_connections_{{ loop.index0 }}" value="{{ provider.max_keepalive_connections | default(100) }}" class="neumorphic-input" min="1">
+                            </div>
+                            <div class="form-group">
+                                <label for="keepalive_expiry-{{ loop.index0 }}">Keepalive Expiry (s)</label>
+                                <input type="number" step="0.1" id="keepalive_expiry-{{ loop.index0 }}" name="keepalive_expiry_{{ loop.index0 }}" value="{{ provider.keepalive_expiry | default(30.0) }}" class="neumorphic-input" min="1">
+                            </div>
+                            <div class="form-group">
+                                <label for="custom_headers-{{ loop.index0 }}">Custom Headers (JSON)</label>
+                                <textarea id="custom_headers-{{ loop.index0 }}" name="custom_headers_{{ loop.index0 }}" class="neumorphic-textarea" rows="2">{{ provider.custom_headers | tojson(indent=2) if provider.custom_headers else '{}' }}</textarea>
+                            </div>
+                            <!-- Hidden fields -->
                             <input type="hidden" name="type_{{ loop.index0 }}" value="{{ provider.type }}">
                             <input type="hidden" name="base_url_{{ loop.index0 }}" value="{{ provider.base_url|default('') }}">
                         </div>

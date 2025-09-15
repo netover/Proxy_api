@@ -107,198 +107,207 @@ def load_env_once() -> Dict[str, str]:
 APP_CONFIG = load_config_once()
 APP_ENV_VARS = load_env_once()
 
-def save_config_and_env(form_data) -> bool:
+def save_config_and_env(form_data: Dict[str, Any]) -> bool:
     """Save configuration and environment variables atomically."""
-
     try:
+        # 1. Parse all settings into a structured dictionary
+        full_config = _parse_global_settings_from_form(form_data)
+
         providers = []
         env_updates = {}
-
-        # Parse providers from form data
         i = 0
-        forced_provider = None
         while f'provider_name_{i}' in form_data:
             provider_data = _parse_provider_from_form(form_data, i)
             if not provider_data:
-                return False
+                return False  # Parsing failed, flash message already sent
             providers.append(provider_data)
-
-            # Check if this is the forced provider
-            if form_data.get('forced_provider') == provider_data['name']:
-                forced_provider = provider_data['name']
-
-            # Collect environment updates
             if provider_data.get('api_key_value'):
                 env_updates[provider_data['api_key_env']] = provider_data['api_key_value']
-
             i += 1
 
-        # Ensure only one provider is forced
-        if forced_provider:
-            for provider in providers:
-                provider['forced'] = (provider['name'] == forced_provider)
-
         if not providers:
-            flash("At least one provider is required", "error")
+            flash("At least one provider is required.", "error")
             return False
 
-        # Validate server settings
-        server_settings = _parse_server_settings(form_data)
-        if not server_settings:
+        # Construct the final configuration object, flattening the settings
+        final_config = full_config.get('settings', {})
+        final_config['providers'] = providers
+
+        # 2. Save the complete config to config.yaml
+        if not _atomic_save_config(final_config):
             return False
 
-        # Atomic save operations
-        success = _atomic_save_config(providers)
-        if not success:
-            return False
-
-        success = _atomic_save_env(env_updates, server_settings)
-        if not success:
+        # 3. Save environment-specific variables to .env
+        if not _atomic_save_env(form_data, env_updates):
             return False
 
         flash("Configuration saved successfully! Restart the API server for changes to take effect.", "success")
-        logger.info("Configuration saved successfully")
+        logger.info("Configuration saved successfully.")
         return True
 
     except Exception as e:
-        logger.error(f"Error saving configuration: {e}")
-        flash(f"Error saving configuration: {str(e)}", "error")
+        logger.error(f"Error saving configuration: {e}", exc_info=True)
+        flash(f"An unexpected error occurred while saving: {e}", "error")
         return False
 
 
 def _parse_provider_from_form(form_data, index: int) -> Optional[Dict[str, Any]]:
     """Parse and validate a single provider from form data."""
-    try:
-        provider_name = form_data.get(f'provider_name_{index}', '').strip()
-        provider_type = form_data.get(f'type_{index}', '').strip().lower()
-        api_key_env = form_data.get(f'api_key_env_{index}', '').strip().upper()
-        api_key_value = form_data.get(f'api_key_value_{index}', '').strip()
-        models_str = form_data.get(f'models_{index}', '').strip()
-        priority_str = form_data.get(f'priority_{index}', '').strip()
-        base_url = form_data.get(f'base_url_{index}', '').strip()
+    def get_form_value(key, default, cast_to=str):
+        val = form_data.get(key, '').strip()
+        if not val:
+            return default
+        try:
+            return cast_to(val)
+        except (ValueError, TypeError):
+            flash(f"Invalid value for {key}: {val}", "error")
+            return None
 
-        # Validation
+    try:
+        provider_name = get_form_value(f'provider_name_{index}', None)
         if not provider_name or not PROVIDER_NAME_PATTERN.match(provider_name):
             flash(f"Invalid provider name: {provider_name}", "error")
             return None
 
+        provider_type = get_form_value(f'type_{index}', '').lower()
         if provider_type not in VALID_PROVIDERS:
             flash(f"Invalid provider type: {provider_type}", "error")
             return None
 
+        api_key_env = get_form_value(f'api_key_env_{index}', '').upper()
         if not api_key_env or not ENV_VAR_PATTERN.match(api_key_env):
             flash(f"Invalid environment variable name: {api_key_env}", "error")
             return None
 
-        if api_key_env not in ALLOWED_ENV_VARS:
-            flash(f"Environment variable not allowed: {api_key_env}", "error")
-            return None
-
-        try:
-            priority = int(priority_str)
-            if not (0 <= priority <= 1000):
-                raise ValueError("Priority out of range")
-        except ValueError:
-            flash(f"Invalid priority: {priority_str}", "error")
-            return None
-
+        models_str = get_form_value(f'models_{index}', '')
         models = [m.strip() for m in models_str.split(',') if m.strip()]
         if not models:
             flash(f"No valid models specified for provider {provider_name}", "error")
+            return None
+
+        custom_headers_str = form_data.get(f'custom_headers_{index}', '{}').strip()
+        try:
+            custom_headers = json.loads(custom_headers_str)
+            if not isinstance(custom_headers, dict):
+                raise ValueError("Custom headers must be a JSON object.")
+        except json.JSONDecodeError:
+            flash(f"Invalid JSON for custom headers in provider {provider_name}", "error")
             return None
 
         return {
             'name': provider_name,
             'type': provider_type,
             'api_key_env': api_key_env,
-            'api_key_value': api_key_value,
-            'base_url': base_url,
+            'api_key_value': get_form_value(f'api_key_value_{index}', ''),
+            'base_url': get_form_value(f'base_url_{index}', ''),
             'models': models,
-            'enabled': form_data.get(f'enabled_{index}', 'false') == 'true',
-            'forced': form_data.get(f'forced_{index}', 'false') == 'true',
-            'priority': priority
+            'enabled': form_data.get(f'enabled_{index}') == 'true',
+            'forced': form_data.get(f'forced_{index}') == 'true',
+            'priority': get_form_value(f'priority_{index}', 100, int),
+            'timeout': get_form_value(f'timeout_{index}', 30, int),
+            'max_retries': get_form_value(f'max_retries_{index}', 3, int),
+            'retry_delay': get_form_value(f'retry_delay_{index}', 1.0, float),
+            'rate_limit': get_form_value(f'rate_limit_{index}', None, int),
+            'max_connections': get_form_value(f'max_connections_{index}', 1000, int),
+            'max_keepalive_connections': get_form_value(f'max_keepalive_connections_{index}', 100, int),
+            'keepalive_expiry': get_form_value(f'keepalive_expiry_{index}', 30.0, float),
+            'custom_headers': custom_headers,
         }
 
     except Exception as e:
-        logger.error(f"Error parsing provider {index}: {e}")
-        flash(f"Error parsing provider {index}", "error")
+        logger.error(f"Error parsing provider {index}: {e}", exc_info=True)
+        flash(f"An error occurred while parsing provider {index}.", "error")
         return None
 
 
-def _parse_server_settings(form_data) -> Optional[Dict[str, str]]:
-    """Parse and validate server settings."""
-    try:
-        port = form_data.get('port', '').strip()
-        api_key_header = form_data.get('api_key_header', '').strip()
+def _parse_global_settings_from_form(form_data: Dict[str, Any]) -> Dict[str, Any]:
+    """Parses all global, cache, and condensation settings from the form."""
 
-        if port:
-            port_int = int(port)
-            if not (1 <= port_int <= 65535):
-                flash("Port must be between 1 and 65535", "error")
-                return None
+    def get_form_value(key, default, cast_to=str, is_bool=False):
+        if is_bool:
+            return form_data.get(key) == 'true'
 
-        if api_key_header and not re.match(r'^[A-Za-z0-9_-]+$', api_key_header):
-            flash("Invalid API key header format", "error")
-            return None
+        val = form_data.get(key, '').strip()
+        if not val:
+            return default
+        try:
+            return cast_to(val)
+        except (ValueError, TypeError):
+            return default
 
-        return {
-            'port': port,
-            'api_key_header': api_key_header or 'X-API-Key'
+    def get_list(key, default=None):
+        default = default or []
+        val = form_data.get(key, '').strip()
+        return [item.strip() for item in val.split(',') if item.strip()] or default
+
+    settings = {
+        "api_keys": [key.strip() for key in form_data.get('api_keys', '').split('\n') if key.strip()],
+        "cors_origins": [origin.strip() for origin in form_data.get('cors_origins', '').split('\n') if origin.strip()],
+        "rate_limit_rpm": get_form_value('rate_limit_rpm', 1000, int),
+        "rate_limit_window": get_form_value('rate_limit_window', 60, int),
+        "circuit_breaker_threshold": get_form_value('circuit_breaker_threshold', 5, int),
+        "circuit_breaker_timeout": get_form_value('circuit_breaker_timeout', 60, int),
+        "cache": {
+            "cache_enabled": get_form_value('cache_enabled', True, is_bool=True),
+            "cache_ttl": get_form_value('cache_ttl', 300, int),
+            "cache_persist": get_form_value('cache_persist', False, is_bool=True),
+            "cache_dir": get_form_value('cache_dir', None),
+        },
+        "condensation": {
+            "cache_ttl": get_form_value('condensation_cache_ttl', 3600, int),
+            "cache_size": get_form_value('condensation_cache_size', 1000, int),
+            "truncation_threshold": get_form_value('truncation_threshold', 2000, int),
+            "max_tokens_default": get_form_value('max_tokens_default', 512, int),
+            "adaptive_factor": get_form_value('adaptive_factor', 0.5, float),
+            "error_keywords": get_list('error_keywords', ["context_length_exceeded", "token_limit"]),
+            "fallback_strategies": get_list('fallback_strategies', ["truncate", "secondary_provider"]),
+            "cache_persist": get_form_value('condensation_cache_persist', False, is_bool=True),
+            "adaptive_enabled": get_form_value('adaptive_enabled', True, is_bool=True),
+            "dynamic_reload": get_form_value('dynamic_reload', True, is_bool=True),
         }
-
-    except ValueError:
-        flash("Invalid port number", "error")
-        return None
+    }
+    return {"settings": settings}
 
 
-def _atomic_save_config(providers: list) -> bool:
-    """Atomically save configuration with backup."""
+def _atomic_save_config(config_data: Dict[str, Any]) -> bool:
+    """Atomically save the entire configuration object with backup."""
     try:
-        # Create backup
         if CONFIG_PATH.exists():
-            backup_path = CONFIG_PATH.with_suffix('.bak')
-            shutil.copy2(CONFIG_PATH, backup_path)
+            shutil.copy2(CONFIG_PATH, CONFIG_PATH.with_suffix('.bak'))
 
-        # Write to temporary file first
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as temp_file:
-            yaml.safe_dump(
-                {'providers': providers},
-                temp_file,
-                default_flow_style=False,
-                sort_keys=False,
-                indent=2
-            )
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False, dir=CONFIG_PATH.parent) as temp_file:
+            yaml.safe_dump(config_data, temp_file, default_flow_style=False, sort_keys=False, indent=2)
             temp_path = Path(temp_file.name)
 
-        # Atomic move
         temp_path.replace(CONFIG_PATH)
         return True
-
     except Exception as e:
-        logger.error(f"Error saving config: {e}")
-        flash("Error saving configuration file", "error")
+        logger.error(f"Error saving config: {e}", exc_info=True)
+        flash("Error saving configuration file.", "error")
         return False
 
 
-def _atomic_save_env(env_updates: Dict[str, str], server_settings: Dict[str, str]) -> bool:
+def _atomic_save_env(form_data: Dict[str, Any], env_updates: Dict[str, str]) -> bool:
     """Atomically save environment variables."""
     try:
-        # Update environment variables
+        # Update provider API keys
         for key, value in env_updates.items():
             if value:  # Only set non-empty values
                 set_key(ENV_PATH, key, shlex.quote(value))
 
-        # Update server settings
-        if server_settings.get('port'):
-            set_key(ENV_PATH, 'PROXY_API_PORT', server_settings['port'])
-        if server_settings.get('api_key_header'):
-            set_key(ENV_PATH, 'PROXY_API_API_KEY_HEADER', server_settings['api_key_header'])
+        # Update server settings from the main form
+        port = form_data.get('port', '').strip()
+        if port:
+            set_key(ENV_PATH, 'PROXY_API_PORT', port)
+
+        api_key_header = form_data.get('api_key_header', '').strip()
+        if api_key_header:
+            set_key(ENV_PATH, 'PROXY_API_API_KEY_HEADER', api_key_header)
 
         return True
-
     except Exception as e:
-        logger.error(f"Error saving environment: {e}")
-        flash("Error saving environment configuration", "error")
+        logger.error(f"Error saving environment variables: {e}", exc_info=True)
+        flash("Error saving environment configuration.", "error")
         return False
 
 def require_api_key():
