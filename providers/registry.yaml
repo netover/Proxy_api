@@ -1,0 +1,401 @@
+providers:
+  openai/gpt-4o:
+    provider: openai
+    api_base: https://api.openai.com/v1
+    api_key_env: OPENAI_API_KEY
+    type: chat
+    rate_limit: &id001
+      rpm: 100
+      tpm: 100000
+    priority: 10
+    name: Gpt-4O
+    models:
+    - gpt-4o
+    enabled: true
+  openai/gpt-4o-mini:
+    provider: openai
+    api_base: https://api.openai.com/v1
+    api_key_env: OPENAI_API_KEY
+    type: chat
+    rate_limit: *id001
+    priority: 10
+    name: Gpt-4O-Mini
+    models:
+    - gpt-4o-mini
+    enabled: true
+  openai/gpt-4-turbo:
+    provider: openai
+    api_base: https://api.openai.com/v1
+    api_key_env: OPENAI_API_KEY
+    type: chat
+    rate_limit: *id001
+    priority: 10
+    name: Gpt-4-Turbo
+    models:
+    - gpt-4-turbo
+    enabled: true
+  openai/gpt-3.5-turbo:
+    provider: openai
+    api_base: https://api.openai.com/v1
+    api_key_env: OPENAI_API_KEY
+    type: chat
+    rate_limit: *id001
+    priority: 10
+    name: Gpt-3.5-Turbo
+    models:
+    - gpt-3.5-turbo
+    enabled: true
+  openai/text-embedding-3-large:
+    provider: openai
+    api_base: https://api.openai.com/v1
+    api_key_env: OPENAI_API_KEY
+    type: embedding
+    rate_limit: *id001
+    priority: 10
+    name: Text-Embedding-3-Large
+    models:
+    - text-embedding-3-large
+    enabled: true
+  openai/text-embedding-3-small:
+    provider: openai
+    api_base: https://api.openai.com/v1
+    api_key_env: OPENAI_API_KEY
+    type: embedding
+    rate_limit: *id001
+    priority: 10
+    name: Text-Embedding-3-Small
+    models:
+    - text-embedding-3-small
+    enabled: true
+  openai/dall-e-3:
+    provider: openai
+    api_base: https://api.openai.com/v1
+    api_key_env: OPENAI_API_KEY
+    type: image
+    rate_limit: *id001
+    priority: 10
+    name: Dall-E-3
+    models:
+    - dall-e-3
+    enabled: true
+  anthropic/claude-3-5-sonnet-20240620:
+    provider: anthropic
+    api_base: https://api.anthropic.com/v1
+    api_key_env: ANTHROPIC_API_KEY
+    type: chat
+    payload_transformer: AnthropicTransformer
+    rate_limit: &id002
+      rpm: 50
+      tpm: 200000
+    priority: 9
+    name: Claude-3-5-Sonnet-20240620
+    models:
+    - claude-3-5-sonnet-20240620
+    enabled: true
+  anthropic/claude-3-opus-20240229:
+    provider: anthropic
+    api_base: https://api.anthropic.com/v1
+    api_key_env: ANTHROPIC_API_KEY
+    type: chat
+    payload_transformer: AnthropicTransformer
+    rate_limit: *id002
+    priority: 9
+    name: Claude-3-Opus-20240229
+    models:
+    - claude-3-opus-20240229
+    enabled: true
+  anthropic/claude-3-haiku-20240307:
+    provider: anthropic
+    api_base: https://api.anthropic.com/v1
+    api_key_env: ANTHROPIC_API_KEY
+    type: chat
+    payload_transformer: AnthropicTransformer
+    rate_limit: *id002
+    priority: 9
+    name: Claude-3-Haiku-20240307
+    models:
+    - claude-3-haiku-20240307
+    enabled: true
+  google_ai_studio/gemini-1.5-pro:
+    provider: google_ai_studio
+    api_base: https://generativelanguage.googleapis.com/v1beta
+    api_key_env: GOOGLE_API_KEY
+    type: chat
+    payload_transformer: GoogleTransformer
+    rate_limit: &id003
+      rpm: 15
+      tpm: 1000000
+    priority: 8
+    name: Gemini-1.5-Pro
+    models:
+    - gemini-1.5-pro
+    enabled: true
+  google_ai_studio/gemini-1.5-flash:
+    provider: google_ai_studio
+    api_base: https://generativelanguage.googleapis.com/v1beta
+    api_key_env: GOOGLE_API_KEY
+    type: chat
+    payload_transformer: GoogleTransformer
+    rate_limit: *id003
+    priority: 8
+    name: Gemini-1.5-Flash
+    models:
+    - gemini-1.5-flash
+    enabled: true
+  google_ai_studio/gemini-pro-vision:
+    provider: google_ai_studio
+    api_base: https://generativelanguage.googleapis.com/v1beta
+    api_key_env: GOOGLE_API_KEY
+    type: chat
+    payload_transformer: GoogleTransformer
+    rate_limit: *id003
+    priority: 8
+    name: Gemini-Pro-Vision
+    models:
+    - gemini-pro-vision
+    enabled: true
+  mistral/open-mistral-7b:
+    provider: mistral
+    api_base: https://api.mistral.ai/v1
+    api_key_env: MISTRAL_API_KEY
+    type: chat
+    rate_limit: &id004
+      rpm: 20
+      tpm: 50000
+    priority: 8
+    name: Open-Mistral-7B
+    models:
+    - open-mistral-7b
+    enabled: true
+  mistral/mixtral-8x7b-instruct-v0.1:
+    provider: mistral
+    api_base: https://api.mistral.ai/v1
+    api_key_env: MISTRAL_API_KEY
+    type: chat
+    rate_limit: *id004
+    priority: 8
+    name: Mixtral-8X7B-Instruct-V0.1
+    models:
+    - mixtral-8x7b-instruct-v0.1
+    enabled: true
+  mistral/mistral-large:
+    provider: mistral
+    api_base: https://api.mistral.ai/v1
+    api_key_env: MISTRAL_API_KEY
+    type: chat
+    rate_limit: *id004
+    priority: 8
+    name: Mistral-Large
+    models:
+    - mistral-large
+    enabled: true
+  mistral/codestral-22-05:
+    provider: mistral
+    api_base: https://api.mistral.ai/v1
+    api_key_env: MISTRAL_API_KEY
+    type: chat
+    rate_limit: *id004
+    priority: 8
+    name: Codestral-22-05
+    models:
+    - codestral-22-05
+    enabled: true
+  groq/llama3-8b-8192:
+    provider: groq
+    api_base: https://api.groq.com/openai/v1
+    api_key_env: GROQ_API_KEY
+    type: chat
+    rate_limit: &id005
+      rpm: 30
+      tpm: 100000
+    priority: 10
+    name: Llama3-8B-8192
+    models:
+    - llama3-8b-8192
+    enabled: true
+  groq/llama3-70b-8192:
+    provider: groq
+    api_base: https://api.groq.com/openai/v1
+    api_key_env: GROQ_API_KEY
+    type: chat
+    rate_limit: *id005
+    priority: 10
+    name: Llama3-70B-8192
+    models:
+    - llama3-70b-8192
+    enabled: true
+  groq/mixtral-8x7b-32768:
+    provider: groq
+    api_base: https://api.groq.com/openai/v1
+    api_key_env: GROQ_API_KEY
+    type: chat
+    rate_limit: *id005
+    priority: 10
+    name: Mixtral-8X7B-32768
+    models:
+    - mixtral-8x7b-32768
+    enabled: true
+  cohere/command-r-plus:
+    provider: cohere
+    api_base: https://api.cohere.ai/v1
+    api_key_env: COHERE_API_KEY
+    type: chat
+    payload_transformer: CohereTransformer
+    rate_limit: &id006
+      rpm: 20
+      tpm: 60000
+    priority: 7
+    name: Command-R-Plus
+    models:
+    - command-r-plus
+    enabled: true
+  cohere/command-r:
+    provider: cohere
+    api_base: https://api.cohere.ai/v1
+    api_key_env: COHERE_API_KEY
+    type: chat
+    payload_transformer: CohereTransformer
+    rate_limit: *id006
+    priority: 7
+    name: Command-R
+    models:
+    - command-r
+    enabled: true
+  cohere/aaya-23:
+    provider: cohere
+    api_base: https://api.cohere.ai/v1
+    api_key_env: COHERE_API_KEY
+    type: chat
+    payload_transformer: CohereTransformer
+    rate_limit: *id006
+    priority: 7
+    name: Aaya-23
+    models:
+    - aaya-23
+    enabled: true
+  ollama/llama3:
+    provider: ollama
+    api_base: http://host.docker.internal:11434/api
+    api_key_env: null
+    type: chat
+    rate_limit: &id007
+      rpm: 1000
+    priority: 5
+    name: Llama3
+    models:
+    - llama3
+    enabled: true
+  ollama/mistral:
+    provider: ollama
+    api_base: http://host.docker.internal:11434/api
+    api_key_env: null
+    type: chat
+    rate_limit: *id007
+    priority: 5
+    name: Mistral
+    models:
+    - mistral
+    enabled: true
+  ollama/phi3:
+    provider: ollama
+    api_base: http://host.docker.internal:11434/api
+    api_key_env: null
+    type: chat
+    rate_limit: *id007
+    priority: 5
+    name: Phi3
+    models:
+    - phi3
+    enabled: true
+  ollama/gemma:7b:
+    provider: ollama
+    api_base: http://host.docker.internal:11434/api
+    api_key_env: null
+    type: chat
+    rate_limit: *id007
+    priority: 5
+    name: Gemma:7B
+    models:
+    - gemma:7b
+    enabled: true
+  together/meta-llama/Llama-3-70b-chat-hf:
+    provider: together
+    api_base: https://api.together.xyz/v1
+    api_key_env: TOGETHER_API_KEY
+    type: chat
+    rate_limit: &id008
+      rpm: 25
+      tpm: 80000
+    priority: 7
+    name: Meta-Llama Llama-3-70B-Chat-Hf
+    models:
+    - meta-llama/Llama-3-70b-chat-hf
+    enabled: true
+  together/mistralai/Mixtral-8x7B-Instruct-v0.1:
+    provider: together
+    api_base: https://api.together.xyz/v1
+    api_key_env: TOGETHER_API_KEY
+    type: chat
+    rate_limit: *id008
+    priority: 7
+    name: Mistralai Mixtral-8X7B-Instruct-V0.1
+    models:
+    - mistralai/Mixtral-8x7B-Instruct-v0.1
+    enabled: true
+  together/microsoft/DialoGPT-medium:
+    provider: together
+    api_base: https://api.together.xyz/v1
+    api_key_env: TOGETHER_API_KEY
+    type: chat
+    rate_limit: *id008
+    priority: 7
+    name: Microsoft Dialogpt-Medium
+    models:
+    - microsoft/DialoGPT-medium
+    enabled: true
+  voyage/voyage-2:
+    provider: voyage
+    api_base: https://api.voyageai.com/v1
+    api_key_env: VOYAGE_API_KEY
+    type: embedding
+    rate_limit: &id009
+      rpm: 100
+    priority: 9
+    name: Voyage-2
+    models:
+    - voyage-2
+    enabled: true
+  voyage/voyage-lite-02-instruct:
+    provider: voyage
+    api_base: https://api.voyageai.com/v1
+    api_key_env: VOYAGE_API_KEY
+    type: embedding
+    rate_limit: *id009
+    priority: 9
+    name: Voyage-Lite-02-Instruct
+    models:
+    - voyage-lite-02-instruct
+    enabled: true
+  elevenlabs/eleven_turbo_v2_5:
+    provider: elevenlabs
+    api_base: https://api.elevenlabs.io/v1
+    api_key_env: ELEVENLABS_API_KEY
+    type: tts
+    rate_limit: &id010
+      rpm: 50
+    priority: 8
+    name: Eleven_Turbo_V2_5
+    models:
+    - eleven_turbo_v2_5
+    enabled: true
+  elevenlabs/eleven_multilingual_v2:
+    provider: elevenlabs
+    api_base: https://api.elevenlabs.io/v1
+    api_key_env: ELEVENLABS_API_KEY
+    type: tts
+    rate_limit: *id010
+    priority: 8
+    name: Eleven_Multilingual_V2
+    models:
+    - eleven_multilingual_v2
+    enabled: true
