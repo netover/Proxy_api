@@ -1,158 +1,122 @@
-import json
+"""
+This module provides a robust, structured, and telemetry-aware logging system.
+It integrates Python's standard logging with `structlog` and OpenTelemetry to
+ensure that all log messages are structured (as JSON) and automatically correlated
+with the current request's trace and span IDs.
+"""
+
 import logging
-import re
 import sys
-from datetime import datetime, timezone
-from logging.handlers import RotatingFileHandler
-from pathlib import Path
-from typing import Any, Dict
+from contextlib import contextmanager
 
+import structlog
+from opentelemetry import trace
+from opentelemetry.trace.status import Status, StatusCode
 
-class JSONFormatter(logging.Formatter):
-    """JSON formatter for structured logging"""
-    
-    def format(self, record: logging.LogRecord) -> str:
-        log_entry = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "level": record.levelname,
-            "logger": record.name,
-            "message": record.getMessage(),
-            "module": record.module,
-            "function": record.funcName,
-            "line": record.lineno,
-            "process": getattr(record, 'process', None),
-            "thread": getattr(record, 'thread', None)
-        }
-        
-        if hasattr(record, 'extra_data'):
-            log_entry.update(record.extra_data)
-            
-        if record.exc_info:
-            log_entry["exception"] = self.formatException(record.exc_info)
-            
-        return json.dumps(log_entry, ensure_ascii=False)
+# --- Structlog Configuration ---
 
-def setup_logging(log_level: str = "INFO", log_file: Path = None):
-    """Setup comprehensive logging configuration"""
-    
-    # Create logs directory
-    if log_file:
-        log_file.parent.mkdir(exist_ok=True, parents=True)
-    
-    # Root logger configuration
-    root_logger = logging.getLogger()
-    root_logger.setLevel(getattr(logging, log_level.upper()))
-    
-    # Console handler with colors - add only if not exists
-    console_handler = None
-    if not any(isinstance(h, logging.StreamHandler) for h in root_logger.handlers):
-        console_handler = logging.StreamHandler(sys.stdout)
-        console_formatter = logging.Formatter(
-            "%(asctime)s | %(levelname)-8s | %(name)s:%(lineno)d | %(message)s",
-            datefmt="%Y-%m-%d %H:%M:%S"
-        )
-        console_handler.setFormatter(console_formatter)
-        root_logger.addHandler(console_handler)
-    else:
-        # Find existing console handler
-        for handler in root_logger.handlers:
-            if isinstance(handler, logging.StreamHandler):
-                console_handler = handler
-                break
-
-    # Handle encoding issues on Windows
-    if sys.platform == "win32" and console_handler:
-        import io
-        console_handler.stream = io.TextIOWrapper(
-            sys.stdout.buffer,
-            encoding='utf-8',
-            errors='replace'
-        )
-    
-    # File handler with JSON format - add only if not exists
-    if log_file and not any(isinstance(h, RotatingFileHandler) for h in root_logger.handlers):
-        file_handler = RotatingFileHandler(
-            log_file,
-            maxBytes=10*1024*1024,  # 10MB
-            backupCount=5
-        )
-        file_handler.setFormatter(JSONFormatter())
-        root_logger.addHandler(file_handler)
-    
-    # Specific loggers
-    logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
-    logging.getLogger("httpx").setLevel(logging.WARNING)
-    
-    return root_logger
-
-
-def mask_secrets(text: str) -> str:
-    """Mask sensitive information in log messages"""
-    if not isinstance(text, str):
-        return text
-
-    # Common API key patterns to mask
-    patterns = [
-        # OpenAI API keys: sk-... (keep first 3 and last 3 chars)
-        (r'\b(sk-[a-zA-Z0-9]{3})[a-zA-Z0-9]{30,}([a-zA-Z0-9]{3})\b', r'\1***\2'),
-        # Generic API keys with prefixes
-        (r'\b(api[_-]?key[_-]?[:=]\s*)[a-zA-Z0-9]{10,}\b', r'\1***MASKED***'),
-        (r'\b(token[_-]?[:=]\s*)[a-zA-Z0-9]{10,}\b', r'\1***MASKED***'),
-        (r'\b(secret[_-]?[:=]\s*)[a-zA-Z0-9]{10,}\b', r'\1***MASKED***'),
-        # Authorization headers
-        (r'\b(Bearer\s+)[a-zA-Z0-9]{10,}\b', r'\1***MASKED***'),
-        (r'\b(Authorization:\s*Bearer\s+)[a-zA-Z0-9]{10,}\b', r'\1***MASKED***'),
-        # Password patterns
-        (r'\b(password[_-]?[:=]\s*)[^\s]{3,}\b', r'\1***MASKED***'),
-        # Email addresses (mask username)
-        (r'\b([a-zA-Z0-9._%+-]+)@([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})\b', r'***@\2'),
+def setup_logging(log_level: str = "INFO"):
+    """
+    Configures the logging system to use structlog with OpenTelemetry integration.
+    All logs will be processed by structlog and output as JSON.
+    """
+    # Define shared processors for all logs
+    shared_processors = [
+        # Add OpenTelemetry context (trace_id, span_id)
+        structlog.contextvars.merge_contextvars,
+        structlog.stdlib.add_logger_name,
+        structlog.stdlib.add_log_level,
+        structlog.processors.TimeStamper(fmt="iso"),
     ]
 
-    masked_text = text
-    for pattern, replacement in patterns:
-        masked_text = re.sub(pattern, replacement, masked_text, flags=re.IGNORECASE)
+    # Configure structlog to wrap the standard logging library
+    structlog.configure(
+        processors=shared_processors + [
+            # Prepare event dict for the renderer.
+            structlog.stdlib.ProcessorFormatter.wrap_for_formatter,
+        ],
+        logger_factory=structlog.stdlib.LoggerFactory(),
+        wrapper_class=structlog.stdlib.BoundLogger,
+        cache_logger_on_first_use=True,
+    )
 
-    return masked_text
+    # Configure the standard logging formatter for JSON output
+    formatter = structlog.stdlib.ProcessorFormatter(
+        # These processors are applied only at render time
+        processor=structlog.processors.JSONRenderer(),
+        # foreign_pre_chain is for logs not originating from structlog
+        foreign_pre_chain=shared_processors,
+    )
+
+    # Get the root logger and remove existing handlers
+    root_logger = logging.getLogger()
+    for handler in root_logger.handlers:
+        root_logger.removeHandler(handler)
+
+    # Add a new stream handler with our JSON formatter
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setFormatter(formatter)
+    root_logger.addHandler(handler)
+    root_logger.setLevel(log_level.upper())
+
+    # Suppress noisy loggers
+    logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+
+    logging.info(f"Structured logging configured with level {log_level}")
 
 
-class ContextualLogger:
-    """Logger with request context"""
-    
+class StructuredLogger:
+    """
+    A telemetry-aware logger that creates structured logs and integrates with OpenTelemetry spans.
+    """
     def __init__(self, name: str):
-        self.logger = logging.getLogger(name)
-        self.context = {}
-    
-    def set_context(self, **kwargs):
-        self.context.update(kwargs)
-    
-    def _log_with_context(self, level: int, msg: str, extra_data: Dict[str, Any] = None):
-        # Mask sensitive information in the message
-        masked_msg = mask_secrets(msg)
+        self.logger = structlog.get_logger(name)
+        self.tracer = trace.get_tracer(name)
 
-        # Also mask sensitive information in extra_data values
-        masked_extra_data = extra_data or {}
-        if masked_extra_data:
-            masked_extra_data = {}
-            for key, value in (extra_data or {}).items():
-                if isinstance(value, str):
-                    masked_extra_data[key] = mask_secrets(value)
-                else:
-                    masked_extra_data[key] = value
+    @contextmanager
+    def span(self, name: str, attributes: dict = None):
+        """
+        Creates an OpenTelemetry span and binds its context to the logger.
+        All logs within this context will automatically have trace_id and span_id.
 
-        extra = {"extra_data": {**self.context, **masked_extra_data}}
-        self.logger.log(level, masked_msg, extra=extra)
-    
-    def info(self, msg: str, **kwargs):
-        self._log_with_context(logging.INFO, msg, kwargs)
-    
-    def error(self, msg: str, **kwargs):
-        self._log_with_context(logging.ERROR, msg, kwargs)
-    
-    def warning(self, msg: str, **kwargs):
-        self._log_with_context(logging.WARNING, msg, kwargs)
+        Args:
+            name: The name of the span (e.g., "proxy_request").
+            attributes: A dictionary of attributes to add to the span.
+        """
+        with self.tracer.start_as_current_span(name, attributes=attributes) as span:
+            span_context = span.get_span_context()
+            context = {
+                "trace_id": f"0x{span_context.trace_id:032x}",
+                "span_id": f"0x{span_context.span_id:016x}",
+            }
+            # Bind the context to structlog's contextvars for the duration of the span
+            with structlog.contextvars.bind_contextvars(**context):
+                try:
+                    yield span
+                    span.set_status(Status(StatusCode.OK))
+                except Exception as e:
+                    span.record_exception(e)
+                    span.set_status(Status(StatusCode.ERROR, str(e)))
+                    self.error("Request failed within span", error=str(e))
+                    raise
 
-    def debug(self, msg: str, **kwargs):
-        self._log_with_context(logging.DEBUG, msg, kwargs)
+    def info(self, message: str, **kwargs):
+        """Logs an informational message."""
+        self.logger.info(message, **kwargs)
 
-    def critical(self, msg: str, **kwargs):
-        self._log_with_context(logging.CRITICAL, msg, kwargs)
+    def error(self, message: str, **kwargs):
+        """Logs an error message."""
+        self.logger.error(message, **kwargs)
+
+    def warning(self, message: str, **kwargs):
+        """Logs a warning message."""
+        self.logger.warning(message, **kwargs)
+
+    def debug(self, message: str, **kwargs):
+        """Logs a debug message."""
+        self.logger.debug(message, **kwargs)
+
+# For backward compatibility, provide a logger instance.
+# In a real app, this would be instantiated per-module.
+logger = StructuredLogger(__name__)

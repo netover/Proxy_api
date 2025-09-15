@@ -17,10 +17,13 @@ Features:
 
 import asyncio
 import threading
+from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Set
 from enum import Enum
+
+import redis.asyncio as redis
 
 from .cache_interface import CacheStats, ICache
 from .cache_migration import CacheMigrationService
@@ -30,6 +33,45 @@ from .logging import ContextualLogger
 from .unified_cache import get_unified_cache
 
 logger = ContextualLogger(__name__)
+
+
+class DistributedLock:
+    """
+    A distributed lock implementation using Redis for cross-instance synchronization.
+    This prevents multiple instances from performing the same work simultaneously (e.g., cache warming).
+    """
+    def __init__(self, redis_client: redis.Redis, lock_key: str, timeout: int = 30):
+        """
+        Initializes the distributed lock.
+        Args:
+            redis_client: An asynchronous Redis client instance.
+            lock_key: The unique key for the lock.
+            timeout: The lock's expiration time in seconds to prevent deadlocks.
+        """
+        self.redis = redis_client
+        self.lock_key = f"lock:{lock_key}"
+        self.timeout = timeout
+
+    @asynccontextmanager
+    async def __aenter__(self):
+        """
+        Acquires the lock, retrying with a backoff until it succeeds.
+        Yields control once the lock is acquired.
+        """
+        # Continuously try to acquire the lock
+        while not await self.redis.set(self.lock_key, "locked", nx=True, ex=self.timeout):
+            # If lock is not acquired, wait for a short period before retrying
+            await asyncio.sleep(0.1)
+        try:
+            # Once the lock is acquired, yield to the context
+            yield self
+        finally:
+            # Always release the lock upon exiting the context
+            await self.redis.delete(self.lock_key)
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """Releases the lock when exiting the async with block."""
+        await self.redis.delete(self.lock_key)
 
 
 class CacheTier(Enum):
@@ -91,7 +133,8 @@ class ConsolidatedCacheManager:
         max_memory_mb: int = 512,
         default_ttl: int = 1800,
         enable_tiering: bool = True,
-        tier_thresholds: Optional[Dict[str, int]] = None
+        tier_thresholds: Optional[Dict[str, int]] = None,
+        redis_url: Optional[str] = None
     ):
         self.cache_dir = cache_dir or Path.cwd() / ".cache" / "consolidated"
         self.enable_warming = enable_warming
@@ -100,6 +143,7 @@ class ConsolidatedCacheManager:
         self.max_memory_mb = max_memory_mb
         self.default_ttl = default_ttl
         self.enable_tiering = enable_tiering
+        self.redis_url = redis_url or "redis://localhost"
 
         # Tier configuration
         self.tier_thresholds = tier_thresholds or {
@@ -114,6 +158,7 @@ class ConsolidatedCacheManager:
         self._warmer: Optional[CacheWarmer] = None
         self._monitor: Optional[CacheMonitor] = None
         self._migrator: Optional[CacheMigrationService] = None
+        self.redis: Optional[redis.Redis] = None
 
         # Tier management
         self._tier_assignments: Dict[str, CacheTier] = {}
@@ -170,6 +215,11 @@ class ConsolidatedCacheManager:
                 return
 
             try:
+                # Initialize Redis client for distributed features
+                self.redis = redis.from_url(self.redis_url, encoding="utf-8", decode_responses=True)
+                await self.redis.ping()
+                logger.info("Redis client connected successfully.")
+
                 # Initialize unified cache as the core
                 self._cache = await get_unified_cache()
 
@@ -702,6 +752,67 @@ class ConsolidatedCacheManager:
             logger.error(f"Category warming error for {category}: {e}")
             return {"error": str(e)}
 
+    async def warm_cache_batch(self, keys: List[str], getter_func: Callable, category: str, ttl: int) -> Dict[str, Any]:
+        """
+        Warms a batch of keys in parallel, protected by a distributed lock to prevent race conditions.
+        Args:
+            keys: A list of keys to warm.
+            getter_func: A callable that takes a key and returns the value to cache.
+            category: The category to cache the items under.
+            ttl: The time-to-live for the cached items.
+        Returns:
+            A dictionary with the status of the warming operation.
+        """
+        if not self._warmer or not self.redis:
+            return {"error": "Warming or Redis not enabled"}
+
+        # Use a hash of the sorted keys to uniquely identify this batch
+        batch_id = hash(tuple(sorted(keys)))
+        lock_key = f"warm_batch:{category}:{batch_id}"
+
+        results = {"acquired_lock": False, "warmed_keys": 0, "failed_keys": 0, "errors": []}
+
+        try:
+            lock = DistributedLock(self.redis, lock_key, timeout=60)
+            async with lock:
+                results["acquired_lock"] = True
+                logger.info(f"Acquired distributed lock for warming batch {lock_key}")
+
+                # Check which keys are not already in the cache
+                existing_keys = await self.get_many(keys, category)
+                keys_to_warm = [k for k in keys if k not in existing_keys]
+
+                if not keys_to_warm:
+                    logger.info(f"All keys in batch {lock_key} are already cached.")
+                    return results
+
+                async def _populate_cache(key: str):
+                    try:
+                        value = await getter_func(key)
+                        await self.set(key, value, ttl, category)
+                        return key, True
+                    except Exception as e:
+                        logger.error(f"Failed to warm key {key} in batch {lock_key}: {e}")
+                        return key, False
+
+                tasks = [_populate_cache(key) for key in keys_to_warm]
+                task_results = await asyncio.gather(*tasks, return_exceptions=True)
+
+                for result in task_results:
+                    if isinstance(result, Exception):
+                        results["failed_keys"] += 1
+                        results["errors"].append(str(result))
+                    elif result[1]:
+                        results["warmed_keys"] += 1
+                    else:
+                        results["failed_keys"] += 1
+
+        except Exception as e:
+            logger.error(f"Error during batch cache warming for {lock_key}: {e}", exc_info=True)
+            results["errors"].append(str(e))
+
+        return results
+
     # Enhanced monitoring methods
 
     async def get_cache_health(self) -> Dict[str, Any]:
@@ -773,6 +884,9 @@ class ConsolidatedCacheManager:
                     await self._monitor.stop_monitoring()
                 if self._cache:
                     await self._cache.stop()
+                if self.redis:
+                    await self.redis.close()
+                    logger.info("Redis client connection closed.")
 
                 self._running = False
                 logger.info("ConsolidatedCacheManager stopped")
