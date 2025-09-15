@@ -140,6 +140,31 @@ class AppConfig(BaseModel):
 
         return v
 
+def _try_load_config(yaml_path: Path, json_path: Path, description: str) -> Optional[AppConfig]:
+    """Helper function to try loading a config file with both YAML and JSON"""
+    # Try YAML first
+    if yaml_path.exists():
+        try:
+            with open(yaml_path, 'r', encoding='utf-8') as f:
+                config_data = yaml.safe_load(f)
+            logger.info(f"Loaded {description} config (YAML)", config_path=str(yaml_path))
+            return AppConfig(**config_data)
+        except Exception as e:
+            logger.warning(f"Error reading {description} YAML config", error=str(e), config_path=str(yaml_path))
+
+    # Try JSON as fallback
+    if json_path.exists():
+        try:
+            with open(json_path, 'r', encoding='utf-8') as f:
+                config_data = json.load(f)
+            logger.info(f"Loaded {description} config (JSON)", config_path=str(json_path))
+            return AppConfig(**config_data)
+        except Exception as e:
+            logger.warning(f"Error reading {description} JSON config", error=str(e), config_path=str(json_path))
+
+    return None
+
+
 def load_config() -> AppConfig:
     """Load config with optimized loading and fallback: external -> bundled -> default"""
     bundle_yaml, bundle_json, external_yaml, external_json = get_config_paths()
@@ -183,37 +208,13 @@ def load_config() -> AppConfig:
         logger.warning("Async optimized loading failed", error=str(e))
 
     # Fallback to original synchronous loading
-    # Helper function to try loading a config file with both YAML and JSON
-    def try_load_config(yaml_path: Path, json_path: Path, description: str) -> Optional[AppConfig]:
-        # Try YAML first
-        if yaml_path.exists():
-            try:
-                with open(yaml_path, 'r', encoding='utf-8') as f:
-                    config_data = yaml.safe_load(f)
-                logger.info(f"Loaded {description} config (YAML)", config_path=str(yaml_path))
-                return AppConfig(**config_data)
-            except Exception as e:
-                logger.warning(f"Error reading {description} YAML config", error=str(e), config_path=str(yaml_path))
-
-        # Try JSON as fallback
-        if json_path.exists():
-            try:
-                with open(json_path, 'r', encoding='utf-8') as f:
-                    config_data = json.load(f)
-                logger.info(f"Loaded {description} config (JSON)", config_path=str(json_path))
-                return AppConfig(**config_data)
-            except Exception as e:
-                logger.warning(f"Error reading {description} JSON config", error=str(e), config_path=str(json_path))
-
-        return None
-
     # 1st: Try external config (editable by user) - YAML preferred, JSON fallback
-    external_config = try_load_config(external_yaml, external_json, "external")
+    external_config = _try_load_config(external_yaml, external_json, "external")
     if external_config:
         return external_config
 
     # 2nd: Try bundled config (read-only) - YAML preferred, JSON fallback
-    bundled_config = try_load_config(bundle_yaml, bundle_json, "bundled")
+    bundled_config = _try_load_config(bundle_yaml, bundle_json, "bundled")
     if bundled_config:
         # Copy bundled config to external for future editing (try both formats)
         try:

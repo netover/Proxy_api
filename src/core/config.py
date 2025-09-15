@@ -23,12 +23,12 @@ class Settings(BaseSettings):
     # Security
     api_key_header: str = "X-API-Key"
     allowed_origins: List[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
-    proxy_api_keys: List[str] = []
+    keys: List[str] = []
 
-    @field_validator('proxy_api_keys', mode='before')
+    @field_validator('keys', mode='before')
     @classmethod
     def parse_proxy_keys(cls, v):
-        """Parse proxy_api_keys from string to list if necessary.
+        """Parse keys from string to list if necessary.
 
         Handles multiple input formats:
         - Comma-separated string: "key1,key2,key3"
@@ -103,7 +103,7 @@ from src.core.app_config import ProviderConfig
 settings = Settings()
 
 # Validate that proxy API keys are configured
-if not settings.proxy_api_keys:
+if not settings.keys:
     raise ValueError("Proxy API keys must be configured. At least one key is required for security.")
 
 def load_providers_cfg(path: str) -> List[ProviderConfig]:

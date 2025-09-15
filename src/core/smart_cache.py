@@ -12,6 +12,8 @@ from dataclasses import dataclass, field
 from threading import Lock
 from typing import Any, Dict, Optional
 
+from src.utils.semantic_cache import SemanticCache
+
 logger = logging.getLogger(__name__)
 
 
@@ -53,21 +55,28 @@ class SmartCache:
         default_ttl: int = 3600,  # 1 hour
         max_memory_mb: int = 512,
         cleanup_interval: int = 300,  # 5 minutes
-        enable_compression: bool = True
+        enable_compression: bool = True,
+        enable_semantic_caching: bool = False
     ):
         self.max_size = max_size
         self.default_ttl = default_ttl
         self.max_memory_bytes = max_memory_mb * 1024 * 1024
         self.cleanup_interval = cleanup_interval
         self.enable_compression = enable_compression
+        self.enable_semantic_caching = enable_semantic_caching
 
         # Thread-safe storage
         self._cache: OrderedDict[str, CacheEntry] = OrderedDict()
         self._lock = Lock()
 
+        # Semantic Cache
+        if self.enable_semantic_caching:
+            self.semantic_cache = SemanticCache()
+
         # Statistics
         self.hits = 0
         self.misses = 0
+        self.semantic_hits = 0
         self.evictions = 0
         self.total_requests = 0
 
@@ -144,40 +153,41 @@ class SmartCache:
             # Rough estimate for other objects
             return 256
 
-    async def get(self, key: str) -> Optional[Any]:
-        """Get value from cache"""
+    async def get(self, key: str, original_query: Optional[str] = None) -> Optional[Any]:
+        """Get value from cache, with semantic search fallback."""
         with self._lock:
             self.total_requests += 1
 
-            if key not in self._cache:
-                self.misses += 1
-                return None
+            if key in self._cache:
+                entry = self._cache[key]
+                if not entry.is_expired():
+                    entry.touch()
+                    self._cache.move_to_end(key)
+                    self.hits += 1
+                    return entry.value
+                else:
+                    # Expired entry
+                    del self._cache[key]
 
-            entry = self._cache[key]
+        # Semantic search fallback
+        if self.enable_semantic_caching and original_query:
+            semantic_result = self.semantic_cache.search(original_query)
+            if semantic_result:
+                self.semantic_hits += 1
+                return semantic_result
 
-            if entry.is_expired():
-                # Remove expired entry
-                del self._cache[key]
-                self.misses += 1
-                return None
-
-            # Update access statistics
-            entry.touch()
-
-            # Move to end (most recently used)
-            self._cache.move_to_end(key)
-
-            self.hits += 1
-            return entry.value
+        self.misses += 1
+        return None
 
     async def set(
         self,
         key: str,
         value: Any,
         ttl: Optional[int] = None,
-        skip_memory_check: bool = False
+        skip_memory_check: bool = False,
+        original_query: Optional[str] = None
     ) -> bool:
-        """Set value in cache"""
+        """Set value in cache and semantic cache."""
         if ttl is None:
             ttl = self.default_ttl
 
@@ -195,13 +205,15 @@ class SmartCache:
                 logger.warning("Cache memory limit exceeded, skipping cache set")
                 return False
 
-            # Remove existing entry if present
+            # Add to main cache
             if key in self._cache:
                 del self._cache[key]
-
-            # Add new entry
             self._cache[key] = entry
             self._cache.move_to_end(key)
+
+            # Add to semantic cache
+            if self.enable_semantic_caching and original_query:
+                self.semantic_cache.add(original_query, value)
 
             # Enforce size limits
             await self._enforce_size_limit()
@@ -294,6 +306,7 @@ class SmartCache:
                 'max_memory_mb': self.max_memory_bytes / (1024 * 1024),
                 'hits': self.hits,
                 'misses': self.misses,
+                'semantic_hits': self.semantic_hits,
                 'total_requests': self.total_requests,
                 'hit_rate': round(hit_rate, 4),
                 'evictions': self.evictions,

@@ -319,6 +319,53 @@ class MemoryManager:
 _memory_manager: Optional[MemoryManager] = None
 
 
+from collections import OrderedDict
+import gc
+from typing import Any
+
+class SmartContextManager:
+    def __init__(self, max_size: int = 1000):
+        self.max_size = max_size
+        self.contexts = OrderedDict()
+        self.gc_threshold = max_size * 0.8
+
+    async def add_context(self, session_id: str, context: Any):
+        if len(self.contexts) >= self.max_size:
+            await self._evict_oldest()
+
+        self.contexts[session_id] = context
+        self.contexts.move_to_end(session_id)
+
+        if len(self.contexts) > self.gc_threshold:
+            await self._trigger_gc()
+
+    async def get_context(self, session_id: str) -> Optional[Any]:
+        if session_id in self.contexts:
+            self.contexts.move_to_end(session_id)
+            return self.contexts[session_id]
+        return None
+
+    async def _evict_oldest(self):
+        self.contexts.popitem(last=False)
+        logger.info("Evicted oldest context due to size limit.")
+
+    async def _trigger_gc(self):
+        # Forçar GC generacional
+        logger.info("Context manager threshold reached, triggering GC.")
+        gc.collect(2)  # Generation 2 (mais agressivo)
+
+
+# Global context manager instance
+_smart_context_manager: Optional[SmartContextManager] = None
+
+def get_smart_context_manager() -> SmartContextManager:
+    """Get the global smart context manager instance."""
+    global _smart_context_manager
+    if _smart_context_manager is None:
+        _smart_context_manager = SmartContextManager()
+    return _smart_context_manager
+
+
 async def get_memory_manager() -> MemoryManager:
     """Get global memory manager instance"""
     global _memory_manager

@@ -17,6 +17,7 @@ class ChatCompletionRequest(BaseModel):
     frequency_penalty: Optional[float] = Field(None, ge=-2.0, le=2.0)
     logit_bias: Optional[Dict[str, float]] = None
     user: Optional[str] = None
+    session_id: Optional[str] = None
     tools: Optional[List[Dict[str, Any]]] = None
     tool_choice: Optional[Union[str, Dict[str, Any]]] = None
     parallel_tool_calls: Optional[bool] = False

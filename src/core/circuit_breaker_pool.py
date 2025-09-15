@@ -10,7 +10,7 @@ from enum import Enum
 from typing import Any, Awaitable, Callable, Dict, List, Optional
 
 from .circuit_breaker import (CircuitBreakerOpenException,
-                              ProductionCircuitBreaker)
+                              get_circuit_breaker, DistributedCircuitBreaker)
 from .logging import ContextualLogger
 from .provider_discovery import provider_discovery
 
@@ -41,7 +41,7 @@ class AdaptiveTimeoutConfig:
 class ProviderCircuitBreaker:
     """Circuit breaker configuration for a specific provider"""
     provider_name: str
-    circuit_breaker: ProductionCircuitBreaker
+    circuit_breaker: DistributedCircuitBreaker
     adaptive_config: AdaptiveTimeoutConfig
     request_history: List[float] = field(default_factory=list)
     last_adaptation: float = 0.0
@@ -94,13 +94,8 @@ class CircuitBreakerPool:
         if provider_name not in self._provider_breakers:
             config = config or self._default_config
 
-            # Create circuit breaker
-            circuit_breaker = ProductionCircuitBreaker(
-                name=provider_name,
-                failure_threshold=5,  # Configurable via unified config
-                recovery_timeout=60,
-                adaptive_thresholds=True
-            )
+            # Create circuit breaker using the factory
+            circuit_breaker = get_circuit_breaker(provider_name)
 
             # Create provider breaker wrapper
             provider_breaker = ProviderCircuitBreaker(

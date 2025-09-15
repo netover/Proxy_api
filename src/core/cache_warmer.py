@@ -19,14 +19,38 @@ import statistics
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Callable, Dict, List, Optional, Set
 
+import redis.asyncio as redis
 from .model_discovery import ModelDiscoveryService, ProviderConfig
 from .unified_cache import UnifiedCache, get_unified_cache
 
 logger = logging.getLogger(__name__)
+
+
+class DistributedLock:
+    """A distributed lock implementation using Redis."""
+    def __init__(self, redis_client, lock_key: str, timeout: int = 30):
+        self.redis = redis_client
+        self.lock_key = f"lock:{lock_key}"
+        self.timeout = timeout
+
+    @asynccontextmanager
+    async def __aenter__(self):
+        # Loop until the lock is acquired
+        while not await self.redis.set(self.lock_key, "locked", nx=True, ex=self.timeout):
+            await asyncio.sleep(0.1)  # Backoff to prevent busy-waiting
+        try:
+            yield self
+        finally:
+            # Always release the lock
+            await self.redis.delete(self.lock_key)
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        pass # The lock is released in __aenter__'s finally block
 
 
 @dataclass
@@ -143,6 +167,9 @@ class CacheWarmer:
         self._warming_executor = ThreadPoolExecutor(max_workers=max_concurrent_warmings)
         self._active_warmings: Set[str] = set()
 
+        # Redis client for distributed lock
+        self.redis_client: Optional[redis.Redis] = None
+
         # Statistics
         self.stats = WarmingStats()
         self._warming_times: List[float] = []
@@ -165,6 +192,19 @@ class CacheWarmer:
 
         # Initialize discovery service
         self._discovery_service = ModelDiscoveryService()
+
+        # Initialize Redis client if not already set (assuming config is available)
+        # In a real app, redis_url would come from a config object
+        # For now, we assume it might be set externally or we try a default.
+        if not self.redis_client:
+            try:
+                # This is a placeholder for proper config injection
+                redis_url = os.environ.get("REDIS_URL", "redis://localhost:6379")
+                self.redis_client = redis.from_url(redis_url)
+                logger.info("CacheWarmer connected to Redis for distributed locking.")
+            except Exception as e:
+                logger.warning(f"CacheWarmer could not connect to Redis for distributed locking: {e}")
+                self.redis_client = None
 
         # Start background tasks
         tasks = []
@@ -390,65 +430,60 @@ class CacheWarmer:
                 logger.error(f"Warming loop error: {e}")
 
     async def _execute_warming_task(self, task: Dict[str, Any]) -> None:
-        """Execute a warming task"""
+        """Execute a warming task, using a distributed lock if available."""
         task_key = task.get('key', 'unknown')
-        self._active_warmings.add(task_key)
 
-        start_time = time.time()
+        async def perform_warming():
+            self._active_warmings.add(task_key)
+            start_time = time.time()
+            try:
+                # Check if already warmed by another instance
+                if await self.cache.has(task_key):
+                    logger.info(f"Key {task_key} already warmed, skipping.")
+                    self.stats.skipped_warmings += 1
+                    return
 
-        try:
-            self.stats.total_warmings += 1
+                self.stats.total_warmings += 1
+                getter_func = task['getter_func']
+                value = await getter_func()
 
-            # Get value using getter function
-            getter_func = task['getter_func']
-            value = await getter_func()
-
-            if value is not None:
-                # Set in cache with appropriate TTL
-                ttl = await self._determine_warming_ttl(task)
-                category = task.get('category', 'default')
-
-                success = await self.cache.set(
-                    key=task_key,
-                    value=value,
-                    ttl=ttl,
-                    category=category
-                )
-
-                if success:
-                    self.stats.successful_warmings += 1
-                    self.stats.total_keys_warmed += 1 if isinstance(value, list) else 1
-                    logger.info(f"Successfully warmed key: {task_key}")
+                if value is not None:
+                    ttl = await self._determine_warming_ttl(task)
+                    category = task.get('category', 'default')
+                    success = await self.cache.set(
+                        key=task_key, value=value, ttl=ttl, category=category
+                    )
+                    if success:
+                        self.stats.successful_warmings += 1
+                        self.stats.total_keys_warmed += 1
+                        logger.info(f"Successfully warmed key: {task_key}")
+                    else:
+                        self.stats.failed_warmings += 1
+                        logger.warning(f"Failed to warm key: {task_key}")
                 else:
-                    self.stats.failed_warmings += 1
-                    logger.warning(f"Failed to warm key: {task_key}")
-            else:
-                self.stats.skipped_warmings += 1
-                logger.debug(f"Skipped warming for key {task_key}: no value")
+                    self.stats.skipped_warmings += 1
+            except Exception as e:
+                self.stats.failed_warmings += 1
+                logger.error(f"Warming task failed for key {task_key}: {e}")
+            finally:
+                warming_time = time.time() - start_time
+                self._warming_times.append(warming_time)
+                if len(self._warming_times) > 1000:
+                    self._warming_times = self._warming_times[-1000:]
+                if self._warming_times:
+                    self.stats.average_warming_time = statistics.mean(self._warming_times)
+                self.stats.last_warming_time = datetime.now()
+                self._active_warmings.discard(task_key)
+                if 'queue_item' in task:
+                    task['queue_item'].task_done()
 
-        except Exception as e:
-            self.stats.failed_warmings += 1
-            logger.error(f"Warming task failed for key {task_key}: {e}")
-        finally:
-            # Record timing
-            warming_time = time.time() - start_time
-            self._warming_times.append(warming_time)
-
-            # Keep only recent timing data
-            if len(self._warming_times) > 1000:
-                self._warming_times = self._warming_times[-1000:]
-
-            # Update stats
-            if self._warming_times:
-                self.stats.average_warming_time = statistics.mean(self._warming_times)
-            self.stats.last_warming_time = datetime.now()
-
-            # Remove from active set
-            self._active_warmings.discard(task_key)
-
-            # Mark task as done
-            if 'queue_item' in task:
-                task['queue_item'].task_done()
+        if self.redis_client:
+            lock = DistributedLock(self.redis_client, f"warm_task:{task_key}")
+            async with await lock.__aenter__():
+                await perform_warming()
+        else:
+            # No distributed lock, perform directly
+            await perform_warming()
 
     async def _analyze_patterns(self) -> None:
         """Analyze access patterns for predictive warming"""

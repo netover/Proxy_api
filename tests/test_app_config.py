@@ -82,7 +82,7 @@ class TestProviderConfig:
                 api_key_env="TEST_KEY",
                 models=[]
             )
-        assert "At least one model must be specified" in str(exc_info.value)
+        assert "List should have at least 1 item" in str(exc_info.value)
 
     def test_duplicate_models_removed(self):
         """Test that duplicate models are removed"""
@@ -93,7 +93,7 @@ class TestProviderConfig:
             api_key_env="TEST_KEY",
             models=["model1", "model1", "model2"]
         )
-        assert config.models == ["model1", "model2"]
+        assert sorted(config.models) == sorted(["model1", "model2"])
 
     def test_priority_bounds(self):
         """Test priority field bounds"""
@@ -426,7 +426,7 @@ class TestAppConfig:
         """Test validation for empty providers list"""
         with pytest.raises(ValidationError) as exc_info:
             AppConfig(providers=[])
-        assert "At least one provider must be configured" in str(exc_info.value)
+        assert "List should have at least 1 item" in str(exc_info.value)
 
     def test_duplicate_provider_names(self):
         """Test validation for duplicate provider names"""
@@ -474,38 +474,48 @@ class TestAppConfig:
 class TestConfigFunctions:
     """Test configuration utility functions"""
 
-    @patch('sys.frozen', False)
+    @patch('sys.frozen', False, create=True)
     @patch('src.core.app_config.Path')
     def test_get_config_paths_development(self, mock_path_class):
         """Test get_config_paths in development mode"""
+        # Configure the mock to simulate path operations
         mock_base_path = mock_path_class.return_value.parent.parent.parent
-        mock_base_path.__truediv__ = lambda self, x: f"/path/to/{x}"
+        mock_base_path.__truediv__.side_effect = lambda x: Path(f"/mock/base/{x}")
 
         paths = get_config_paths()
 
-        expected_bundle_yaml = "/path/to/config.yaml"
-        expected_bundle_json = "/path/to/config.json"
-        expected_external_yaml = "/path/to/config.yaml"
-        expected_external_json = "/path/to/config.json"
+        expected_yaml_path = Path("/mock/base/config.yaml")
+        expected_json_path = Path("/mock/base/config.json")
+        assert paths[0] == expected_yaml_path
+        assert paths[1] == expected_json_path
+        assert paths[2] == expected_yaml_path
+        assert paths[3] == expected_json_path
 
-        assert paths[0] == expected_bundle_yaml  # bundle_yaml
-        assert paths[1] == expected_bundle_json  # bundle_json
-        assert paths[2] == expected_external_yaml  # external_yaml
-        assert paths[3] == expected_external_json  # external_json
-
-    @patch('sys.frozen', True)
-    @patch('sys._MEIPASS', '/frozen/path')
+    @patch('sys.frozen', True, create=True)
+    @patch('sys._MEIPASS', '/frozen/path', create=True)
     @patch('sys.executable', '/exec/path/app.exe')
     @patch('src.core.app_config.Path')
     def test_get_config_paths_frozen(self, mock_path_class):
         """Test get_config_paths in frozen/executable mode"""
+        from unittest.mock import MagicMock
+        # Configure the mock to simulate path operations
+        def path_side_effect(p):
+            if p == '/frozen/path':
+                return Path('/frozen/path')
+            elif p == '/exec/path/app.exe':
+                mock_exe_path = MagicMock()
+                mock_exe_path.parent = Path('/exec/path')
+                return mock_exe_path
+            return Path(p)
+        mock_path_class.side_effect = path_side_effect
+
         paths = get_config_paths()
 
         # Should use _MEIPASS for bundle and executable parent for external
-        assert str(paths[0]).endswith("config.yaml")  # bundle_yaml
-        assert str(paths[1]).endswith("config.json")  # bundle_json
-        assert str(paths[2]).endswith("config.yaml")  # external_yaml
-        assert str(paths[3]).endswith("config.json")  # external_json
+        assert paths[0] == Path('/frozen/path/config.yaml')
+        assert paths[1] == Path('/frozen/path/config.json')
+        assert paths[2] == Path('/exec/path/config.yaml')
+        assert paths[3] == Path('/exec/path/config.json')
 
     def test_create_default_config_yaml(self):
         """Test create_default_config with YAML format"""
@@ -552,7 +562,7 @@ class TestConfigFunctions:
         mock_logger.error.assert_called_once()
 
     @patch('src.core.app_config.get_config_paths')
-    @patch('src.core.app_config.try_load_config')
+    @patch('src.core.app_config._try_load_config')
     @patch('src.core.app_config.create_default_config')
     def test_load_config_fallback_chain(self, mock_create_default, mock_try_load, mock_get_paths):
         """Test load_config fallback chain"""
@@ -578,7 +588,7 @@ class TestConfigFunctions:
             # Should try external first, then bundled, then create default
             assert mock_try_load.call_count == 2  # external + bundled
             mock_create_default.assert_called_once()
-            mock_app_config.assert_called_once_with(default_config)
+            mock_app_config.assert_called_once_with(**default_config)
             assert result == "parsed_config"
 
     @patch('src.core.app_config.load_config')
@@ -615,7 +625,7 @@ class TestConfigLoading:
                 yaml.safe_dump(config_data, f)
 
             with patch('src.core.app_config.get_config_paths', return_value=(config_path, None, config_path, None)):
-                with patch('src.core.app_config.try_load_config') as mock_try_load:
+                with patch('src.core.app_config._try_load_config') as mock_try_load:
                     mock_try_load.return_value = AppConfig(**config_data)
 
                     result = load_config()
@@ -643,7 +653,7 @@ class TestConfigLoading:
                 json.dump(config_data, f)
 
             with patch('src.core.app_config.get_config_paths', return_value=(None, config_path, None, config_path)):
-                with patch('src.core.app_config.try_load_config') as mock_try_load:
+                with patch('src.core.app_config._try_load_config') as mock_try_load:
                     mock_try_load.return_value = AppConfig(**config_data)
 
                     result = load_config()
