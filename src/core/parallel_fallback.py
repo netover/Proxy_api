@@ -21,15 +21,19 @@ logger = ContextualLogger(__name__)
 
 class ParallelExecutionMode(Enum):
     """Execution modes for parallel fallback"""
-    FIRST_SUCCESS = "first_success"           # First successful response wins
-    BEST_RESPONSE = "best_response"           # Wait for all, return best by quality/latency
-    LOAD_BALANCED = "load_balanced"           # Distribute load across healthy providers
-    ADAPTIVE = "adaptive"                     # Adaptive based on provider performance
+
+    FIRST_SUCCESS = "first_success"  # First successful response wins
+    BEST_RESPONSE = (
+        "best_response"  # Wait for all, return best by quality/latency
+    )
+    LOAD_BALANCED = "load_balanced"  # Distribute load across healthy providers
+    ADAPTIVE = "adaptive"  # Adaptive based on provider performance
 
 
 @dataclass
 class ParallelExecutionResult:
     """Result from parallel execution"""
+
     success: bool
     response: Optional[Any] = None
     provider_name: Optional[str] = None
@@ -41,6 +45,7 @@ class ParallelExecutionResult:
 @dataclass
 class ProviderAttempt:
     """Record of a single provider attempt"""
+
     provider_name: str
     start_time: float
     end_time: Optional[float] = None
@@ -56,7 +61,9 @@ class ParallelFallbackEngine:
     Eliminates O(n) sequential latency through intelligent parallelization
     """
 
-    def __init__(self, max_concurrent_providers: int = 5, default_timeout: float = 30.0):
+    def __init__(
+        self, max_concurrent_providers: int = 5, default_timeout: float = 30.0
+    ):
         self.max_concurrent_providers = max_concurrent_providers
         self.default_timeout = default_timeout
 
@@ -70,9 +77,13 @@ class ParallelFallbackEngine:
         self._total_latency_ms = 0.0
 
         # Thread pool for CPU-bound operations
-        self._thread_pool = ThreadPoolExecutor(max_workers=4, thread_name_prefix="parallel-fallback")
+        self._thread_pool = ThreadPoolExecutor(
+            max_workers=4, thread_name_prefix="parallel-fallback"
+        )
 
-        logger.info(f"Parallel Fallback Engine initialized with {max_concurrent_providers} max concurrent providers")
+        logger.info(
+            f"Parallel Fallback Engine initialized with {max_concurrent_providers} max concurrent providers"
+        )
 
     async def execute_parallel(
         self,
@@ -80,7 +91,7 @@ class ParallelFallbackEngine:
         request_data: Dict[str, Any],
         execution_mode: ParallelExecutionMode = ParallelExecutionMode.FIRST_SUCCESS,
         timeout: Optional[float] = None,
-        max_providers: Optional[int] = None
+        max_providers: Optional[int] = None,
     ) -> ParallelExecutionResult:
         """
         Execute request across multiple providers in parallel
@@ -100,16 +111,21 @@ class ParallelFallbackEngine:
         self._execution_count += 1
 
         timeout = timeout or self.default_timeout
-        max_providers = min(max_providers or self.max_concurrent_providers, self.max_concurrent_providers)
+        max_providers = min(
+            max_providers or self.max_concurrent_providers,
+            self.max_concurrent_providers,
+        )
 
         # Get healthy providers for the model
-        candidate_providers = provider_discovery.get_healthy_providers_for_model(model)
+        candidate_providers = (
+            provider_discovery.get_healthy_providers_for_model(model)
+        )
 
         if not candidate_providers:
             return ParallelExecutionResult(
                 success=False,
                 error="No healthy providers available for model",
-                latency_ms=(time.time() - start_time) * 1000
+                latency_ms=(time.time() - start_time) * 1000,
             )
 
         # Limit to max_providers
@@ -118,12 +134,12 @@ class ParallelFallbackEngine:
         logger.info(
             f"Starting parallel execution {execution_id}",
             extra={
-                'model': model,
-                'providers': selected_providers,
-                'mode': execution_mode.value,
-                'timeout': timeout,
-                'max_providers': max_providers
-            }
+                "model": model,
+                "providers": selected_providers,
+                "mode": execution_mode.value,
+                "timeout": timeout,
+                "max_providers": max_providers,
+            },
         )
 
         try:
@@ -144,14 +160,16 @@ class ParallelFallbackEngine:
                     execution_id, selected_providers, request_data, timeout
                 )
             else:
-                raise ValueError(f"Unsupported execution mode: {execution_mode}")
+                raise ValueError(
+                    f"Unsupported execution mode: {execution_mode}"
+                )
 
         except Exception as e:
             logger.error(f"Parallel execution {execution_id} failed: {e}")
             return ParallelExecutionResult(
                 success=False,
                 error=str(e),
-                latency_ms=(time.time() - start_time) * 1000
+                latency_ms=(time.time() - start_time) * 1000,
             )
 
     async def _execute_first_success(
@@ -159,7 +177,7 @@ class ParallelFallbackEngine:
         execution_id: str,
         providers: List[str],
         request_data: Dict[str, Any],
-        timeout: float
+        timeout: float,
     ) -> ParallelExecutionResult:
         """
         First-success-wins execution: Return the first successful response
@@ -174,29 +192,33 @@ class ParallelFallbackEngine:
         async def execute_provider(provider_name: str):
             nonlocal winner_provider, winner_response, winner_latency
 
-            attempt = ProviderAttempt(provider_name=provider_name, start_time=time.time())
+            attempt = ProviderAttempt(
+                provider_name=provider_name, start_time=time.time()
+            )
             attempts.append(attempt)
 
             try:
                 # Check if already completed by another provider
                 if completion_event.is_set():
                     attempt.end_time = time.time()
-                    attempt.latency_ms = (attempt.end_time - attempt.start_time) * 1000
+                    attempt.latency_ms = (
+                        attempt.end_time - attempt.start_time
+                    ) * 1000
                     return
 
                 # Get provider instance
                 provider = await provider_factory.get_provider(provider_name)
                 if not provider:
-                    raise ProviderError(f"Provider {provider_name} not available")
+                    raise ProviderError(
+                        f"Provider {provider_name} not available"
+                    )
 
                 # Execute with circuit breaker protection
                 circuit_breaker = get_circuit_breaker(provider_name)
 
                 start_time = time.time()
                 result = await circuit_breaker.execute(
-                    self._execute_provider_request,
-                    provider,
-                    request_data
+                    self._execute_provider_request, provider, request_data
                 )
                 end_time = time.time()
 
@@ -220,17 +242,19 @@ class ParallelFallbackEngine:
                 logger.info(
                     f"Provider {provider_name} completed successfully",
                     extra={
-                        'execution_id': execution_id,
-                        'latency_ms': attempt.latency_ms,
-                        'is_winner': completion_event.is_set()
-                    }
+                        "execution_id": execution_id,
+                        "latency_ms": attempt.latency_ms,
+                        "is_winner": completion_event.is_set(),
+                    },
                 )
 
             except Exception as e:
                 attempt.end_time = time.time()
                 attempt.success = False
                 attempt.error = str(e)
-                attempt.latency_ms = (attempt.end_time - attempt.start_time) * 1000
+                attempt.latency_ms = (
+                    attempt.end_time - attempt.start_time
+                ) * 1000
 
                 # Record failed request
                 await provider_discovery.record_request_result(
@@ -240,10 +264,10 @@ class ParallelFallbackEngine:
                 logger.warning(
                     f"Provider {provider_name} failed",
                     extra={
-                        'execution_id': execution_id,
-                        'error': str(e),
-                        'latency_ms': attempt.latency_ms
-                    }
+                        "execution_id": execution_id,
+                        "error": str(e),
+                        "latency_ms": attempt.latency_ms,
+                    },
                 )
 
         # Launch all provider requests in parallel
@@ -265,7 +289,9 @@ class ParallelFallbackEngine:
             await asyncio.gather(*tasks, return_exceptions=True)
 
         except asyncio.TimeoutError:
-            logger.warning(f"Parallel execution {execution_id} timed out after {timeout}s")
+            logger.warning(
+                f"Parallel execution {execution_id} timed out after {timeout}s"
+            )
 
             # Cancel all remaining tasks
             for task in tasks:
@@ -278,12 +304,15 @@ class ParallelFallbackEngine:
                 success=False,
                 error=f"Timeout after {timeout}s",
                 latency_ms=timeout * 1000,
-                attempts=[{
-                    'provider': attempt.provider_name,
-                    'success': attempt.success,
-                    'latency_ms': attempt.latency_ms,
-                    'error': attempt.error
-                } for attempt in attempts]
+                attempts=[
+                    {
+                        "provider": attempt.provider_name,
+                        "success": attempt.success,
+                        "latency_ms": attempt.latency_ms,
+                        "error": attempt.error,
+                    }
+                    for attempt in attempts
+                ],
             )
 
         # Return successful result
@@ -299,13 +328,16 @@ class ParallelFallbackEngine:
                 response=winner_response,
                 provider_name=winner_provider,
                 latency_ms=total_latency,
-                attempts=[{
-                    'provider': attempt.provider_name,
-                    'success': attempt.success,
-                    'latency_ms': attempt.latency_ms,
-                    'error': attempt.error,
-                    'is_winner': attempt.provider_name == winner_provider
-                } for attempt in attempts]
+                attempts=[
+                    {
+                        "provider": attempt.provider_name,
+                        "success": attempt.success,
+                        "latency_ms": attempt.latency_ms,
+                        "error": attempt.error,
+                        "is_winner": attempt.provider_name == winner_provider,
+                    }
+                    for attempt in attempts
+                ],
             )
 
         # All providers failed
@@ -313,12 +345,15 @@ class ParallelFallbackEngine:
             success=False,
             error="All providers failed",
             latency_ms=(time.time() - attempts[0].start_time) * 1000,
-            attempts=[{
-                'provider': attempt.provider_name,
-                'success': attempt.success,
-                'latency_ms': attempt.latency_ms,
-                'error': attempt.error
-            } for attempt in attempts]
+            attempts=[
+                {
+                    "provider": attempt.provider_name,
+                    "success": attempt.success,
+                    "latency_ms": attempt.latency_ms,
+                    "error": attempt.error,
+                }
+                for attempt in attempts
+            ],
         )
 
     async def _execute_best_response(
@@ -326,41 +361,45 @@ class ParallelFallbackEngine:
         execution_id: str,
         providers: List[str],
         request_data: Dict[str, Any],
-        timeout: float
+        timeout: float,
     ) -> ParallelExecutionResult:
         """Execute all providers and return the best response by quality/latency"""
         # Implementation for best response mode
         # This would evaluate response quality and latency
-        return await self._execute_first_success(execution_id, providers, request_data, timeout)
+        return await self._execute_first_success(
+            execution_id, providers, request_data, timeout
+        )
 
     async def _execute_load_balanced(
         self,
         execution_id: str,
         providers: List[str],
         request_data: Dict[str, Any],
-        timeout: float
+        timeout: float,
     ) -> ParallelExecutionResult:
         """Distribute load across healthy providers"""
         # Simple round-robin for load balancing
         # In production, this would use more sophisticated load balancing
-        return await self._execute_first_success(execution_id, providers, request_data, timeout)
+        return await self._execute_first_success(
+            execution_id, providers, request_data, timeout
+        )
 
     async def _execute_adaptive(
         self,
         execution_id: str,
         providers: List[str],
         request_data: Dict[str, Any],
-        timeout: float
+        timeout: float,
     ) -> ParallelExecutionResult:
         """Adaptive execution based on provider performance history"""
         # Use provider discovery metrics to optimize execution order
         # Prioritize faster, more reliable providers
-        return await self._execute_first_success(execution_id, providers, request_data, timeout)
+        return await self._execute_first_success(
+            execution_id, providers, request_data, timeout
+        )
 
     async def _execute_provider_request(
-        self,
-        provider: BaseProvider,
-        request_data: Dict[str, Any]
+        self, provider: BaseProvider, request_data: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Execute a single provider request"""
         # Determine request type and call appropriate method
@@ -388,7 +427,7 @@ class ParallelFallbackEngine:
             "success_rate": round(success_rate, 4),
             "average_latency_ms": round(avg_latency, 2),
             "max_concurrent_providers": self.max_concurrent_providers,
-            "default_timeout": self.default_timeout
+            "default_timeout": self.default_timeout,
         }
 
     async def cancel_execution(self, execution_id: str):

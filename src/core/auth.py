@@ -13,27 +13,28 @@ from src.core.unified_config import config_manager
 
 logger = ContextualLogger(__name__)
 
+
 class APIKeyAuth:
     """API Key authentication"""
-    
+
     def __init__(self, api_keys: list[str]):
         self.valid_api_key_hashes = self._load_api_keys(api_keys)
-    
+
     def _load_api_keys(self, api_keys: list[str]) -> set[str]:
         """Load and hash API keys"""
         hashed_keys = set()
         for key in api_keys:
             if key:
                 hashed_keys.add(hashlib.sha256(key.encode()).hexdigest())
-        
+
         logger.info(f"Loaded {len(hashed_keys)} API keys for authentication")
         return hashed_keys
-    
+
     def verify_api_key(self, api_key: str) -> bool:
         """Verify API key securely"""
         if not api_key or not self.valid_api_key_hashes:
             return False
-        
+
         # Hash the provided key to compare with the stored hashes
         key_hash = hashlib.sha256(api_key.encode()).hexdigest()
 
@@ -47,35 +48,34 @@ class APIKeyAuth:
 
         return is_valid
 
+
 # This dependency will be initialized during app startup
 def get_api_key_auth(request: Request) -> APIKeyAuth:
     return request.app.state.api_key_auth
 
+
 async def verify_api_key(
-    request: Request,
-    api_key_auth: APIKeyAuth = Depends(get_api_key_auth)
+    request: Request, api_key_auth: APIKeyAuth = Depends(get_api_key_auth)
 ) -> bool:
     """Verify API key from request headers using the application's auth instance"""
     # Check for API key in custom header or Authorization header
-    api_key = request.headers.get(config_manager.load_config().settings.api_key_header.lower())
+    api_key = request.headers.get(
+        config_manager.load_config().settings.api_key_header.lower()
+    )
     if not api_key:
         auth_header = request.headers.get("authorization")
         if auth_header and auth_header.startswith("Bearer "):
             api_key = auth_header[7:]  # Remove "Bearer " prefix
-    
+
     if not api_key:
         logger.warning("No API key provided", path=request.url.path)
-        raise HTTPException(
-            status_code=401,
-            detail="API key required"
-        )
-    
+        raise HTTPException(status_code=401, detail="API key required")
+
     if not api_key_auth.verify_api_key(api_key):
         logger.warning("Invalid API key provided", path=request.url.path)
         raise HTTPException(
-            status_code=401,
-            detail="Invalid or unauthorized API key"
+            status_code=401, detail="Invalid or unauthorized API key"
         )
-    
+
     logger.info("API key verified successfully", path=request.url.path)
     return True

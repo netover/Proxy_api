@@ -11,7 +11,9 @@ client = TestClient(app)
 @pytest.mark.asyncio
 async def test_get_metrics_success():
     """Test get metrics endpoint success."""
-    with patch('src.api.controllers.analytics_controller.metrics_collector') as mock_metrics_collector:
+    with patch(
+        "src.api.controllers.analytics_controller.metrics_collector"
+    ) as mock_metrics_collector:
 
         # Mock metrics data
         mock_stats = {
@@ -19,14 +21,14 @@ async def test_get_metrics_success():
                 "total_requests": 100,
                 "success_rate": 0.95,
                 "average_response_time": 1.2,
-                "error_count": 5
+                "error_count": 5,
             },
             "anthropic": {
                 "total_requests": 50,
                 "success_rate": 0.98,
                 "average_response_time": 2.1,
-                "error_count": 1
-            }
+                "error_count": 1,
+            },
         }
         mock_metrics_collector.get_all_stats.return_value = mock_stats
 
@@ -52,13 +54,16 @@ async def test_get_metrics_success():
         mock_provider2.error_count = 1
 
         mock_provider_factory = AsyncMock()
-        mock_provider_factory.get_all_provider_info.return_value = [mock_provider1, mock_provider2]
+        mock_provider_factory.get_all_provider_info.return_value = [
+            mock_provider1,
+            mock_provider2,
+        ]
 
         # Mock the app state in the request
         mock_app_state = Mock()
         mock_app_state.provider_factory = mock_provider_factory
 
-        with patch.object(app.state, 'app_state', mock_app_state):
+        with patch.object(app.state, "app_state", mock_app_state):
             async with AsyncClient(app=app, base_url="http://test") as ac:
                 headers = {"Authorization": "Bearer test_key"}
                 response = await ac.get("/metrics", headers=headers)
@@ -86,7 +91,9 @@ async def test_get_metrics_success():
                 summary = json_response["summary"]
                 assert summary["total_providers"] == 2
                 assert summary["total_requests"] == 150  # 100 + 50
-                assert summary["average_success_rate"] == 0.965  # (0.95 + 0.98) / 2
+                assert (
+                    summary["average_success_rate"] == 0.965
+                )  # (0.95 + 0.98) / 2
 
 
 @pytest.mark.asyncio
@@ -115,8 +122,11 @@ async def test_get_metrics_invalid_api_key():
 @pytest.mark.asyncio
 async def test_get_metrics_empty_providers():
     """Test get metrics endpoint with no providers."""
-    with patch('src.api.controllers.analytics_controller.metrics_collector') as mock_metrics_collector, \
-         patch('src.api.controllers.analytics_controller.app_state') as mock_app_state:
+    with patch(
+        "src.api.controllers.analytics_controller.metrics_collector"
+    ) as mock_metrics_collector, patch(
+        "src.api.controllers.analytics_controller.app_state"
+    ) as mock_app_state:
 
         mock_metrics_collector.get_all_stats.return_value = {}
 
@@ -139,7 +149,9 @@ async def test_get_metrics_empty_providers():
 @pytest.mark.asyncio
 async def test_get_prometheus_metrics_success():
     """Test get prometheus metrics endpoint success."""
-    with patch('src.api.controllers.analytics_controller.metrics_collector') as mock_metrics_collector:
+    with patch(
+        "src.api.controllers.analytics_controller.metrics_collector"
+    ) as mock_metrics_collector:
         prometheus_data = """# HELP http_requests_total Total number of HTTP requests
 # TYPE http_requests_total counter
 http_requests_total{method="GET",endpoint="/metrics"} 150
@@ -153,13 +165,17 @@ response_time_seconds_sum 225.5
 response_time_seconds_count 150
 """
 
-        mock_metrics_collector.get_prometheus_metrics.return_value = prometheus_data
+        mock_metrics_collector.get_prometheus_metrics.return_value = (
+            prometheus_data
+        )
 
         async with AsyncClient(app=app, base_url="http://test") as ac:
             headers = {"Authorization": "Bearer test_key"}
             response = await ac.get("/metrics/prometheus", headers=headers)
             assert response.status_code == 200
-            assert response.headers["content-type"] == "text/plain; charset=utf-8"
+            assert (
+                response.headers["content-type"] == "text/plain; charset=utf-8"
+            )
             assert prometheus_data in response.text
 
 
@@ -189,28 +205,35 @@ async def test_get_prometheus_metrics_invalid_api_key():
 @pytest.mark.asyncio
 async def test_get_prometheus_metrics_empty():
     """Test get prometheus metrics endpoint with empty data."""
-    with patch('src.api.controllers.analytics_controller.metrics_collector') as mock_metrics_collector:
+    with patch(
+        "src.api.controllers.analytics_controller.metrics_collector"
+    ) as mock_metrics_collector:
         mock_metrics_collector.get_prometheus_metrics.return_value = None
 
         async with AsyncClient(app=app, base_url="http://test") as ac:
             headers = {"Authorization": "Bearer test_key"}
             response = await ac.get("/metrics/prometheus", headers=headers)
             assert response.status_code == 200
-            assert response.headers["content-type"] == "text/plain; charset=utf-8"
+            assert (
+                response.headers["content-type"] == "text/plain; charset=utf-8"
+            )
             assert response.text == ""
 
 
 @pytest.mark.asyncio
 async def test_metrics_with_provider_errors():
     """Test metrics endpoint with providers having errors."""
-    with patch('src.api.controllers.analytics_controller.metrics_collector') as mock_metrics_collector, \
-         patch('src.api.controllers.analytics_controller.app_state') as mock_app_state:
+    with patch(
+        "src.api.controllers.analytics_controller.metrics_collector"
+    ) as mock_metrics_collector, patch(
+        "src.api.controllers.analytics_controller.app_state"
+    ) as mock_app_state:
 
         mock_stats = {
             "openai": {
                 "total_requests": 100,
                 "success_rate": 0.8,
-                "error_count": 20
+                "error_count": 20,
             }
         }
         mock_metrics_collector.get_all_stats.return_value = mock_stats
@@ -226,7 +249,9 @@ async def test_metrics_with_provider_errors():
         mock_provider.error_count = 20
 
         mock_provider_factory = AsyncMock()
-        mock_provider_factory.get_all_provider_info.return_value = [mock_provider]
+        mock_provider_factory.get_all_provider_info.return_value = [
+            mock_provider
+        ]
         mock_app_state.provider_factory = mock_provider_factory
 
         async with AsyncClient(app=app, base_url="http://test") as ac:
@@ -244,15 +269,13 @@ async def test_metrics_with_provider_errors():
 @pytest.mark.asyncio
 async def test_metrics_with_forced_provider():
     """Test metrics endpoint with a forced provider."""
-    with patch('src.api.controllers.analytics_controller.metrics_collector') as mock_metrics_collector, \
-         patch('src.api.controllers.analytics_controller.app_state') as mock_app_state:
+    with patch(
+        "src.api.controllers.analytics_controller.metrics_collector"
+    ) as mock_metrics_collector, patch(
+        "src.api.controllers.analytics_controller.app_state"
+    ) as mock_app_state:
 
-        mock_stats = {
-            "openai": {
-                "total_requests": 200,
-                "success_rate": 0.9
-            }
-        }
+        mock_stats = {"openai": {"total_requests": 200, "success_rate": 0.9}}
         mock_metrics_collector.get_all_stats.return_value = mock_stats
 
         mock_provider = Mock()
@@ -266,7 +289,9 @@ async def test_metrics_with_forced_provider():
         mock_provider.error_count = 0
 
         mock_provider_factory = AsyncMock()
-        mock_provider_factory.get_all_provider_info.return_value = [mock_provider]
+        mock_provider_factory.get_all_provider_info.return_value = [
+            mock_provider
+        ]
         mock_app_state.provider_factory = mock_provider_factory
 
         async with AsyncClient(app=app, base_url="http://test") as ac:

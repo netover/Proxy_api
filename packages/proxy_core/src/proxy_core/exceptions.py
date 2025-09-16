@@ -1,10 +1,13 @@
 from typing import Optional
 import httpx
 
+
 class ProviderError(Exception):
     """Base exception for all provider errors"""
 
-    def __init__(self, message: str, provider: str = "", code: str = "provider_error"):
+    def __init__(
+        self, message: str, provider: str = "", code: str = "provider_error"
+    ):
         self.message = message
         self.provider = provider
         self.code = code
@@ -15,49 +18,75 @@ class ProviderError(Exception):
             "message": self.message,
             "type": self.code,
             "param": None,
-            "code": self.code
+            "code": self.code,
         }
+
 
 class InvalidRequestError(ProviderError):
     """Raised for invalid request parameters"""
-    def __init__(self, message: str, param: str = "unknown", code: str = "invalid_request_error"):
+
+    def __init__(
+        self,
+        message: str,
+        param: str = "unknown",
+        code: str = "invalid_request_error",
+    ):
         super().__init__(message, code=code)
         self.param = param
 
+
 class RateLimitError(ProviderError):
     """Raised for rate limiting errors"""
-    def __init__(self, message: str, retry_after: Optional[int] = None, code: str = "rate_limit_error"):
+
+    def __init__(
+        self,
+        message: str,
+        retry_after: Optional[int] = None,
+        code: str = "rate_limit_error",
+    ):
         super().__init__(message, code=code)
         self.retry_after = retry_after
 
+
 class AuthenticationError(ProviderError):
     """Raised for authentication failures"""
+
     def __init__(self, message: str, code: str = "authentication_error"):
         super().__init__(message, code=code)
 
+
 class ServiceUnavailableError(ProviderError):
     """Raised when service is unavailable"""
+
     def __init__(self, message: str, code: str = "service_unavailable_error"):
         super().__init__(message, code=code)
 
+
 class NotImplementedError(ProviderError):
     """Raised when operation is not implemented by provider"""
+
     def __init__(self, message: str, code: str = "not_implemented_error"):
         super().__init__(message, code=code)
 
+
 class APIConnectionError(ProviderError):
     """Raised for API connection errors"""
+
     def __init__(self, message: str, code: str = "api_connection_error"):
         super().__init__(message, code=code)
 
+
 class ValidationError(Exception):
     """Raised for validation errors in data processing"""
+
     def __init__(self, message: str):
         self.message = message
         super().__init__(self.message)
 
+
 class ConfigurationError(Exception):
     """Raised for configuration-related errors"""
+
     def __init__(self, message: str):
         self.message = message
         super().__init__(self.message)

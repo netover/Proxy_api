@@ -17,11 +17,15 @@ from src.core.http_client import OptimizedHTTPClient
 from src.core.http_client_v2 import AdvancedHTTPClient
 
 # Configure logging
-logging.basicConfig(level=logging.ERROR)  # Minimize logging for throughput tests
+logging.basicConfig(
+    level=logging.ERROR
+)  # Minimize logging for throughput tests
 logger = logging.getLogger(__name__)
+
 
 class ThroughputBenchmarkResult:
     """Container for throughput benchmark results"""
+
     def __init__(self, client_name: str):
         self.client_name = client_name
         self.total_requests: int = 0
@@ -39,25 +43,40 @@ class ThroughputBenchmarkResult:
 
     @property
     def requests_per_second(self) -> float:
-        return self.successful_requests / self.total_time if self.total_time > 0 else 0
+        return (
+            self.successful_requests / self.total_time
+            if self.total_time > 0
+            else 0
+        )
 
     @property
     def success_rate(self) -> float:
-        return (self.successful_requests / self.total_requests * 100) if self.total_requests > 0 else 0
+        return (
+            (self.successful_requests / self.total_requests * 100)
+            if self.total_requests > 0
+            else 0
+        )
 
     @property
     def avg_response_time(self) -> float:
-        return statistics.mean(self.response_times) if self.response_times else 0
+        return (
+            statistics.mean(self.response_times) if self.response_times else 0
+        )
 
     @property
     def median_response_time(self) -> float:
-        return statistics.median(self.response_times) if self.response_times else 0
+        return (
+            statistics.median(self.response_times)
+            if self.response_times
+            else 0
+        )
 
     @property
     def p95_response_time(self) -> float:
         if len(self.response_times) >= 20:
             return statistics.quantiles(self.response_times, n=20)[18]
         return max(self.response_times) if self.response_times else 0
+
 
 async def benchmark_throughput():
     """Benchmark maximum throughput for both HTTP clients"""
@@ -71,20 +90,20 @@ async def benchmark_throughput():
             "name": "Low Concurrency (10 concurrent)",
             "concurrent_requests": 10,
             "total_requests": 100,
-            "duration": 30
+            "duration": 30,
         },
         {
             "name": "Medium Concurrency (50 concurrent)",
             "concurrent_requests": 50,
             "total_requests": 500,
-            "duration": 30
+            "duration": 30,
         },
         {
             "name": "High Concurrency (100 concurrent)",
             "concurrent_requests": 100,
             "total_requests": 1000,
-            "duration": 30
-        }
+            "duration": 30,
+        },
     ]
 
     test_url = "https://httpbin.org/get"
@@ -103,25 +122,19 @@ async def benchmark_throughput():
         # Test OptimizedHTTPClient (v1)
         print("  Testing OptimizedHTTPClient (v1)...")
         v1_result = await run_throughput_test(
-            OptimizedHTTPClient,
-            "OptimizedHTTPClient_v1",
-            test_url,
-            config
+            OptimizedHTTPClient, "OptimizedHTTPClient_v1", test_url, config
         )
 
         # Test AdvancedHTTPClient (v2)
         print("  Testing AdvancedHTTPClient (v2)...")
         v2_result = await run_throughput_test(
-            AdvancedHTTPClient,
-            "AdvancedHTTPClient_v2",
-            test_url,
-            config
+            AdvancedHTTPClient, "AdvancedHTTPClient_v2", test_url, config
         )
 
-        results[config['name']] = {
+        results[config["name"]] = {
             "v1": v1_result,
             "v2": v2_result,
-            "config": config
+            "config": config,
         }
 
         # Print configuration results
@@ -131,12 +144,24 @@ async def benchmark_throughput():
         print(".1f")
         print(f"    V1 Success Rate: {v1_result.success_rate:.1f}%")
         print(f"    V2 Success Rate: {v2_result.success_rate:.1f}%")
-        print(f"    V1 Avg Response Time: {v1_result.avg_response_time*1000:.2f}ms")
-        print(f"    V2 Avg Response Time: {v2_result.avg_response_time*1000:.2f}ms")
-        print(f"    V1 Median Response Time: {v1_result.median_response_time*1000:.2f}ms")
-        print(f"    V2 Median Response Time: {v2_result.median_response_time*1000:.2f}ms")
-        print(f"    V1 P95 Response Time: {v1_result.p95_response_time*1000:.2f}ms")
-        print(f"    V2 P95 Response Time: {v2_result.p95_response_time*1000:.2f}ms")
+        print(
+            f"    V1 Avg Response Time: {v1_result.avg_response_time*1000:.2f}ms"
+        )
+        print(
+            f"    V2 Avg Response Time: {v2_result.avg_response_time*1000:.2f}ms"
+        )
+        print(
+            f"    V1 Median Response Time: {v1_result.median_response_time*1000:.2f}ms"
+        )
+        print(
+            f"    V2 Median Response Time: {v2_result.median_response_time*1000:.2f}ms"
+        )
+        print(
+            f"    V1 P95 Response Time: {v1_result.p95_response_time*1000:.2f}ms"
+        )
+        print(
+            f"    V2 P95 Response Time: {v2_result.p95_response_time*1000:.2f}ms"
+        )
         print()
 
     # Overall comparison
@@ -209,8 +234,16 @@ async def benchmark_throughput():
         print(f"  {config_name}:")
 
         # Efficiency = requests per second per unit of response time
-        v1_efficiency = v1_result.requests_per_second / v1_result.avg_response_time if v1_result.avg_response_time > 0 else 0
-        v2_efficiency = v2_result.requests_per_second / v2_result.avg_response_time if v2_result.avg_response_time > 0 else 0
+        v1_efficiency = (
+            v1_result.requests_per_second / v1_result.avg_response_time
+            if v1_result.avg_response_time > 0
+            else 0
+        )
+        v2_efficiency = (
+            v2_result.requests_per_second / v2_result.avg_response_time
+            if v2_result.avg_response_time > 0
+            else 0
+        )
 
         print(".3f")
         print(".3f")
@@ -221,16 +254,20 @@ async def benchmark_throughput():
     print("-" * 40)
     for config_name, config_results in results.items():
         print(f"\n{config_name}:")
-        print("  V1 Metrics:", json.dumps(config_results["v1"].metrics, indent=4, default=str))
-        print("  V2 Metrics:", json.dumps(config_results["v2"].metrics, indent=4, default=str))
+        print(
+            "  V1 Metrics:",
+            json.dumps(config_results["v1"].metrics, indent=4, default=str),
+        )
+        print(
+            "  V2 Metrics:",
+            json.dumps(config_results["v2"].metrics, indent=4, default=str),
+        )
 
     return results
 
+
 async def run_throughput_test(
-    client_class,
-    client_name: str,
-    url: str,
-    config: Dict[str, Any]
+    client_class, client_name: str, url: str, config: Dict[str, Any]
 ) -> ThroughputBenchmarkResult:
     """Run throughput test for a specific client and configuration"""
 
@@ -245,14 +282,14 @@ async def run_throughput_test(
             max_keepalive_connections=concurrent_requests * 2,
             max_connections=concurrent_requests * 4,
             timeout=30.0,
-            retry_attempts=1  # Minimal retries for throughput tests
+            retry_attempts=1,  # Minimal retries for throughput tests
         )
     else:  # AdvancedHTTPClient
         client = client_class(
             provider_name="throughput_test",
             max_keepalive_connections=concurrent_requests * 2,
             max_connections=concurrent_requests * 4,
-            timeout=30.0
+            timeout=30.0,
         )
 
     async with client:
@@ -260,7 +297,9 @@ async def run_throughput_test(
         print("    Warm-up phase...")
         warmup_tasks = []
         for _ in range(min(10, concurrent_requests)):
-            task = asyncio.create_task(make_request(client, url, result, is_warmup=True))
+            task = asyncio.create_task(
+                make_request(client, url, result, is_warmup=True)
+            )
             warmup_tasks.append(task)
 
         await asyncio.gather(*warmup_tasks)
@@ -285,7 +324,10 @@ async def run_throughput_test(
         tasks = []
         start_time = time.time()
 
-        while time.time() - start_time < duration and result.total_requests < total_requests:
+        while (
+            time.time() - start_time < duration
+            and result.total_requests < total_requests
+        ):
             if len(tasks) < concurrent_requests:
                 task = asyncio.create_task(limited_request())
                 tasks.append(task)
@@ -310,7 +352,13 @@ async def run_throughput_test(
 
     return result
 
-async def make_request(client, url: str, result: ThroughputBenchmarkResult, is_warmup: bool = False):
+
+async def make_request(
+    client,
+    url: str,
+    result: ThroughputBenchmarkResult,
+    is_warmup: bool = False,
+):
     """Make a single HTTP request and record metrics"""
     start_time = time.time()
 
@@ -333,6 +381,7 @@ async def make_request(client, url: str, result: ThroughputBenchmarkResult, is_w
     if not is_warmup:
         result.total_requests += 1
         result.response_times.append(response_time)
+
 
 if __name__ == "__main__":
     asyncio.run(benchmark_throughput())

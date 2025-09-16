@@ -18,10 +18,10 @@ logger = ContextualLogger(__name__)
 class ProviderConfig:
     """
     Configuration for a model provider.
-    
+
     This class encapsulates all necessary configuration for connecting to
     an OpenAI-compatible API endpoint.
-    
+
     Attributes:
         name: Human-readable name for the provider
         base_url: Base URL for the API endpoint
@@ -30,7 +30,7 @@ class ProviderConfig:
         timeout: Request timeout in seconds (default: 30)
         max_retries: Maximum number of retry attempts (default: 3)
     """
-    
+
     def __init__(
         self,
         name: str,
@@ -38,20 +38,22 @@ class ProviderConfig:
         api_key: str,
         organization: Optional[str] = None,
         timeout: int = 30,
-        max_retries: int = 3
+        max_retries: int = 3,
     ):
         """Initialize provider configuration."""
         self.name = name
-        self.base_url = base_url.rstrip('/')
+        self.base_url = base_url.rstrip("/")
         self.api_key = api_key
         self.organization = organization
         self.timeout = timeout
         self.max_retries = max_retries
-    
+
     def __str__(self) -> str:
         """String representation of the provider config."""
-        return f"ProviderConfig(name='{self.name}', base_url='{self.base_url}')"
-    
+        return (
+            f"ProviderConfig(name='{self.name}', base_url='{self.base_url}')"
+        )
+
     def __repr__(self) -> str:
         """Detailed string representation for debugging."""
         return (
@@ -94,7 +96,9 @@ class ModelDiscoveryService:
         """
         self.http_client = http_client or HTTPClient()
         self._cache = None
-        logger.info("ModelDiscoveryService initialized", service_type="model_discovery")
+        logger.info(
+            "ModelDiscoveryService initialized", service_type="model_discovery"
+        )
 
     async def _get_cache(self):
         """Get or initialize the unified cache instance"""
@@ -102,12 +106,18 @@ class ModelDiscoveryService:
             self._cache = await get_unified_cache()
         return self._cache
 
-    def _generate_model_cache_key(self, provider_config: ProviderConfig) -> str:
+    def _generate_model_cache_key(
+        self, provider_config: ProviderConfig
+    ) -> str:
         """Generate a unique cache key for provider models"""
-        key_string = f"models:{provider_config.name}:{provider_config.base_url}"
+        key_string = (
+            f"models:{provider_config.name}:{provider_config.base_url}"
+        )
         return hashlib.md5(key_string.encode()).hexdigest()
 
-    async def invalidate_model_cache(self, provider_config: ProviderConfig) -> bool:
+    async def invalidate_model_cache(
+        self, provider_config: ProviderConfig
+    ) -> bool:
         """
         Invalidate cached model data for a specific provider.
 
@@ -121,9 +131,17 @@ class ModelDiscoveryService:
         cache_key = self._generate_model_cache_key(provider_config)
         result = await cache.delete(cache_key)
         if result:
-            logger.info("Invalidated model cache", provider=provider_config.name, cache_key=cache_key)
+            logger.info(
+                "Invalidated model cache",
+                provider=provider_config.name,
+                cache_key=cache_key,
+            )
         else:
-            logger.debug("No cache entry to invalidate", provider=provider_config.name, cache_key=cache_key)
+            logger.debug(
+                "No cache entry to invalidate",
+                provider=provider_config.name,
+                cache_key=cache_key,
+            )
         return result
 
     async def clear_all_model_cache(self) -> int:
@@ -135,7 +153,11 @@ class ModelDiscoveryService:
         """
         cache = await self._get_cache()
         count = await cache.clear(category="models")
-        logger.info("Cleared model cache entries", entries_cleared=count, category="models")
+        logger.info(
+            "Cleared model cache entries",
+            entries_cleared=count,
+            category="models",
+        )
         return count
 
     async def get_cache_stats(self):
@@ -150,20 +172,22 @@ class ModelDiscoveryService:
 
         # Filter stats for model-related entries
         model_entries = 0
-        for category, count in stats.get('categories', {}).items():
-            if category == 'models':
+        for category, count in stats.get("categories", {}).items():
+            if category == "models":
                 model_entries = count
                 break
 
         return {
-            'model_cache_entries': model_entries,
-            'total_cache_entries': stats.get('entries', 0),
-            'cache_hit_rate': stats.get('hit_rate', 0),
-            'cache_memory_usage_mb': stats.get('memory_usage_mb', 0),
-            'cache_max_memory_mb': stats.get('max_memory_mb', 0)
+            "model_cache_entries": model_entries,
+            "total_cache_entries": stats.get("entries", 0),
+            "cache_hit_rate": stats.get("hit_rate", 0),
+            "cache_memory_usage_mb": stats.get("memory_usage_mb", 0),
+            "cache_max_memory_mb": stats.get("max_memory_mb", 0),
         }
-    
-    async def discover_models(self, provider_config: ProviderConfig) -> List[ModelInfo]:
+
+    async def discover_models(
+        self, provider_config: ProviderConfig
+    ) -> List[ModelInfo]:
         """
         Discover all available models from a provider with intelligent caching.
 
@@ -193,16 +217,25 @@ class ModelDiscoveryService:
         # Try to get from cache first
         cached_models = await cache.get(cache_key, category="models")
         if cached_models is not None:
-            logger.debug("Cache hit for models", provider=provider_config.name, model_count=len(cached_models), cache_key=cache_key)
+            logger.debug(
+                "Cache hit for models",
+                provider=provider_config.name,
+                model_count=len(cached_models),
+                cache_key=cache_key,
+            )
             return cached_models
 
         # Cache miss - fetch from provider
-        logger.info("Cache miss - discovering models from provider", provider=provider_config.name, cache_key=cache_key)
+        logger.info(
+            "Cache miss - discovering models from provider",
+            provider=provider_config.name,
+            cache_key=cache_key,
+        )
 
         url = f"{provider_config.base_url}/v1/models"
         headers = {
             "Authorization": f"Bearer {provider_config.api_key}",
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
         }
 
         if provider_config.organization:
@@ -214,7 +247,9 @@ class ModelDiscoveryService:
             ) as session:
                 for attempt in range(provider_config.max_retries + 1):
                     try:
-                        async with session.get(url, headers=headers) as response:
+                        async with session.get(
+                            url, headers=headers
+                        ) as response:
                             if response.status == 200:
                                 data = await response.json()
                                 break
@@ -230,7 +265,7 @@ class ModelDiscoveryService:
                                 )
                             elif response.status == 429:
                                 if attempt < provider_config.max_retries:
-                                    wait_time = 2 ** attempt
+                                    wait_time = 2**attempt
                                     logger.warning(
                                         f"Rate limited, waiting {wait_time}s before retry"
                                     )
@@ -246,7 +281,7 @@ class ModelDiscoveryService:
                                 )
                     except aiohttp.ClientError as e:
                         if attempt < provider_config.max_retries:
-                            wait_time = 2 ** attempt
+                            wait_time = 2**attempt
                             logger.warning(
                                 f"Request failed: {e}. Retrying in {wait_time}s"
                             )
@@ -275,13 +310,17 @@ class ModelDiscoveryService:
                         continue
 
                 # Cache the results (15 minutes TTL for model data)
-                await cache.set(cache_key, models, ttl=900, category="models", priority=3)
+                await cache.set(
+                    cache_key, models, ttl=900, category="models", priority=3
+                )
 
-                logger.info("Discovered and cached models",
-                           provider=provider_config.name,
-                           model_count=len(models),
-                           cache_key=cache_key,
-                           ttl_seconds=900)
+                logger.info(
+                    "Discovered and cached models",
+                    provider=provider_config.name,
+                    model_count=len(models),
+                    cache_key=cache_key,
+                    ttl_seconds=900,
+                )
                 return models
 
         except asyncio.TimeoutError:
@@ -289,11 +328,9 @@ class ModelDiscoveryService:
                 f"Timeout connecting to {provider_config.name} "
                 f"after {provider_config.timeout}s"
             )
-    
+
     async def validate_model(
-        self,
-        provider_config: ProviderConfig,
-        model_id: str
+        self, provider_config: ProviderConfig, model_id: str
     ) -> bool:
         """
         Validate if a specific model exists and is accessible.
@@ -334,22 +371,20 @@ class ModelDiscoveryService:
         except ProviderError as e:
             logger.error(f"Failed to validate model: {e}")
             return False
-    
+
     async def get_model_info(
-        self,
-        provider_config: ProviderConfig,
-        model_id: str
+        self, provider_config: ProviderConfig, model_id: str
     ) -> Optional[ModelInfo]:
         """
         Get detailed information for a specific model.
-        
+
         Args:
             provider_config: Configuration for the provider to query
             model_id: The model ID to retrieve information for
-            
+
         Returns:
             ModelInfo object if the model exists, None otherwise
-            
+
         Example:
             >>> config = ProviderConfig("openai", "https://api.openai.com", "sk-...")
             >>> service = ModelDiscoveryService()
@@ -360,28 +395,28 @@ class ModelDiscoveryService:
         logger.info(
             f"Getting model info for '{model_id}' from provider: {provider_config.name}"
         )
-        
+
         try:
             models = await self.discover_models(provider_config)
             for model in models:
                 if model.id == model_id:
                     return model
             return None
-            
+
         except ProviderError as e:
             logger.error(f"Failed to get model info: {e}")
             return None
-    
+
     async def close(self) -> None:
         """Close the HTTP client and cleanup resources."""
         if self.http_client:
             await self.http_client.close()
         logger.info("ModelDiscoveryService closed")
-    
+
     async def __aenter__(self):
         """Async context manager entry."""
         return self
-    
+
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         """Async context manager exit."""
         await self.close()

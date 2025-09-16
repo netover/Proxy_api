@@ -20,6 +20,7 @@ from src.core.logging import ContextualLogger
 
 logger = ContextualLogger(__name__)
 
+
 class ConfigValidator:
     """Validates configuration consistency and provider mappings"""
 
@@ -53,7 +54,9 @@ class ConfigValidator:
 
                 # Check if class exists
                 if not hasattr(module, class_name):
-                    self.log_issue(f"Provider class '{class_name}' not found in {module_path}")
+                    self.log_issue(
+                        f"Provider class '{class_name}' not found in {module_path}"
+                    )
                     success = False
                     continue
 
@@ -61,17 +64,26 @@ class ConfigValidator:
 
                 # Check if it inherits from BaseProvider
                 from src.core.provider_factory import BaseProvider
+
                 if not issubclass(provider_class, BaseProvider):
-                    self.log_issue(f"Provider class '{class_name}' does not inherit from BaseProvider")
+                    self.log_issue(
+                        f"Provider class '{class_name}' does not inherit from BaseProvider"
+                    )
                     success = False
 
-                logger.info(f"✓ Provider mapping validated: {provider_type.value} -> {module_path}.{class_name}")
+                logger.info(
+                    f"✓ Provider mapping validated: {provider_type.value} -> {module_path}.{class_name}"
+                )
 
             except ImportError as e:
-                self.log_issue(f"Failed to import provider module {module_path}: {e}")
+                self.log_issue(
+                    f"Failed to import provider module {module_path}: {e}"
+                )
                 success = False
             except Exception as e:
-                self.log_issue(f"Error validating provider {provider_type.value}: {e}")
+                self.log_issue(
+                    f"Error validating provider {provider_type.value}: {e}"
+                )
                 success = False
 
         return success
@@ -89,23 +101,34 @@ class ConfigValidator:
             # Check model selections file
             model_selections_path = Path("config/model_selections.json")
             if model_selections_path.exists():
-                with open(model_selections_path, 'r') as f:
+                with open(model_selections_path, "r") as f:
                     model_selections = json.load(f)
 
                 # Validate that selected models exist in provider configs
                 for provider_name, selection in model_selections.items():
-                    provider_config = config_manager.get_provider_by_name(provider_name)
+                    provider_config = config_manager.get_provider_by_name(
+                        provider_name
+                    )
                     if not provider_config:
-                        self.log_issue(f"Model selection for unknown provider: {provider_name}")
+                        self.log_issue(
+                            f"Model selection for unknown provider: {provider_name}"
+                        )
                         success = False
                         continue
 
-                    selected_model = selection.get('model_name')
-                    if selected_model and selected_model not in provider_config.models:
-                        self.log_issue(f"Selected model '{selected_model}' not supported by provider '{provider_name}'")
+                    selected_model = selection.get("model_name")
+                    if (
+                        selected_model
+                        and selected_model not in provider_config.models
+                    ):
+                        self.log_issue(
+                            f"Selected model '{selected_model}' not supported by provider '{provider_name}'"
+                        )
                         success = False
 
-                logger.info("✓ Model selections validated against provider configs")
+                logger.info(
+                    "✓ Model selections validated against provider configs"
+                )
             else:
                 self.log_warning("Model selections file not found")
 
@@ -128,27 +151,41 @@ class ConfigValidator:
             # Test creating provider instances
             for provider_config in config.providers:
                 if not provider_config.enabled:
-                    logger.info(f"Skipping disabled provider: {provider_config.name}")
+                    logger.info(
+                        f"Skipping disabled provider: {provider_config.name}"
+                    )
                     continue
 
                 try:
                     # Create provider instance
-                    provider = await provider_factory.create_provider(provider_config)
-                    logger.info(f"✓ Created provider instance: {provider_config.name}")
+                    provider = await provider_factory.create_provider(
+                        provider_config
+                    )
+                    logger.info(
+                        f"✓ Created provider instance: {provider_config.name}"
+                    )
 
                     # Test health check
                     health_result = await provider.health_check()
-                    if health_result.get('healthy'):
-                        logger.info(f"✓ Health check passed for: {provider_config.name}")
+                    if health_result.get("healthy"):
+                        logger.info(
+                            f"✓ Health check passed for: {provider_config.name}"
+                        )
                     else:
-                        self.log_warning(f"Health check failed for {provider_config.name}: {health_result.get('error', 'Unknown error')}")
+                        self.log_warning(
+                            f"Health check failed for {provider_config.name}: {health_result.get('error', 'Unknown error')}"
+                        )
 
                     # Test cleanup
                     await provider.close()
-                    logger.info(f"✓ Provider cleanup successful: {provider_config.name}")
+                    logger.info(
+                        f"✓ Provider cleanup successful: {provider_config.name}"
+                    )
 
                 except Exception as e:
-                    self.log_issue(f"Error with provider {provider_config.name}: {e}")
+                    self.log_issue(
+                        f"Error with provider {provider_config.name}: {e}"
+                    )
                     success = False
 
         except Exception as e:
@@ -181,20 +218,26 @@ class ConfigValidator:
             # Check for models supported by multiple providers
             for model, providers in model_providers.items():
                 if len(providers) > 1:
-                    logger.info(f"Model '{model}' supported by multiple providers: {providers}")
+                    logger.info(
+                        f"Model '{model}' supported by multiple providers: {providers}"
+                    )
 
             # Check for orphaned model selections
             model_selections_path = Path("config/model_selections.json")
             if model_selections_path.exists():
-                with open(model_selections_path, 'r') as f:
+                with open(model_selections_path, "r") as f:
                     model_selections = json.load(f)
 
                 for provider_name in model_selections.keys():
                     if not config_manager.get_provider_by_name(provider_name):
-                        self.log_issue(f"Model selection exists for non-existent provider: {provider_name}")
+                        self.log_issue(
+                            f"Model selection exists for non-existent provider: {provider_name}"
+                        )
                         success = False
 
-            logger.info(f"✓ Validated mappings for {len(model_providers)} models")
+            logger.info(
+                f"✓ Validated mappings for {len(model_providers)} models"
+            )
 
         except Exception as e:
             self.log_issue(f"Error validating model mappings: {e}")
@@ -209,16 +252,24 @@ class ConfigValidator:
         results = []
 
         # Run all validation checks
-        results.append(("Provider Mappings", self.validate_provider_mappings()))
-        results.append(("Config Consistency", self.validate_config_consistency()))
+        results.append(
+            ("Provider Mappings", self.validate_provider_mappings())
+        )
+        results.append(
+            ("Config Consistency", self.validate_config_consistency())
+        )
         results.append(("Model Mappings", self.validate_model_mappings()))
-        results.append(("Provider Instances", await self.validate_provider_instances()))
+        results.append(
+            ("Provider Instances", await self.validate_provider_instances())
+        )
 
         # Summary
         total_checks = len(results)
         passed_checks = sum(1 for _, passed in results if passed)
 
-        logger.info(f"Validation complete: {passed_checks}/{total_checks} checks passed")
+        logger.info(
+            f"Validation complete: {passed_checks}/{total_checks} checks passed"
+        )
 
         if self.issues:
             logger.error(f"Found {len(self.issues)} issues:")
@@ -232,6 +283,7 @@ class ConfigValidator:
 
         return len(self.issues) == 0
 
+
 async def main():
     """Main validation function"""
     validator = ConfigValidator()
@@ -243,6 +295,7 @@ async def main():
     else:
         logger.error("❌ Validation failed!")
         return 1
+
 
 if __name__ == "__main__":
     exit_code = asyncio.run(main())

@@ -6,7 +6,7 @@ from src.core.exceptions import (
     InvalidRequestError as CoreInvalidRequestError,
     NotFoundError as CoreNotFoundError,
     RateLimitError as CoreRateLimitError,
-    ServiceUnavailableError as CoreServiceUnavailableError
+    ServiceUnavailableError as CoreServiceUnavailableError,
 )
 
 # Use core exceptions for consistency

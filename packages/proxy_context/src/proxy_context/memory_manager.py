@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class MemoryStats:
     """Memory usage statistics"""
+
     total_memory_mb: float
     available_memory_mb: float
     used_memory_mb: float
@@ -46,16 +47,18 @@ class MemoryManager:
         emergency_threshold_mb: int = 1536,  # 1.5GB
         cleanup_interval: int = 300,  # 5 minutes
         enable_gc_tuning: bool = True,
-        leak_detection_enabled: bool = True
+        leak_detection_enabled: bool = True,
     ):
         # Feature flag manager
         self._feature_manager = get_feature_flag_manager()
 
         # Apply feature flags
-        if is_feature_enabled('memory_manager_aggressive_gc'):
+        if is_feature_enabled("memory_manager_aggressive_gc"):
             # Enable more aggressive GC settings
             self.enable_gc_tuning = True
-            self.cleanup_interval = max(60, cleanup_interval // 2)  # More frequent cleanup
+            self.cleanup_interval = max(
+                60, cleanup_interval // 2
+            )  # More frequent cleanup
             logger.info("Memory manager aggressive GC enabled")
         else:
             self.enable_gc_tuning = enable_gc_tuning
@@ -100,10 +103,10 @@ class MemoryManager:
         logger.info(
             "Memory manager started",
             extra={
-                'baseline_memory_mb': round(self.baseline_memory, 2),
-                'threshold_mb': self.memory_threshold_mb,
-                'emergency_threshold_mb': self.emergency_threshold_mb
-            }
+                "baseline_memory_mb": round(self.baseline_memory, 2),
+                "threshold_mb": self.memory_threshold_mb,
+                "emergency_threshold_mb": self.emergency_threshold_mb,
+            },
         )
 
     async def stop(self):
@@ -151,9 +154,9 @@ class MemoryManager:
             logger.warning(
                 "Emergency memory threshold exceeded",
                 extra={
-                    'current_memory_mb': round(current_memory, 2),
-                    'threshold_mb': self.emergency_threshold_mb
-                }
+                    "current_memory_mb": round(current_memory, 2),
+                    "threshold_mb": self.emergency_threshold_mb,
+                },
             )
             await self._emergency_cleanup()
             self.emergency_cleanups += 1
@@ -164,9 +167,9 @@ class MemoryManager:
             logger.warning(
                 "High memory usage detected",
                 extra={
-                    'current_memory_mb': round(current_memory, 2),
-                    'threshold_mb': self.memory_threshold_mb
-                }
+                    "current_memory_mb": round(current_memory, 2),
+                    "threshold_mb": self.memory_threshold_mb,
+                },
             )
             await self._high_memory_cleanup()
             self.memory_pressure_events += 1
@@ -196,7 +199,9 @@ class MemoryManager:
         # Aggressive garbage collection
         for generation in range(3):
             collected = gc.collect(generation)
-            logger.info(f"Emergency GC generation {generation}: {collected} objects")
+            logger.info(
+                f"Emergency GC generation {generation}: {collected} objects"
+            )
 
         # Clear any cached objects
         gc.collect()
@@ -237,12 +242,22 @@ class MemoryManager:
     def _get_object_snapshot(self) -> Dict[str, int]:
         """Get snapshot of object counts"""
         return {
-            'dict': len([obj for obj in gc.get_objects() if isinstance(obj, dict)]),
-            'list': len([obj for obj in gc.get_objects() if isinstance(obj, list)]),
-            'tuple': len([obj for obj in gc.get_objects() if isinstance(obj, tuple)]),
-            'str': len([obj for obj in gc.get_objects() if isinstance(obj, str)]),
-            'function': len([obj for obj in gc.get_objects() if callable(obj)]),
-            'total': len(gc.get_objects())
+            "dict": len(
+                [obj for obj in gc.get_objects() if isinstance(obj, dict)]
+            ),
+            "list": len(
+                [obj for obj in gc.get_objects() if isinstance(obj, list)]
+            ),
+            "tuple": len(
+                [obj for obj in gc.get_objects() if isinstance(obj, tuple)]
+            ),
+            "str": len(
+                [obj for obj in gc.get_objects() if isinstance(obj, str)]
+            ),
+            "function": len(
+                [obj for obj in gc.get_objects() if callable(obj)]
+            ),
+            "total": len(gc.get_objects()),
         }
 
     def _analyze_leak_trends(self):
@@ -253,21 +268,25 @@ class MemoryManager:
         # Check for consistent growth in object counts
         recent = self.object_snapshots[-3:]
 
-        for obj_type in ['dict', 'list', 'function']:
+        for obj_type in ["dict", "list", "function"]:
             counts = [snapshot.get(obj_type, 0) for snapshot in recent]
 
             # Check if all counts are increasing
-            if all(counts[i] < counts[i+1] for i in range(len(counts)-1)):
-                growth_rate = (counts[-1] - counts[0]) / counts[0] if counts[0] > 0 else 0
+            if all(counts[i] < counts[i + 1] for i in range(len(counts) - 1)):
+                growth_rate = (
+                    (counts[-1] - counts[0]) / counts[0]
+                    if counts[0] > 0
+                    else 0
+                )
 
                 if growth_rate > 0.1:  # 10% growth
                     logger.warning(
                         f"Potential memory leak detected",
                         extra={
-                            'object_type': obj_type,
-                            'growth_rate': round(growth_rate, 3),
-                            'counts': counts
-                        }
+                            "object_type": obj_type,
+                            "growth_rate": round(growth_rate, 3),
+                            "counts": counts,
+                        },
                     )
 
     def _get_process_memory_mb(self) -> float:
@@ -296,29 +315,35 @@ class MemoryManager:
         memory_info = process.memory_info()
 
         return MemoryStats(
-            total_memory_mb=round(psutil.virtual_memory().total / (1024 * 1024), 2),
-            available_memory_mb=round(psutil.virtual_memory().available / (1024 * 1024), 2),
-            used_memory_mb=round(psutil.virtual_memory().used / (1024 * 1024), 2),
+            total_memory_mb=round(
+                psutil.virtual_memory().total / (1024 * 1024), 2
+            ),
+            available_memory_mb=round(
+                psutil.virtual_memory().available / (1024 * 1024), 2
+            ),
+            used_memory_mb=round(
+                psutil.virtual_memory().used / (1024 * 1024), 2
+            ),
             memory_percent=round(psutil.virtual_memory().percent, 2),
             process_memory_mb=round(memory_info.rss / (1024 * 1024), 2),
             gc_collections=dict(gc.get_stats()),
-            object_counts=self._get_object_snapshot()
+            object_counts=self._get_object_snapshot(),
         )
 
     def get_manager_stats(self) -> Dict[str, Any]:
         """Get memory manager statistics"""
         return {
-            'baseline_memory_mb': round(self.baseline_memory, 2),
-            'current_memory_mb': round(self._get_process_memory_mb(), 2),
-            'memory_threshold_mb': self.memory_threshold_mb,
-            'emergency_threshold_mb': self.emergency_threshold_mb,
-            'memory_pressure_events': self.memory_pressure_events,
-            'emergency_cleanups': self.emergency_cleanups,
-            'cleanup_callbacks_count': len(self.cleanup_callbacks),
-            'leak_detection_enabled': self.leak_detection_enabled,
-            'gc_tuning_enabled': self.enable_gc_tuning,
-            'snapshots_count': len(self.object_snapshots),
-            'last_cleanup': self.last_cleanup
+            "baseline_memory_mb": round(self.baseline_memory, 2),
+            "current_memory_mb": round(self._get_process_memory_mb(), 2),
+            "memory_threshold_mb": self.memory_threshold_mb,
+            "emergency_threshold_mb": self.emergency_threshold_mb,
+            "memory_pressure_events": self.memory_pressure_events,
+            "emergency_cleanups": self.emergency_cleanups,
+            "cleanup_callbacks_count": len(self.cleanup_callbacks),
+            "leak_detection_enabled": self.leak_detection_enabled,
+            "gc_tuning_enabled": self.enable_gc_tuning,
+            "snapshots_count": len(self.object_snapshots),
+            "last_cleanup": self.last_cleanup,
         }
 
 
@@ -364,11 +389,15 @@ def get_memory_stats() -> MemoryStats:
     memory_info = process.memory_info()
 
     return MemoryStats(
-        total_memory_mb=round(psutil.virtual_memory().total / (1024 * 1024), 2),
-        available_memory_mb=round(psutil.virtual_memory().available / (1024 * 1024), 2),
+        total_memory_mb=round(
+            psutil.virtual_memory().total / (1024 * 1024), 2
+        ),
+        available_memory_mb=round(
+            psutil.virtual_memory().available / (1024 * 1024), 2
+        ),
         used_memory_mb=round(psutil.virtual_memory().used / (1024 * 1024), 2),
         memory_percent=round(psutil.virtual_memory().percent, 2),
         process_memory_mb=round(memory_info.rss / (1024 * 1024), 2),
         gc_collections=dict(gc.get_stats()),
-        object_counts={}
+        object_counts={},
     )

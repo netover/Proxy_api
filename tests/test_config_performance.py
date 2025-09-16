@@ -22,10 +22,11 @@ from core.optimized_config import (
     load_critical_config,
     load_config_section,
     load_full_config,
-    get_config_performance_stats
+    get_config_performance_stats,
 )
 from core.unified_config import ConfigManager
 from core.app_config import load_config as load_app_config
+
 
 class ConfigPerformanceTester:
     """Tests configuration loading performance"""
@@ -57,8 +58,9 @@ class ConfigPerformanceTester:
 
     def test_legacy_yaml_loading(self) -> Dict[str, Any]:
         """Test legacy synchronous YAML loading"""
+
         def load_yaml():
-            with open(self.config_path, 'r', encoding='utf-8') as f:
+            with open(self.config_path, "r", encoding="utf-8") as f:
                 return yaml.safe_load(f)
 
         times = self.time_function(load_yaml)
@@ -68,7 +70,7 @@ class ConfigPerformanceTester:
             "avg_time_ms": statistics.mean(times),
             "min_time_ms": min(times),
             "max_time_ms": max(times),
-            "std_dev_ms": statistics.stdev(times) if len(times) > 1 else 0
+            "std_dev_ms": statistics.stdev(times) if len(times) > 1 else 0,
         }
 
     def test_legacy_config_manager(self) -> Dict[str, Any]:
@@ -85,11 +87,12 @@ class ConfigPerformanceTester:
             "avg_time_ms": statistics.mean(times),
             "min_time_ms": min(times),
             "max_time_ms": max(times),
-            "std_dev_ms": statistics.stdev(times) if len(times) > 1 else 0
+            "std_dev_ms": statistics.stdev(times) if len(times) > 1 else 0,
         }
 
     def test_legacy_app_config(self) -> Dict[str, Any]:
         """Test legacy app config loading"""
+
         def load_app():
             return load_app_config()
 
@@ -100,7 +103,7 @@ class ConfigPerformanceTester:
             "avg_time_ms": statistics.mean(times),
             "min_time_ms": min(times),
             "max_time_ms": max(times),
-            "std_dev_ms": statistics.stdev(times) if len(times) > 1 else 0
+            "std_dev_ms": statistics.stdev(times) if len(times) > 1 else 0,
         }
 
     async def test_optimized_full_loading(self) -> Dict[str, Any]:
@@ -112,7 +115,7 @@ class ConfigPerformanceTester:
             "avg_time_ms": statistics.mean(times),
             "min_time_ms": min(times),
             "max_time_ms": max(times),
-            "std_dev_ms": statistics.stdev(times) if len(times) > 1 else 0
+            "std_dev_ms": statistics.stdev(times) if len(times) > 1 else 0,
         }
 
     async def test_optimized_critical_loading(self) -> Dict[str, Any]:
@@ -124,16 +127,23 @@ class ConfigPerformanceTester:
             "avg_time_ms": statistics.mean(times),
             "min_time_ms": min(times),
             "max_time_ms": max(times),
-            "std_dev_ms": statistics.stdev(times) if len(times) > 1 else 0
+            "std_dev_ms": statistics.stdev(times) if len(times) > 1 else 0,
         }
 
     async def test_lazy_loading(self) -> Dict[str, Any]:
         """Test lazy loading of non-critical sections"""
-        lazy_sections = ['telemetry', 'chaos_engineering', 'load_testing', 'network_simulation']
+        lazy_sections = [
+            "telemetry",
+            "chaos_engineering",
+            "load_testing",
+            "network_simulation",
+        ]
 
         total_times = []
         for section in lazy_sections:
-            times = await self.time_async_function(load_config_section, section)
+            times = await self.time_async_function(
+                load_config_section, section
+            )
             total_times.extend(times)
 
         return {
@@ -143,7 +153,9 @@ class ConfigPerformanceTester:
             "avg_time_ms": statistics.mean(total_times),
             "min_time_ms": min(total_times),
             "max_time_ms": max(total_times),
-            "std_dev_ms": statistics.stdev(total_times) if len(total_times) > 1 else 0
+            "std_dev_ms": (
+                statistics.stdev(total_times) if len(total_times) > 1 else 0
+            ),
         }
 
     async def test_cache_performance(self) -> Dict[str, Any]:
@@ -160,7 +172,7 @@ class ConfigPerformanceTester:
             "avg_time_ms": statistics.mean(times),
             "min_time_ms": min(times),
             "max_time_ms": max(times),
-            "std_dev_ms": statistics.stdev(times) if len(times) > 1 else 0
+            "std_dev_ms": statistics.stdev(times) if len(times) > 1 else 0,
         }
 
     async def run_all_tests(self) -> Dict[str, Any]:
@@ -188,7 +200,9 @@ class ConfigPerformanceTester:
         results["optimized_full"] = await self.test_optimized_full_loading()
 
         print("Testing optimized critical loading...")
-        results["optimized_critical"] = await self.test_optimized_critical_loading()
+        results["optimized_critical"] = (
+            await self.test_optimized_critical_loading()
+        )
 
         print("Testing lazy loading...")
         results["lazy_loading"] = await self.test_lazy_loading()
@@ -207,13 +221,17 @@ class ConfigPerformanceTester:
         print("=" * 80)
 
         # Summary table
-        print(f"{'Method':<30} {'Avg (ms)':<12} {'Min (ms)':<12} {'Max (ms)':<12} {'Std Dev':<12}")
+        print(
+            f"{'Method':<30} {'Avg (ms)':<12} {'Min (ms)':<12} {'Max (ms)':<12} {'Std Dev':<12}"
+        )
         print("-" * 80)
 
         for method, data in results.items():
             if method == "performance_stats":
                 continue
-            print(f"{method:<30} {data['avg_time_ms']:<12.2f} {data['min_time_ms']:<12.2f} {data['max_time_ms']:<12.2f} {data['std_dev_ms']:<12.2f}")
+            print(
+                f"{method:<30} {data['avg_time_ms']:<12.2f} {data['min_time_ms']:<12.2f} {data['max_time_ms']:<12.2f} {data['std_dev_ms']:<12.2f}"
+            )
 
         print("-" * 80)
 
@@ -259,6 +277,7 @@ class ConfigPerformanceTester:
             print(f"Cache hit rate: {stats['cache_hit_rate']:.1f}%")
             print(f"Lazy loads: {stats['lazy_loads']}")
 
+
 def main():
     """Main test function"""
     config_path = Path("config.yaml")
@@ -269,6 +288,7 @@ def main():
 
     # Set dummy environment variables for testing
     import os
+
     os.environ["PROXY_API_OPENAI_API_KEY"] = "dummy_key_123"
     os.environ["PROXY_API_ANTHROPIC_API_KEY"] = "dummy_key_456"
     os.environ["PROXY_API_AZURE_OPENAI_KEY"] = "dummy_key_789"
@@ -276,6 +296,7 @@ def main():
     tester = ConfigPerformanceTester(config_path, iterations=5)
     results = asyncio.run(tester.run_all_tests())
     tester.print_results(results)
+
 
 if __name__ == "__main__":
     main()

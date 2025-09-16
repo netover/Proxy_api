@@ -9,7 +9,12 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 
-from src.core.memory_manager import SmartContextManager, get_memory_manager, shutdown_memory_manager, initialize_memory_manager
+from src.core.memory_manager import (
+    SmartContextManager,
+    get_memory_manager,
+    shutdown_memory_manager,
+    initialize_memory_manager,
+)
 
 # Mark all tests in this file as asyncio
 pytestmark = pytest.mark.asyncio
@@ -71,7 +76,7 @@ async def test_lru_eviction(manager: SmartContextManager):
 async def test_gc_triggering(manager: SmartContextManager):
     """Test that garbage collection is triggered when the threshold is exceeded."""
     # The GC threshold is 8 (80% of 10)
-    with patch('gc.collect') as mock_gc_collect:
+    with patch("gc.collect") as mock_gc_collect:
         # Add items up to the threshold
         for i in range(8):
             await manager.add_context(f"session_{i}", {"id": i})
@@ -113,11 +118,14 @@ async def test_remove_context(manager: SmartContextManager):
 async def test_concurrent_add(manager: SmartContextManager):
     """Test that concurrent additions are handled correctly and do not exceed max_size."""
     # Concurrently add more items than the manager can hold
-    tasks = [manager.add_context(f"concurrent_session_{i}", {"id": i}) for i in range(20)]
+    tasks = [
+        manager.add_context(f"concurrent_session_{i}", {"id": i})
+        for i in range(20)
+    ]
     await asyncio.gather(*tasks)
 
     stats = manager.get_stats()
-    assert stats["current_size"] == 10 # Should not exceed max_size
+    assert stats["current_size"] == 10  # Should not exceed max_size
 
 
 async def test_global_instance_management():

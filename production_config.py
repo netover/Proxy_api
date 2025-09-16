@@ -39,85 +39,107 @@ PRODUCTION_CONFIG = {
     "worker_connections": 1000,
     "max_requests": 1000,  # Restart worker after this many requests
     "max_requests_jitter": 50,
-
     # Performance Tuning
     "http_client": {
-        "max_keepalive_connections": int(os.getenv("HTTP_MAX_KEEPALIVE", "200")),
+        "max_keepalive_connections": int(
+            os.getenv("HTTP_MAX_KEEPALIVE", "200")
+        ),
         "max_connections": int(os.getenv("HTTP_MAX_CONNECTIONS", "2000")),
         "keepalive_expiry": float(os.getenv("HTTP_KEEPALIVE_EXPIRY", "30.0")),
         "timeout": float(os.getenv("HTTP_TIMEOUT", "30.0")),
         "connect_timeout": float(os.getenv("HTTP_CONNECT_TIMEOUT", "10.0")),
         "retry_attempts": int(os.getenv("HTTP_RETRY_ATTEMPTS", "3")),
     },
-
     "cache": {
         "response_cache_size": int(os.getenv("RESPONSE_CACHE_SIZE", "10000")),
-        "response_cache_ttl": int(os.getenv("RESPONSE_CACHE_TTL", "1800")),  # 30 min
+        "response_cache_ttl": int(
+            os.getenv("RESPONSE_CACHE_TTL", "1800")
+        ),  # 30 min
         "summary_cache_size": int(os.getenv("SUMMARY_CACHE_SIZE", "2000")),
-        "summary_cache_ttl": int(os.getenv("SUMMARY_CACHE_TTL", "3600")),  # 1 hour
+        "summary_cache_ttl": int(
+            os.getenv("SUMMARY_CACHE_TTL", "3600")
+        ),  # 1 hour
         "max_memory_mb": int(os.getenv("CACHE_MAX_MEMORY_MB", "512")),
     },
-
     "memory_manager": {
         "memory_threshold_mb": int(os.getenv("MEMORY_THRESHOLD_MB", "1024")),
-        "emergency_threshold_mb": int(os.getenv("EMERGENCY_MEMORY_MB", "1536")),
+        "emergency_threshold_mb": int(
+            os.getenv("EMERGENCY_MEMORY_MB", "1536")
+        ),
         "cleanup_interval": int(os.getenv("CLEANUP_INTERVAL", "300")),
-        "enable_gc_tuning": os.getenv("ENABLE_GC_TUNING", "true").lower() == "true",
-        "leak_detection_enabled": os.getenv("LEAK_DETECTION", "true").lower() == "true",
+        "enable_gc_tuning": os.getenv("ENABLE_GC_TUNING", "true").lower()
+        == "true",
+        "leak_detection_enabled": os.getenv("LEAK_DETECTION", "true").lower()
+        == "true",
     },
-
     "circuit_breaker": {
         "failure_threshold": int(os.getenv("CB_FAILURE_THRESHOLD", "5")),
         "recovery_timeout": int(os.getenv("CB_RECOVERY_TIMEOUT", "60")),
         "success_threshold": int(os.getenv("CB_SUCCESS_THRESHOLD", "3")),
-        "adaptive_thresholds": os.getenv("CB_ADAPTIVE", "true").lower() == "true",
+        "adaptive_thresholds": os.getenv("CB_ADAPTIVE", "true").lower()
+        == "true",
     },
-
     # Security Configuration
     "security": {
-        "api_keys_required": os.getenv("API_KEYS_REQUIRED", "true").lower() == "true",
+        "api_keys_required": os.getenv("API_KEYS_REQUIRED", "true").lower()
+        == "true",
         "rate_limit_requests": int(os.getenv("RATE_LIMIT_REQUESTS", "1000")),
         "rate_limit_window": int(os.getenv("RATE_LIMIT_WINDOW", "60")),
-        "cors_origins": os.getenv("CORS_ORIGINS", "https://yourdomain.com").split(","),
-        "trusted_proxies": os.getenv("TRUSTED_PROXIES", "").split(",") if os.getenv("TRUSTED_PROXIES") else [],
+        "cors_origins": os.getenv(
+            "CORS_ORIGINS", "https://yourdomain.com"
+        ).split(","),
+        "trusted_proxies": (
+            os.getenv("TRUSTED_PROXIES", "").split(",")
+            if os.getenv("TRUSTED_PROXIES")
+            else []
+        ),
         "ssl_certfile": os.getenv("SSL_CERTFILE"),
         "ssl_keyfile": os.getenv("SSL_KEYFILE"),
     },
-
     # Logging Configuration
     "logging": {
-        "level": os.getenv("LOG_LEVEL", "WARNING" if IS_PRODUCTION else "INFO"),
+        "level": os.getenv(
+            "LOG_LEVEL", "WARNING" if IS_PRODUCTION else "INFO"
+        ),
         "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         "file": LOGS_DIR / "app.log",
         "max_file_size": int(os.getenv("LOG_MAX_SIZE", "100")),  # MB
         "backup_count": int(os.getenv("LOG_BACKUP_COUNT", "10")),
         "json_format": os.getenv("LOG_JSON_FORMAT", "true").lower() == "true",
     },
-
     # Monitoring Configuration
     "monitoring": {
-        "metrics_enabled": os.getenv("METRICS_ENABLED", "true").lower() == "true",
+        "metrics_enabled": os.getenv("METRICS_ENABLED", "true").lower()
+        == "true",
         "metrics_port": int(os.getenv("METRICS_PORT", "9090")),
         "health_check_interval": int(os.getenv("HEALTH_CHECK_INTERVAL", "30")),
         "alert_webhook_url": os.getenv("ALERT_WEBHOOK_URL"),
         "alert_threshold_cpu": float(os.getenv("ALERT_CPU_THRESHOLD", "80.0")),
-        "alert_threshold_memory": float(os.getenv("ALERT_MEMORY_THRESHOLD", "85.0")),
+        "alert_threshold_memory": float(
+            os.getenv("ALERT_MEMORY_THRESHOLD", "85.0")
+        ),
     },
-
     # Telemetry Configuration
     "telemetry": {
         "enabled": os.getenv("TELEMETRY_ENABLED", "true").lower() == "true",
         "sampling_rates": {
-            "development": float(os.getenv("TELEMETRY_SAMPLING_DEV", "1.0")),  # 100%
-            "staging": float(os.getenv("TELEMETRY_SAMPLING_STAGING", "0.5")),  # 50%
-            "production": float(os.getenv("TELEMETRY_SAMPLING_PROD", "0.1")),  # 10%
+            "development": float(
+                os.getenv("TELEMETRY_SAMPLING_DEV", "1.0")
+            ),  # 100%
+            "staging": float(
+                os.getenv("TELEMETRY_SAMPLING_STAGING", "0.5")
+            ),  # 50%
+            "production": float(
+                os.getenv("TELEMETRY_SAMPLING_PROD", "0.1")
+            ),  # 10%
         },
         "otlp_endpoint": os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT"),
         "service_name": os.getenv("OTEL_SERVICE_NAME", "proxy-api"),
         "service_version": os.getenv("OTEL_SERVICE_VERSION", "1.0.0"),
-        "overhead_target_percent": float(os.getenv("TELEMETRY_OVERHEAD_TARGET", "2.0")),
+        "overhead_target_percent": float(
+            os.getenv("TELEMETRY_OVERHEAD_TARGET", "2.0")
+        ),
     },
-
     # Database Configuration (if needed)
     "database": {
         "url": os.getenv("DATABASE_URL"),
@@ -126,33 +148,36 @@ PRODUCTION_CONFIG = {
         "pool_timeout": int(os.getenv("DB_POOL_TIMEOUT", "30")),
         "pool_recycle": int(os.getenv("DB_POOL_RECYCLE", "3600")),
     },
-
     # External Services
     "external": {
         "redis_url": os.getenv("REDIS_URL"),
         "prometheus_url": os.getenv("PROMETHEUS_URL"),
         "grafana_url": os.getenv("GRAFANA_URL"),
         "alertmanager_url": os.getenv("ALERTMANAGER_URL"),
-    }
+    },
 }
 
 # Environment-specific overrides
 if IS_PRODUCTION:
-    PRODUCTION_CONFIG.update({
-        "cache": {
-            **PRODUCTION_CONFIG["cache"],
-            "max_memory_mb": 1024,  # 1GB for production
-        },
-        "http_client": {
-            **PRODUCTION_CONFIG["http_client"],
-            "max_connections": 5000,
-            "max_keepalive_connections": 500,
+    PRODUCTION_CONFIG.update(
+        {
+            "cache": {
+                **PRODUCTION_CONFIG["cache"],
+                "max_memory_mb": 1024,  # 1GB for production
+            },
+            "http_client": {
+                **PRODUCTION_CONFIG["http_client"],
+                "max_connections": 5000,
+                "max_keepalive_connections": 500,
+            },
         }
-    })
+    )
+
 
 def get_production_config() -> Dict[str, Any]:
     """Get production configuration with environment overrides"""
     return PRODUCTION_CONFIG.copy()
+
 
 def setup_production_logging():
     """Setup production logging configuration"""
@@ -170,7 +195,7 @@ def setup_production_logging():
     if config["json_format"]:
         if pythonjsonlogger:
             formatter = pythonjsonlogger.jsonlogger.JsonFormatter(
-                fmt='%(asctime)s %(name)s %(levelname)s %(message)s'
+                fmt="%(asctime)s %(name)s %(levelname)s %(message)s"
             )
         else:
             formatter = logging.Formatter(config["format"])
@@ -179,10 +204,11 @@ def setup_production_logging():
 
     # File handler with rotation
     from logging.handlers import RotatingFileHandler
+
     file_handler = RotatingFileHandler(
         config["file"],
         maxBytes=config["max_file_size"] * 1024 * 1024,
-        backupCount=config["backup_count"]
+        backupCount=config["backup_count"],
     )
     file_handler.setFormatter(formatter)
     root_logger.addHandler(file_handler)
@@ -192,6 +218,7 @@ def setup_production_logging():
         console_handler = logging.StreamHandler()
         console_handler.setFormatter(formatter)
         root_logger.addHandler(console_handler)
+
 
 def validate_production_config() -> List[str]:
     """Validate production configuration and return issues"""
@@ -203,17 +230,24 @@ def validate_production_config() -> List[str]:
     if config["security"]["api_keys_required"]:
         api_keys = os.getenv("PROXY_API_KEYS", "")
         if not api_keys or len(api_keys.split(",")) < 1:
-            issues.append("PROXY_API_KEYS must be configured with at least one key")
+            issues.append(
+                "PROXY_API_KEYS must be configured with at least one key"
+            )
 
     # Check SSL configuration for production
     if IS_PRODUCTION:
-        if not config["security"]["ssl_certfile"] or not config["security"]["ssl_keyfile"]:
+        if (
+            not config["security"]["ssl_certfile"]
+            or not config["security"]["ssl_keyfile"]
+        ):
             issues.append("SSL certificates must be configured for production")
 
     # Check external services
     if config["monitoring"]["metrics_enabled"]:
         if not config["external"]["prometheus_url"]:
-            issues.append("Prometheus URL must be configured when metrics are enabled")
+            issues.append(
+                "Prometheus URL must be configured when metrics are enabled"
+            )
 
     # Check database configuration
     if config["database"]["url"]:
@@ -221,6 +255,7 @@ def validate_production_config() -> List[str]:
         pass
 
     return issues
+
 
 # Production startup validation
 def validate_production_readiness() -> bool:
@@ -235,6 +270,7 @@ def validate_production_readiness() -> bool:
 
     print("✅ Production configuration validated successfully")
     return True
+
 
 if __name__ == "__main__":
     # Validate configuration when run directly

@@ -14,7 +14,14 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
-from src.core.alerting import AlertSeverity, AlertStatus, NotificationChannel, alert_manager
+from src.core.alerting import (
+    Alert,
+    AlertRule,
+    AlertSeverity,
+    AlertStatus,
+    NotificationChannel,
+    alert_manager,
+)
 from src.core.auth import verify_api_key
 from src.core.logging import ContextualLogger
 
@@ -26,20 +33,37 @@ router = APIRouter()
 # Pydantic models for request/response
 class AlertRuleCreate(BaseModel):
     """Model for creating alert rules"""
+
     name: str = Field(..., description="Unique name for the alert rule")
-    description: str = Field(..., description="Description of what this alert monitors")
-    metric_path: str = Field(..., description="Dot-separated path to metric (e.g., 'system_health.cpu_percent')")
-    condition: str = Field(..., description="Comparison operator: >, <, >=, <=, ==, !=")
+    description: str = Field(
+        ..., description="Description of what this alert monitors"
+    )
+    metric_path: str = Field(
+        ...,
+        description="Dot-separated path to metric (e.g., 'system_health.cpu_percent')",
+    )
+    condition: str = Field(
+        ..., description="Comparison operator: >, <, >=, <=, ==, !="
+    )
     threshold: float = Field(..., description="Threshold value for the alert")
-    severity: str = Field(..., description="Alert severity: info, warning, error, critical")
+    severity: str = Field(
+        ..., description="Alert severity: info, warning, error, critical"
+    )
     enabled: bool = Field(True, description="Whether the rule is enabled")
-    cooldown_minutes: int = Field(5, description="Minimum time between alerts in minutes")
-    channels: List[str] = Field(["log"], description="Notification channels to use")
-    custom_message: Optional[str] = Field(None, description="Custom alert message")
+    cooldown_minutes: int = Field(
+        5, description="Minimum time between alerts in minutes"
+    )
+    channels: List[str] = Field(
+        ["log"], description="Notification channels to use"
+    )
+    custom_message: Optional[str] = Field(
+        None, description="Custom alert message"
+    )
 
 
 class AlertRuleUpdate(BaseModel):
     """Model for updating alert rules"""
+
     description: Optional[str] = None
     metric_path: Optional[str] = None
     condition: Optional[str] = None
@@ -53,6 +77,7 @@ class AlertRuleUpdate(BaseModel):
 
 class NotificationConfig(BaseModel):
     """Model for notification configuration"""
+
     email: Optional[Dict[str, Any]] = None
     webhook: Optional[Dict[str, Any]] = None
     slack: Optional[Dict[str, Any]] = None
@@ -63,7 +88,7 @@ async def get_active_alerts(
     request: Request,
     severity: Optional[str] = None,
     status: Optional[str] = None,
-    _: bool = Depends(verify_api_key)
+    _: bool = Depends(verify_api_key),
 ):
     """Get active alerts with optional filtering"""
     start_time = time.time()
@@ -79,27 +104,29 @@ async def get_active_alerts(
             alerts = [a for a in alerts if a["status"] == status]
 
         response_time = time.time() - start_time
-        logger.info("Active alerts retrieved",
-                   count=len(alerts),
-                   response_time=response_time,
-                   filters={"severity": severity, "status": status})
+        logger.info(
+            "Active alerts retrieved",
+            count=len(alerts),
+            response_time=response_time,
+            filters={"severity": severity, "status": status},
+        )
 
         return {
             "alerts": alerts,
             "count": len(alerts),
-            "timestamp": time.time()
+            "timestamp": time.time(),
         }
 
     except Exception as e:
         logger.error("Failed to get active alerts", error=str(e))
-        raise HTTPException(status_code=500, detail="Failed to retrieve alerts")
+        raise HTTPException(
+            status_code=500, detail="Failed to retrieve alerts"
+        )
 
 
 @router.get("/alerts/{alert_id}")
 async def get_alert_details(
-    request: Request,
-    alert_id: str,
-    _: bool = Depends(verify_api_key)
+    request: Request, alert_id: str, _: bool = Depends(verify_api_key)
 ):
     """Get details of a specific alert"""
     logger.info("Getting alert details", alert_id=alert_id)
@@ -118,7 +145,7 @@ async def acknowledge_alert(
     request: Request,
     alert_id: str,
     acknowledged_by: str = "api",
-    _: bool = Depends(verify_api_key)
+    _: bool = Depends(verify_api_key),
 ):
     """Acknowledge an alert"""
     logger.info("Acknowledging alert", alert_id=alert_id, by=acknowledged_by)
@@ -127,15 +154,19 @@ async def acknowledge_alert(
         alert_manager.acknowledge_alert(alert_id, acknowledged_by)
         return {"message": "Alert acknowledged successfully"}
     except Exception as e:
-        logger.error("Failed to acknowledge alert", alert_id=alert_id, error=str(e))
-        raise HTTPException(status_code=500, detail="Failed to acknowledge alert")
+        logger.error(
+            "Failed to acknowledge alert", alert_id=alert_id, error=str(e)
+        )
+        raise HTTPException(
+            status_code=500, detail="Failed to acknowledge alert"
+        )
 
 
 @router.get("/rules")
 async def get_alert_rules(
     request: Request,
     enabled: Optional[bool] = None,
-    _: bool = Depends(verify_api_key)
+    _: bool = Depends(verify_api_key),
 ):
     """Get all alert rules with optional filtering"""
     start_time = time.time()
@@ -149,27 +180,27 @@ async def get_alert_rules(
             rules = [r for r in rules if r["enabled"] == enabled]
 
         response_time = time.time() - start_time
-        logger.info("Alert rules retrieved",
-                   count=len(rules),
-                   response_time=response_time,
-                   filters={"enabled": enabled})
+        logger.info(
+            "Alert rules retrieved",
+            count=len(rules),
+            response_time=response_time,
+            filters={"enabled": enabled},
+        )
 
-        return {
-            "rules": rules,
-            "count": len(rules),
-            "timestamp": time.time()
-        }
+        return {"rules": rules, "count": len(rules), "timestamp": time.time()}
 
     except Exception as e:
         logger.error("Failed to get alert rules", error=str(e))
-        raise HTTPException(status_code=500, detail="Failed to retrieve alert rules")
+        raise HTTPException(
+            status_code=500, detail="Failed to retrieve alert rules"
+        )
 
 
 @router.post("/rules")
 async def create_alert_rule(
     request: Request,
     rule_data: AlertRuleCreate,
-    _: bool = Depends(verify_api_key)
+    _: bool = Depends(verify_api_key),
 ):
     """Create a new alert rule"""
     logger.info("Creating alert rule", rule_name=rule_data.name)
@@ -179,7 +210,10 @@ async def create_alert_rule(
         try:
             severity = AlertSeverity(rule_data.severity.lower())
         except ValueError:
-            raise HTTPException(status_code=400, detail=f"Invalid severity: {rule_data.severity}")
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid severity: {rule_data.severity}",
+            )
 
         # Validate channels
         channels = []
@@ -187,14 +221,18 @@ async def create_alert_rule(
             try:
                 channels.append(NotificationChannel(channel_str.lower()))
             except ValueError:
-                raise HTTPException(status_code=400, detail=f"Invalid channel: {channel_str}")
+                raise HTTPException(
+                    status_code=400, detail=f"Invalid channel: {channel_str}"
+                )
 
         # Validate condition
         valid_conditions = [">", "<", ">=", "<=", "==", "!="]
         if rule_data.condition not in valid_conditions:
-            raise HTTPException(status_code=400, detail=f"Invalid condition: {rule_data.condition}")
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid condition: {rule_data.condition}",
+            )
 
-        from src.core.alerting import AlertRule
         rule = AlertRule(
             name=rule_data.name,
             description=rule_data.description,
@@ -205,26 +243,33 @@ async def create_alert_rule(
             enabled=rule_data.enabled,
             cooldown_minutes=rule_data.cooldown_minutes,
             channels=channels,
-            custom_message=rule_data.custom_message
+            custom_message=rule_data.custom_message,
         )
 
         alert_manager.add_rule(rule)
 
         logger.info("Alert rule created", rule_name=rule_data.name)
-        return {"message": "Alert rule created successfully", "rule": rule_data.dict()}
+        return {
+            "message": "Alert rule created successfully",
+            "rule": rule_data.dict(),
+        }
 
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("Failed to create alert rule", rule_name=rule_data.name, error=str(e))
-        raise HTTPException(status_code=500, detail="Failed to create alert rule")
+        logger.error(
+            "Failed to create alert rule",
+            rule_name=rule_data.name,
+            error=str(e),
+        )
+        raise HTTPException(
+            status_code=500, detail="Failed to create alert rule"
+        )
 
 
 @router.get("/rules/{rule_name}")
 async def get_alert_rule(
-    request: Request,
-    rule_name: str,
-    _: bool = Depends(verify_api_key)
+    request: Request, rule_name: str, _: bool = Depends(verify_api_key)
 ):
     """Get details of a specific alert rule"""
     logger.info("Getting alert rule", rule_name=rule_name)
@@ -243,7 +288,7 @@ async def update_alert_rule(
     request: Request,
     rule_name: str,
     rule_data: AlertRuleUpdate,
-    _: bool = Depends(verify_api_key)
+    _: bool = Depends(verify_api_key),
 ):
     """Update an existing alert rule"""
     logger.info("Updating alert rule", rule_name=rule_name)
@@ -251,7 +296,9 @@ async def update_alert_rule(
     try:
         # Get existing rule
         rules = alert_manager.get_alert_rules()
-        existing_rule = next((r for r in rules if r["name"] == rule_name), None)
+        existing_rule = next(
+            (r for r in rules if r["name"] == rule_name), None
+        )
 
         if not existing_rule:
             raise HTTPException(status_code=404, detail="Alert rule not found")
@@ -261,9 +308,14 @@ async def update_alert_rule(
 
         if "severity" in updates:
             try:
-                updates["severity"] = AlertSeverity(updates["severity"].lower())
+                updates["severity"] = AlertSeverity(
+                    updates["severity"].lower()
+                )
             except ValueError:
-                raise HTTPException(status_code=400, detail=f"Invalid severity: {updates['severity']}")
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid severity: {updates['severity']}",
+                )
 
         if "channels" in updates:
             channels = []
@@ -271,27 +323,45 @@ async def update_alert_rule(
                 try:
                     channels.append(NotificationChannel(channel_str.lower()))
                 except ValueError:
-                    raise HTTPException(status_code=400, detail=f"Invalid channel: {channel_str}")
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Invalid channel: {channel_str}",
+                    )
             updates["channels"] = channels
 
         if "condition" in updates:
             valid_conditions = [">", "<", ">=", "<=", "==", "!="]
             if updates["condition"] not in valid_conditions:
-                raise HTTPException(status_code=400, detail=f"Invalid condition: {updates['condition']}")
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid condition: {updates['condition']}",
+                )
 
         # Create updated rule
-        from src.core.alerting import AlertRule
         updated_rule = AlertRule(
             name=rule_name,
-            description=updates.get("description", existing_rule["description"]),
-            metric_path=updates.get("metric_path", existing_rule["metric_path"]),
+            description=updates.get(
+                "description", existing_rule["description"]
+            ),
+            metric_path=updates.get(
+                "metric_path", existing_rule["metric_path"]
+            ),
             condition=updates.get("condition", existing_rule["condition"]),
             threshold=updates.get("threshold", existing_rule["threshold"]),
-            severity=updates.get("severity", AlertSeverity(existing_rule["severity"])),
+            severity=updates.get(
+                "severity", AlertSeverity(existing_rule["severity"])
+            ),
             enabled=updates.get("enabled", existing_rule["enabled"]),
-            cooldown_minutes=updates.get("cooldown_minutes", existing_rule["cooldown_minutes"]),
-            channels=updates.get("channels", [NotificationChannel(c) for c in existing_rule["channels"]]),
-            custom_message=updates.get("custom_message", existing_rule["custom_message"])
+            cooldown_minutes=updates.get(
+                "cooldown_minutes", existing_rule["cooldown_minutes"]
+            ),
+            channels=updates.get(
+                "channels",
+                [NotificationChannel(c) for c in existing_rule["channels"]],
+            ),
+            custom_message=updates.get(
+                "custom_message", existing_rule["custom_message"]
+            ),
         )
 
         alert_manager.update_rule(updated_rule)
@@ -302,15 +372,17 @@ async def update_alert_rule(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("Failed to update alert rule", rule_name=rule_name, error=str(e))
-        raise HTTPException(status_code=500, detail="Failed to update alert rule")
+        logger.error(
+            "Failed to update alert rule", rule_name=rule_name, error=str(e)
+        )
+        raise HTTPException(
+            status_code=500, detail="Failed to update alert rule"
+        )
 
 
 @router.delete("/rules/{rule_name}")
 async def delete_alert_rule(
-    request: Request,
-    rule_name: str,
-    _: bool = Depends(verify_api_key)
+    request: Request, rule_name: str, _: bool = Depends(verify_api_key)
 ):
     """Delete an alert rule"""
     logger.info("Deleting alert rule", rule_name=rule_name)
@@ -329,14 +401,17 @@ async def delete_alert_rule(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("Failed to delete alert rule", rule_name=rule_name, error=str(e))
-        raise HTTPException(status_code=500, detail="Failed to delete alert rule")
+        logger.error(
+            "Failed to delete alert rule", rule_name=rule_name, error=str(e)
+        )
+        raise HTTPException(
+            status_code=500, detail="Failed to delete alert rule"
+        )
 
 
 @router.get("/config")
 async def get_alerting_config(
-    request: Request,
-    _: bool = Depends(verify_api_key)
+    request: Request, _: bool = Depends(verify_api_key)
 ):
     """Get alerting configuration"""
     logger.info("Getting alerting configuration")
@@ -348,28 +423,33 @@ async def get_alerting_config(
         # Remove sensitive information
         if "notifications" in config:
             notifications = config["notifications"]
-            if "email" in notifications and "password" in notifications["email"]:
+            if (
+                "email" in notifications
+                and "password" in notifications["email"]
+            ):
                 notifications["email"] = {**notifications["email"]}
                 notifications["email"]["password"] = "***"
-            if "webhook" in notifications and "auth_token" in notifications["webhook"]:
+            if (
+                "webhook" in notifications
+                and "auth_token" in notifications["webhook"]
+            ):
                 notifications["webhook"] = {**notifications["webhook"]}
                 notifications["webhook"]["auth_token"] = "***"
 
-        return {
-            "config": config,
-            "timestamp": time.time()
-        }
+        return {"config": config, "timestamp": time.time()}
 
     except Exception as e:
         logger.error("Failed to get alerting configuration", error=str(e))
-        raise HTTPException(status_code=500, detail="Failed to retrieve configuration")
+        raise HTTPException(
+            status_code=500, detail="Failed to retrieve configuration"
+        )
 
 
 @router.post("/config")
 async def update_alerting_config(
     request: Request,
     config: NotificationConfig,
-    _: bool = Depends(verify_api_key)
+    _: bool = Depends(verify_api_key),
 ):
     """Update alerting configuration"""
     logger.info("Updating alerting configuration")
@@ -391,21 +471,20 @@ async def update_alerting_config(
 
     except Exception as e:
         logger.error("Failed to update alerting configuration", error=str(e))
-        raise HTTPException(status_code=500, detail="Failed to update configuration")
+        raise HTTPException(
+            status_code=500, detail="Failed to update configuration"
+        )
 
 
 @router.post("/test-notification")
 async def test_notification(
-    request: Request,
-    channel: str,
-    _: bool = Depends(verify_api_key)
+    request: Request, channel: str, _: bool = Depends(verify_api_key)
 ):
     """Test notification channel"""
     logger.info("Testing notification channel", channel=channel)
 
     try:
         # Create a test alert
-        from src.core.alerting import Alert, AlertSeverity, AlertStatus, NotificationChannel
         import uuid
 
         test_alert = Alert(
@@ -416,11 +495,10 @@ async def test_notification(
             message="This is a test notification from the Proxy API alerting system",
             value=100.0,
             threshold=50.0,
-            timestamp=time.time()
+            timestamp=time.time(),
         )
 
         # Create a test rule
-        from src.core.alerting import AlertRule
         test_rule = AlertRule(
             name="test_rule",
             description="Test notification rule",
@@ -428,23 +506,36 @@ async def test_notification(
             condition=">",
             threshold=50.0,
             severity=AlertSeverity.INFO,
-            channels=[NotificationChannel(channel.lower())]
+            channels=[NotificationChannel(channel.lower())],
         )
 
         # Send test notification
         if alert_manager.notification_manager:
-            results = await alert_manager.notification_manager.notify(test_alert, test_rule)
+            results = await alert_manager.notification_manager.notify(
+                test_alert, test_rule
+            )
 
             success = results.get(channel.lower(), False)
             if success:
-                return {"message": f"Test notification sent successfully via {channel}"}
+                return {
+                    "message": f"Test notification sent successfully via {channel}"
+                }
             else:
-                raise HTTPException(status_code=500, detail=f"Failed to send test notification via {channel}")
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Failed to send test notification via {channel}",
+                )
         else:
-            raise HTTPException(status_code=500, detail="Notification manager not initialized")
+            raise HTTPException(
+                status_code=500, detail="Notification manager not initialized"
+            )
 
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("Failed to test notification", channel=channel, error=str(e))
-        raise HTTPException(status_code=500, detail=f"Failed to test {channel} notification")
+        logger.error(
+            "Failed to test notification", channel=channel, error=str(e)
+        )
+        raise HTTPException(
+            status_code=500, detail=f"Failed to test {channel} notification"
+        )

@@ -13,7 +13,9 @@ try:
     from openai import AsyncOpenAI
     from openai.types.chat import ChatCompletion
 except ImportError:
-    logger.warning("openai library not found. Using mock classes for type hinting.")
+    logger.warning(
+        "openai library not found. Using mock classes for type hinting."
+    )
     AsyncOpenAI = object
     ChatCompletion = object
 
@@ -26,32 +28,38 @@ class GenericOpenAIWrapper:
 
     def __init__(self, api_key: str = None, base_url: str = None):
         self.client = AsyncOpenAI(api_key=api_key, base_url=base_url)
-        self.transformer: Callable[[Dict], Dict] = lambda payload: payload # Default: no-op
+        self.transformer: Callable[[Dict], Dict] = (
+            lambda payload: payload
+        )  # Default: no-op
 
     def set_transformer(self, transformer: Callable[[Dict], Dict]):
         """Aplica um transformador de payload a este wrapper."""
         self.transformer = transformer
 
-    async def chat_completions(self, model: str, messages: List[Dict], **kwargs) -> Dict:
+    async def chat_completions(
+        self, model: str, messages: List[Dict], **kwargs
+    ) -> Dict:
         """
         Chama o endpoint /v1/chat/completions.
         O payload é primeiro passado pelo transformer.
         """
-        payload = {
-            "model": model,
-            "messages": messages,
-            **kwargs
-        }
+        payload = {"model": model, "messages": messages, **kwargs}
 
         # Aplica a transformação de payload
         transformed_payload = self.transformer(payload)
 
         try:
-            response: ChatCompletion = await self.client.chat.completions.create(**transformed_payload)
+            response: ChatCompletion = (
+                await self.client.chat.completions.create(
+                    **transformed_payload
+                )
+            )
             # Retorna o dicionário para consistência com o formato JSON da API
             return response.model_dump()
         except Exception as e:
-            logger.error(f"Erro no wrapper genérico para {self.client.base_url}: {e}")
+            logger.error(
+                f"Erro no wrapper genérico para {self.client.base_url}: {e}"
+            )
             raise
 
     async def embeddings(self, model: str, input: List[str], **kwargs) -> Dict:
@@ -60,13 +68,19 @@ class GenericOpenAIWrapper:
         transformed_payload = self.transformer(payload)
 
         try:
-            response = await self.client.embeddings.create(**transformed_payload)
+            response = await self.client.embeddings.create(
+                **transformed_payload
+            )
             return response.model_dump()
         except Exception as e:
-            logger.error(f"Erro no wrapper de embeddings para {self.client.base_url}: {e}")
+            logger.error(
+                f"Erro no wrapper de embeddings para {self.client.base_url}: {e}"
+            )
             raise
 
+
 # --- Payload Transformers ---
+
 
 class AnthropicTransformer:
     """Converte um payload no formato OpenAI para o formato da API da Anthropic."""
@@ -92,6 +106,7 @@ class AnthropicTransformer:
 
         return payload
 
+
 class GoogleTransformer:
     """Converte um payload no formato OpenAI para o formato da Google AI Studio (Gemini)."""
 
@@ -102,10 +117,9 @@ class GoogleTransformer:
         for msg in payload.get("messages", []):
             # O role 'assistant' do OpenAI mapeia para 'model' no Gemini
             role = "user" if msg["role"] == "user" else "model"
-            contents.append({
-                "role": role,
-                "parts": [{"text": msg["content"]}]
-            })
+            contents.append(
+                {"role": role, "parts": [{"text": msg["content"]}]}
+            )
 
         payload["contents"] = contents
 
@@ -120,8 +134,12 @@ class GoogleTransformer:
         # Gemini requer configurações de segurança
         payload["safetySettings"] = [
             {"category": cat, "threshold": "BLOCK_MEDIUM_AND_ABOVE"}
-            for cat in ["HARM_CATEGORY_HARASSMENT", "HARM_CATEGORY_HATE_SPEECH",
-                       "HARM_CATEGORY_SEXUALLY_EXPLICIT", "HARM_CATEGORY_DANGEROUS_CONTENT"]
+            for cat in [
+                "HARM_CATEGORY_HARASSMENT",
+                "HARM_CATEGORY_HATE_SPEECH",
+                "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                "HARM_CATEGORY_DANGEROUS_CONTENT",
+            ]
         ]
 
         # Remove campos que não são do Gemini
@@ -129,6 +147,7 @@ class GoogleTransformer:
         payload.pop("model", None)
 
         return payload
+
 
 class CohereTransformer:
     """Converte um payload no formato OpenAI para o formato da API da Cohere."""

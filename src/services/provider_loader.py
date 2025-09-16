@@ -14,6 +14,7 @@ async def get_provider_factories(cfgs: List) -> Dict[str, any]:
     providers = await provider_factory.initialize_providers(config.providers)
     return {name: provider for name, provider in providers.items()}
 
+
 def instantiate_providers(provider_cfgs: List) -> Dict[str, any]:
     """
     Synchronous wrapper for initialize_providers for backward compatibility.

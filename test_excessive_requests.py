@@ -17,7 +17,12 @@ from collections import defaultdict
 class RateLimitTester:
     """Test class for demonstrating rate limiting functionality"""
 
-    def __init__(self, base_url="http://localhost:8000", num_threads=10, requests_per_thread=20):
+    def __init__(
+        self,
+        base_url="http://localhost:8000",
+        num_threads=10,
+        requests_per_thread=20,
+    ):
         self.base_url = base_url
         self.num_threads = num_threads
         self.requests_per_thread = requests_per_thread
@@ -36,24 +41,34 @@ class RateLimitTester:
 
                 with self.lock:
                     if response.status == 200:
-                        self.stats['success'] += 1
-                        print(f"✅ {endpoint} - {response.status} ({response_time:.2f}s)")
+                        self.stats["success"] += 1
+                        print(
+                            f"✅ {endpoint} - {response.status} ({response_time:.2f}s)"
+                        )
                     elif response.status == 429:
-                        self.stats['rate_limited'] += 1
-                        retry_after = response.headers.get('Retry-After', 'unknown')
-                        print(f"🚫 {endpoint} - {response.status} (Rate limited, retry after: {retry_after}s) ({response_time:.2f}s)")
+                        self.stats["rate_limited"] += 1
+                        retry_after = response.headers.get(
+                            "Retry-After", "unknown"
+                        )
+                        print(
+                            f"🚫 {endpoint} - {response.status} (Rate limited, retry after: {retry_after}s) ({response_time:.2f}s)"
+                        )
                     else:
-                        self.stats['error'] += 1
-                        print(f"❌ {endpoint} - {response.status} ({response_time:.2f}s)")
+                        self.stats["error"] += 1
+                        print(
+                            f"❌ {endpoint} - {response.status} ({response_time:.2f}s)"
+                        )
 
         except Exception as e:
             with self.lock:
-                self.stats['exception'] += 1
+                self.stats["exception"] += 1
                 print(f"💥 {endpoint} - Exception: {e}")
 
     async def test_endpoint(self, endpoint, client):
         """Test a specific endpoint with multiple requests"""
-        print(f"\n📡 Testing {endpoint} with {self.requests_per_thread} requests...")
+        print(
+            f"\n📡 Testing {endpoint} with {self.requests_per_thread} requests..."
+        )
         tasks = []
 
         for _ in range(self.requests_per_thread):
@@ -70,11 +85,7 @@ class RateLimitTester:
 
         async with aiohttp.ClientSession() as client:
             # Test each rate-limited endpoint
-            endpoints = [
-                "/v1/models",
-                "/v1/providers",
-                "/v1/cache/stats"
-            ]
+            endpoints = ["/v1/models", "/v1/providers", "/v1/cache/stats"]
 
             for endpoint in endpoints:
                 await self.test_endpoint(endpoint, client)
@@ -83,9 +94,9 @@ class RateLimitTester:
 
     def print_summary(self):
         """Print test summary"""
-        print("\n" + "="*60)
+        print("\n" + "=" * 60)
         print("📊 RATE LIMITING TEST SUMMARY")
-        print("="*60)
+        print("=" * 60)
         print(f"Total Success Responses: {self.stats['success']}")
         print(f"Rate Limited Responses: {self.stats['rate_limited']}")
         print(f"Error Responses: {self.stats['error']}")
@@ -94,10 +105,14 @@ class RateLimitTester:
 
         total_requests = sum(self.stats.values())
         if total_requests > 0:
-            rate_limited_percentage = (self.stats['rate_limited'] / total_requests) * 100
+            rate_limited_percentage = (
+                self.stats["rate_limited"] / total_requests
+            ) * 100
             print(".1f")
-            print(f"Success Rate: {(self.stats['success'] / total_requests) * 100:.1f}%")
-        print("="*60)
+            print(
+                f"Success Rate: {(self.stats['success'] / total_requests) * 100:.1f}%"
+            )
+        print("=" * 60)
 
 
 async def main():
@@ -111,7 +126,7 @@ async def main():
     tester = RateLimitTester(
         base_url="http://localhost:8000",
         num_threads=5,  # 5 threads
-        requests_per_thread=15  # 15 requests each = 75 total per endpoint
+        requests_per_thread=15,  # 15 requests each = 75 total per endpoint
     )
 
     try:

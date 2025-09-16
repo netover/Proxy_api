@@ -13,11 +13,12 @@ import yaml
 import time
 from typing import Dict, Any
 
+
 def load_build_config() -> Dict[str, Any]:
     """Load build configuration"""
     config_path = Path("build_config.yaml")
     if config_path.exists():
-        with open(config_path, 'r') as f:
+        with open(config_path, "r") as f:
             return yaml.safe_load(f)
     else:
         # Default configuration
@@ -30,13 +31,16 @@ def load_build_config() -> Dict[str, Any]:
             "onefile": True,
             "include_files": [
                 ("config.yaml", "config.yaml"),
-                ("logs", "logs")
-            ]
+                ("logs", "logs"),
+            ],
         }
+
 
 def copy_config_with_permissions():
     """Copy config.yaml to dist directory with proper permissions"""
-    print("📋 Copying config.yaml to dist directory with proper permissions...")
+    print(
+        "📋 Copying config.yaml to dist directory with proper permissions..."
+    )
 
     source_config = Path("config.yaml")
     dist_dir = Path("dist")
@@ -64,13 +68,16 @@ def copy_config_with_permissions():
         print(f"❌ Failed to copy config file: {e}")
         return False
 
+
 def build_executable():
     """Build Linux executable using PyInstaller"""
     print("🚀 Building LLM Proxy API Linux executable...")
 
     # Load build configuration
     config = load_build_config()
-    print(f"📋 Build configuration loaded: {config['app_name']} v{config['version']}")
+    print(
+        f"📋 Build configuration loaded: {config['app_name']} v{config['version']}"
+    )
 
     # Create build directory
     build_dir = Path("build")
@@ -80,7 +87,9 @@ def build_executable():
 
     # Prepare PyInstaller command for Linux
     cmd = [
-        sys.executable, "-m", "PyInstaller",
+        sys.executable,
+        "-m",
+        "PyInstaller",
         "--clean",
         "--noconfirm",
         f"--name={config['app_name'].replace(' ', '_')}",
@@ -106,7 +115,6 @@ def build_executable():
         "--hidden-import=uvicorn.config",
         "--hidden-import=uvicorn.supervisors",
         "--hidden-import=uvicorn.workers",
-
         # FastAPI comprehensive imports
         "--hidden-import=fastapi",
         "--hidden-import=fastapi.routing",
@@ -136,7 +144,6 @@ def build_executable():
         "--hidden-import=fastapi.templating",
         "--hidden-import=fastapi.testclient",
         "--hidden-import=fastapi.utils",
-
         # Data validation - COMPREHENSIVE PYDANTIC
         "--hidden-import=pydantic",
         "--hidden-import=pydantic.fields",
@@ -146,7 +153,6 @@ def build_executable():
         "--hidden-import=pydantic_settings.sources",
         "--hidden-import=pydantic_core",
         "--hidden-import=pydantic_core.core_schema",
-
         # HTTP client - COMPREHENSIVE HTTPX
         "--hidden-import=httpx",
         "--hidden-import=httpx._main",
@@ -163,7 +169,6 @@ def build_executable():
         "--hidden-import=httpx._sync",
         "--hidden-import=httpx._async",
         "--hidden-import=httpx._api",
-
         # Async libraries - CRITICAL FOR STREAMING
         "--hidden-import=anyio",
         "--hidden-import=anyio._core",
@@ -173,11 +178,9 @@ def build_executable():
         "--hidden-import=anyio.streams",
         "--hidden-import=anyio.to_thread",
         "--hidden-import=anyio.from_thread",
-
         # Performance optimizations
         "--hidden-import=uvloop",  # Linux/macOS only
         "--hidden-import=orjson",
-
         # Rate limiting - COMPREHENSIVE SLOWAPI
         "--hidden-import=slowapi",
         "--hidden-import=slowapi.middleware",
@@ -188,7 +191,6 @@ def build_executable():
         "--hidden-import=slowapi.storage.memcached",
         "--hidden-import=slowapi.storage.memory",
         "--hidden-import=slowapi.wrappers",
-
         # Configuration and utilities
         "--hidden-import=pyyaml",
         "--hidden-import=json",
@@ -198,7 +200,6 @@ def build_executable():
         "--hidden-import=cryptography.hazmat",
         "--hidden-import=cryptography.hazmat.primitives",
         "--hidden-import=cryptography.hazmat.backends",
-
         # Project modules - ALL CORE MODULES
         "--hidden-import=src.core.config",
         "--hidden-import=src.core.logging",
@@ -220,7 +221,6 @@ def build_executable():
         "--hidden-import=src.utils.context_condenser",
         "--hidden-import=src.utils.helpers",
         "--hidden-import=src.config.models",
-
         # All provider modules
         "--hidden-import=src.providers.base",
         "--hidden-import=src.providers.openai",
@@ -233,7 +233,6 @@ def build_executable():
         "--hidden-import=src.providers.azure_openai",
         "--hidden-import=src.providers.dynamic_base",
         "--hidden-import=src.providers.dynamic_blackbox",
-
         # Collect all for complex packages - ENHANCED
         "--collect-all=fastapi",
         "--collect-all=pydantic",
@@ -244,7 +243,7 @@ def build_executable():
         "--collect-all=anyio",
         "--collect-all=slowapi",
         "--collect-all=pyyaml",
-        "--collect-all=cryptography"
+        "--collect-all=cryptography",
     ]
 
     # Add include files
@@ -264,7 +263,10 @@ def build_executable():
         start_time = time.time()
 
         import subprocess
-        result = subprocess.run(cmd, capture_output=True, text=True, cwd=Path.cwd())
+
+        result = subprocess.run(
+            cmd, capture_output=True, text=True, cwd=Path.cwd()
+        )
 
         if result.returncode != 0:
             print("❌ PyInstaller failed!")
@@ -297,6 +299,7 @@ def build_executable():
         print(f"❌ Build failed with exception: {e}")
         return False
 
+
 def main():
     """Main build function"""
     print("🔨 LLM Proxy API Linux Build Script")
@@ -312,6 +315,7 @@ def main():
     print("1. Test the executable: ./dist/llm-proxy-api")
     print("2. Configure your API keys in the embedded config.yaml")
     print("3. Run the executable to start the proxy server")
+
 
 if __name__ == "__main__":
     main()

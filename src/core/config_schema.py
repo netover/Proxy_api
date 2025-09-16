@@ -24,11 +24,13 @@ CONFIG_SCHEMA = {
             "properties": {
                 "name": {"type": "string", "minLength": 1},
                 "version": {"type": "string", "pattern": r"^\d+\.\d+\.\d+$"},
-                "environment": {"type": "string", "enum": ["development", "staging", "production"]}
+                "environment": {
+                    "type": "string",
+                    "enum": ["development", "staging", "production"],
+                },
             },
-            "required": ["name", "version"]
+            "required": ["name", "version"],
         },
-
         # Server configuration
         "server": {
             "type": "object",
@@ -36,11 +38,10 @@ CONFIG_SCHEMA = {
                 "host": {"type": "string", "format": "hostname"},
                 "port": {"type": "integer", "minimum": 1, "maximum": 65535},
                 "debug": {"type": "boolean"},
-                "reload": {"type": "boolean"}
+                "reload": {"type": "boolean"},
             },
-            "required": ["host", "port"]
+            "required": ["host", "port"],
         },
-
         # Telemetry configuration
         "telemetry": {
             "type": "object",
@@ -52,25 +53,28 @@ CONFIG_SCHEMA = {
                     "type": "object",
                     "properties": {
                         "enabled": {"type": "boolean"},
-                        "endpoint": {"type": "string", "format": "uri"}
-                    }
+                        "endpoint": {"type": "string", "format": "uri"},
+                    },
                 },
                 "zipkin": {
                     "type": "object",
                     "properties": {
                         "enabled": {"type": "boolean"},
-                        "endpoint": {"type": "string", "format": "uri"}
-                    }
+                        "endpoint": {"type": "string", "format": "uri"},
+                    },
                 },
                 "sampling": {
                     "type": "object",
                     "properties": {
-                        "probability": {"type": "number", "minimum": 0.0, "maximum": 1.0}
-                    }
-                }
-            }
+                        "probability": {
+                            "type": "number",
+                            "minimum": 0.0,
+                            "maximum": 1.0,
+                        }
+                    },
+                },
+            },
         },
-
         # Templates configuration
         "templates": {
             "type": "object",
@@ -78,10 +82,9 @@ CONFIG_SCHEMA = {
                 "enabled": {"type": "boolean"},
                 "directory": {"type": "string"},
                 "cache_size": {"type": "integer", "minimum": 1},
-                "auto_reload": {"type": "boolean"}
-            }
+                "auto_reload": {"type": "boolean"},
+            },
         },
-
         # Chaos engineering configuration
         "chaos_engineering": {
             "type": "object",
@@ -92,29 +95,43 @@ CONFIG_SCHEMA = {
                     "items": {
                         "type": "object",
                         "properties": {
-                            "type": {"type": "string", "enum": ["delay", "error", "rate_limit", "timeout", "network_failure"]},
-                            "severity": {"type": "string", "enum": ["low", "medium", "high"]},
-                            "probability": {"type": "number", "minimum": 0.0, "maximum": 1.0},
+                            "type": {
+                                "type": "string",
+                                "enum": [
+                                    "delay",
+                                    "error",
+                                    "rate_limit",
+                                    "timeout",
+                                    "network_failure",
+                                ],
+                            },
+                            "severity": {
+                                "type": "string",
+                                "enum": ["low", "medium", "high"],
+                            },
+                            "probability": {
+                                "type": "number",
+                                "minimum": 0.0,
+                                "maximum": 1.0,
+                            },
                             "duration_ms": {"type": "integer", "minimum": 1},
                             "error_code": {"type": "integer"},
-                            "error_message": {"type": "string"}
+                            "error_message": {"type": "string"},
                         },
-                        "required": ["type", "severity", "probability"]
-                    }
-                }
-            }
+                        "required": ["type", "severity", "probability"],
+                    },
+                },
+            },
         },
-
         # Rate limiting
         "rate_limit": {
             "type": "object",
             "properties": {
                 "requests_per_window": {"type": "integer", "minimum": 1},
                 "window_seconds": {"type": "integer", "minimum": 1},
-                "burst_limit": {"type": "integer", "minimum": 1}
-            }
+                "burst_limit": {"type": "integer", "minimum": 1},
+            },
         },
-
         # Authentication
         "auth": {
             "type": "object",
@@ -122,12 +139,11 @@ CONFIG_SCHEMA = {
                 "api_keys": {
                     "type": "array",
                     "items": {"type": "string", "minLength": 1},
-                    "minItems": 1
+                    "minItems": 1,
                 }
             },
-            "required": ["api_keys"]
+            "required": ["api_keys"],
         },
-
         # Providers configuration - most critical section
         "providers": {
             "type": "array",
@@ -135,37 +151,89 @@ CONFIG_SCHEMA = {
             "items": {
                 "type": "object",
                 "properties": {
-                    "name": {"type": "string", "minLength": 1, "maxLength": 50},
-                    "type": {"type": "string", "enum": ["openai", "anthropic", "azure_openai", "cohere", "perplexity", "grok", "blackbox", "openrouter"]},
-                    "api_key_env": {"type": "string", "pattern": r"^[A-Z_][A-Z0-9_]*$"},
+                    "name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 50,
+                    },
+                    "type": {
+                        "type": "string",
+                        "enum": [
+                            "openai",
+                            "anthropic",
+                            "azure_openai",
+                            "cohere",
+                            "perplexity",
+                            "grok",
+                            "blackbox",
+                            "openrouter",
+                        ],
+                    },
+                    "api_key_env": {
+                        "type": "string",
+                        "pattern": r"^[A-Z_][A-Z0-9_]*$",
+                    },
                     "base_url": {"type": "string", "format": "uri"},
                     "models": {
                         "type": "array",
                         "items": {"type": "string", "minLength": 1},
                         "minItems": 1,
-                        "maxItems": 100
+                        "maxItems": 100,
                     },
                     "enabled": {"type": "boolean"},
                     "forced": {"type": "boolean"},
-                    "priority": {"type": "integer", "minimum": 1, "maximum": 1000},
-                    "timeout": {"type": "integer", "minimum": 1, "maximum": 300},
-                    "max_retries": {"type": "integer", "minimum": 0, "maximum": 10},
-                    "max_connections": {"type": "integer", "minimum": 1, "maximum": 1000},
-                    "max_keepalive_connections": {"type": "integer", "minimum": 1, "maximum": 1000},
-                    "keepalive_expiry": {"type": "number", "minimum": 1.0, "maximum": 300.0},
-                    "retry_delay": {"type": "number", "minimum": 0.1, "maximum": 60.0},
+                    "priority": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 1000,
+                    },
+                    "timeout": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 300,
+                    },
+                    "max_retries": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 10,
+                    },
+                    "max_connections": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 1000,
+                    },
+                    "max_keepalive_connections": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 1000,
+                    },
+                    "keepalive_expiry": {
+                        "type": "number",
+                        "minimum": 1.0,
+                        "maximum": 300.0,
+                    },
+                    "retry_delay": {
+                        "type": "number",
+                        "minimum": 0.1,
+                        "maximum": 60.0,
+                    },
                     "custom_headers": {
                         "type": "object",
                         "patternProperties": {
                             "^[a-zA-Z0-9_-]+$": {"type": "string"}
                         },
-                        "additionalProperties": False
-                    }
+                        "additionalProperties": False,
+                    },
                 },
-                "required": ["name", "type", "api_key_env", "base_url", "models"]
-            }
+                "required": [
+                    "name",
+                    "type",
+                    "api_key_env",
+                    "base_url",
+                    "models",
+                ],
+            },
         },
-
         # Circuit breaker
         "circuit_breaker": {
             "type": "object",
@@ -173,10 +241,9 @@ CONFIG_SCHEMA = {
                 "failure_threshold": {"type": "integer", "minimum": 1},
                 "recovery_timeout": {"type": "integer", "minimum": 1},
                 "half_open_max_calls": {"type": "integer", "minimum": 1},
-                "expected_exception": {"type": "string"}
-            }
+                "expected_exception": {"type": "string"},
+            },
         },
-
         # Context condensation
         "condensation": {
             "type": "object",
@@ -190,11 +257,10 @@ CONFIG_SCHEMA = {
                 "cache_redis_url": {"type": "string"},
                 "error_patterns": {
                     "type": "array",
-                    "items": {"type": "string"}
-                }
-            }
+                    "items": {"type": "string"},
+                },
+            },
         },
-
         # Caching
         "caching": {
             "type": "object",
@@ -205,31 +271,37 @@ CONFIG_SCHEMA = {
                     "properties": {
                         "max_size_mb": {"type": "integer", "minimum": 1},
                         "ttl": {"type": "integer", "minimum": 1},
-                        "compression": {"type": "boolean"}
-                    }
+                        "compression": {"type": "boolean"},
+                    },
                 },
                 "summary_cache": {
                     "type": "object",
                     "properties": {
                         "max_size_mb": {"type": "integer", "minimum": 1},
                         "ttl": {"type": "integer", "minimum": 1},
-                        "compression": {"type": "boolean"}
-                    }
-                }
-            }
+                        "compression": {"type": "boolean"},
+                    },
+                },
+            },
         },
-
         # Memory management
         "memory": {
             "type": "object",
             "properties": {
-                "max_usage_percent": {"type": "integer", "minimum": 1, "maximum": 100},
-                "gc_threshold_percent": {"type": "integer", "minimum": 1, "maximum": 100},
+                "max_usage_percent": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 100,
+                },
+                "gc_threshold_percent": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 100,
+                },
                 "monitoring_interval": {"type": "integer", "minimum": 1},
-                "cache_cleanup_interval": {"type": "integer", "minimum": 1}
-            }
+                "cache_cleanup_interval": {"type": "integer", "minimum": 1},
+            },
         },
-
         # HTTP client
         "http_client": {
             "type": "object",
@@ -241,30 +313,34 @@ CONFIG_SCHEMA = {
                     "type": "object",
                     "properties": {
                         "max_connections": {"type": "integer", "minimum": 1},
-                        "max_keepalive_connections": {"type": "integer", "minimum": 1},
-                        "keepalive_timeout": {"type": "integer", "minimum": 1}
-                    }
-                }
-            }
+                        "max_keepalive_connections": {
+                            "type": "integer",
+                            "minimum": 1,
+                        },
+                        "keepalive_timeout": {"type": "integer", "minimum": 1},
+                    },
+                },
+            },
         },
-
         # Logging
         "logging": {
             "type": "object",
             "properties": {
-                "level": {"type": "string", "enum": ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]},
+                "level": {
+                    "type": "string",
+                    "enum": ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+                },
                 "format": {"type": "string", "enum": ["json", "text"]},
                 "file": {"type": "string"},
                 "rotation": {
                     "type": "object",
                     "properties": {
                         "max_size_mb": {"type": "integer", "minimum": 1},
-                        "max_files": {"type": "integer", "minimum": 1}
-                    }
-                }
-            }
+                        "max_files": {"type": "integer", "minimum": 1},
+                    },
+                },
+            },
         },
-
         # Health check
         "health_check": {
             "type": "object",
@@ -274,10 +350,9 @@ CONFIG_SCHEMA = {
                 "providers": {"type": "boolean"},
                 "context_service": {"type": "boolean"},
                 "memory": {"type": "boolean"},
-                "cache": {"type": "boolean"}
-            }
+                "cache": {"type": "boolean"},
+            },
         },
-
         # Load testing
         "load_testing": {
             "type": "object",
@@ -291,15 +366,22 @@ CONFIG_SCHEMA = {
                                 "users": {"type": "integer", "minimum": 1},
                                 "duration": {"type": "string"},
                                 "ramp_up": {"type": "string"},
-                                "expected_rps": {"type": "integer", "minimum": 1}
+                                "expected_rps": {
+                                    "type": "integer",
+                                    "minimum": 1,
+                                },
                             },
-                            "required": ["users", "duration", "ramp_up", "expected_rps"]
+                            "required": [
+                                "users",
+                                "duration",
+                                "ramp_up",
+                                "expected_rps",
+                            ],
                         }
-                    }
+                    },
                 }
-            }
+            },
         },
-
         # Network simulation
         "network_simulation": {
             "type": "object",
@@ -312,19 +394,23 @@ CONFIG_SCHEMA = {
                             "properties": {
                                 "min_delay": {"type": "integer", "minimum": 0},
                                 "max_delay": {"type": "integer", "minimum": 0},
-                                "jitter": {"type": "number", "minimum": 0.0, "maximum": 1.0}
+                                "jitter": {
+                                    "type": "number",
+                                    "minimum": 0.0,
+                                    "maximum": 1.0,
+                                },
                             },
-                            "required": ["min_delay", "max_delay", "jitter"]
+                            "required": ["min_delay", "max_delay", "jitter"],
                         }
-                    }
+                    },
                 }
-            }
-        }
+            },
+        },
     },
-
     # Critical sections that must be present
-    "required": ["app", "server", "auth", "providers"]
+    "required": ["app", "server", "auth", "providers"],
 }
+
 
 class ConfigValidator:
     """Configuration validator with fast failure and detailed error reporting"""
@@ -333,7 +419,9 @@ class ConfigValidator:
         self.schema = schema or CONFIG_SCHEMA
         self._validator = jsonschema.Draft202012Validator(self.schema)
 
-    def validate_config(self, config_data: Dict[str, Any], config_path: Optional[Path] = None) -> None:
+    def validate_config(
+        self, config_data: Dict[str, Any], config_path: Optional[Path] = None
+    ) -> None:
         """
         Validate configuration data against schema
 
@@ -351,13 +439,22 @@ class ConfigValidator:
             if errors:
                 error_messages = []
                 for error in errors:
-                    path = ".".join(str(p) for p in error.absolute_path) if error.absolute_path else "root"
+                    path = (
+                        ".".join(str(p) for p in error.absolute_path)
+                        if error.absolute_path
+                        else "root"
+                    )
                     error_messages.append(f"  {path}: {error.message}")
 
                 config_file = str(config_path) if config_path else "config"
-                error_summary = f"Configuration validation failed for {config_file}:\n" + "\n".join(error_messages)
+                error_summary = (
+                    f"Configuration validation failed for {config_file}:\n"
+                    + "\n".join(error_messages)
+                )
 
-                logger.error("Configuration validation failed", errors=len(errors))
+                logger.error(
+                    "Configuration validation failed", errors=len(errors)
+                )
                 raise ValueError(error_summary)
 
             logger.info("Configuration validation successful")
@@ -384,7 +481,8 @@ class ConfigValidator:
 
         try:
             import yaml
-            with open(config_path, 'r', encoding='utf-8') as f:
+
+            with open(config_path, "r", encoding="utf-8") as f:
                 config_data = yaml.safe_load(f)
 
             if config_data is None:
@@ -396,9 +494,13 @@ class ConfigValidator:
             return config_data
 
         except yaml.YAMLError as e:
-            raise ValueError(f"Invalid YAML in configuration file {config_path}: {e}")
+            raise ValueError(
+                f"Invalid YAML in configuration file {config_path}: {e}"
+            )
         except Exception as e:
-            raise ValueError(f"Failed to load configuration from {config_path}: {e}")
+            raise ValueError(
+                f"Failed to load configuration from {config_path}: {e}"
+            )
 
     def get_schema_summary(self) -> Dict[str, Any]:
         """Get summary of schema requirements for documentation"""
@@ -412,11 +514,13 @@ class ConfigValidator:
         return {
             "required_sections": required_sections,
             "optional_sections": optional_sections,
-            "schema_version": "Draft 2020-12"
+            "schema_version": "Draft 2020-12",
         }
+
 
 # Global validator instance
 config_validator = ConfigValidator()
+
 
 def validate_config_at_startup(config_path: Path) -> Dict[str, Any]:
     """
@@ -432,20 +536,28 @@ def validate_config_at_startup(config_path: Path) -> Dict[str, Any]:
         SystemExit: If validation fails (fast failure)
     """
     try:
-        logger.info("Validating configuration at startup", config_path=str(config_path))
+        logger.info(
+            "Validating configuration at startup", config_path=str(config_path)
+        )
         config_data = config_validator.validate_config_file(config_path)
         logger.info("Configuration validation passed")
         return config_data
 
     except ValueError as e:
-        logger.error("Configuration validation failed at startup", error=str(e))
+        logger.error(
+            "Configuration validation failed at startup", error=str(e)
+        )
         print(f"\n❌ CONFIGURATION ERROR:")
         print(f"{e}")
-        print("\n🔧 Please fix the configuration file and restart the application.\n")
+        print(
+            "\n🔧 Please fix the configuration file and restart the application.\n"
+        )
         exit(1)
 
     except Exception as e:
-        logger.error("Unexpected error during configuration validation", error=str(e))
+        logger.error(
+            "Unexpected error during configuration validation", error=str(e)
+        )
         print(f"\n❌ UNEXPECTED CONFIGURATION ERROR:")
         print(f"{e}")
         print("\n🔧 Please check the configuration file and try again.\n")

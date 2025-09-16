@@ -32,9 +32,10 @@ logger = ContextualLogger(__name__)
 
 class CacheTier(Enum):
     """Cache tier levels for data organization"""
-    HOT = "hot"       # Frequently accessed, fast storage
-    WARM = "warm"     # Moderately accessed, balanced storage
-    COLD = "cold"     # Rarely accessed, cost-effective storage
+
+    HOT = "hot"  # Frequently accessed, fast storage
+    WARM = "warm"  # Moderately accessed, balanced storage
+    COLD = "cold"  # Rarely accessed, cost-effective storage
 
 
 class CacheCategory:
@@ -60,9 +61,16 @@ class CacheCategory:
     def get_all_categories(cls) -> List[str]:
         """Get all predefined categories"""
         return [
-            cls.MODELS, cls.RESPONSES, cls.SUMMARIES, cls.METRICS,
-            cls.CONFIG, cls.TOKENS, cls.SESSIONS,
-            cls.QUERIES, cls.RESULTS, cls.ANALYTICS
+            cls.MODELS,
+            cls.RESPONSES,
+            cls.SUMMARIES,
+            cls.METRICS,
+            cls.CONFIG,
+            cls.TOKENS,
+            cls.SESSIONS,
+            cls.QUERIES,
+            cls.RESULTS,
+            cls.ANALYTICS,
         ]
 
 
@@ -86,7 +94,7 @@ class ConsolidatedCacheManager:
         enable_monitoring: bool = True,
         enable_migration: bool = True,
         max_memory_mb: int = 512,
-        default_ttl: int = 1800
+        default_ttl: int = 1800,
     ):
         self.cache_dir = cache_dir or Path.cwd() / ".cache" / "consolidated"
         self.enable_warming = enable_warming
@@ -123,12 +131,14 @@ class ConsolidatedCacheManager:
                 self._cache = await get_unified_cache()
 
                 # Configure cache with our settings
-                if hasattr(self._cache, '_unified_cache'):
+                if hasattr(self._cache, "_unified_cache"):
                     unified = self._cache._unified_cache
                     # Apply our configuration to the underlying unified cache
-                    if hasattr(unified, 'max_memory_bytes'):
-                        unified.max_memory_bytes = self.max_memory_mb * 1024 * 1024
-                    if hasattr(unified, 'default_ttl'):
+                    if hasattr(unified, "max_memory_bytes"):
+                        unified.max_memory_bytes = (
+                            self.max_memory_mb * 1024 * 1024
+                        )
+                    if hasattr(unified, "default_ttl"):
                         unified.default_ttl = self.default_ttl
 
                 # Initialize warmer
@@ -136,15 +146,14 @@ class ConsolidatedCacheManager:
                     self._warmer = CacheWarmer(
                         cache=self._cache,
                         enable_pattern_analysis=True,
-                        enable_predictive_warming=True
+                        enable_predictive_warming=True,
                     )
                     await self._warmer.start()
 
                 # Initialize monitor
                 if self.enable_monitoring:
                     self._monitor = CacheMonitor(
-                        target_hit_rate=0.9,
-                        check_interval=60
+                        target_hit_rate=0.9, check_interval=60
                     )
                     await self._monitor.start_monitoring()
 
@@ -156,7 +165,9 @@ class ConsolidatedCacheManager:
                 logger.info("ConsolidatedCacheManager fully initialized")
 
             except Exception as e:
-                logger.error(f"Failed to initialize ConsolidatedCacheManager: {e}")
+                logger.error(
+                    f"Failed to initialize ConsolidatedCacheManager: {e}"
+                )
                 await self._cleanup_on_error()
                 raise
 
@@ -177,13 +188,13 @@ class ConsolidatedCacheManager:
         try:
             # Migrate from SmartCache global instances
             from .smart_cache import get_response_cache, get_summary_cache
+
             response_cache = await get_response_cache()
             summary_cache = await get_summary_cache()
 
-            results = await self._migrator.migrate_to_unified_cache([
-                'response_cache',
-                'summary_cache'
-            ])
+            results = await self._migrator.migrate_to_unified_cache(
+                ["response_cache", "summary_cache"]
+            )
 
             # Mark as migrated
             self._migrated = True
@@ -229,14 +240,16 @@ class ConsolidatedCacheManager:
         value: Any,
         ttl: Optional[int] = None,
         category: str = "default",
-        priority: int = 1
+        priority: int = 1,
     ) -> bool:
         """Set value in cache"""
         if not self._cache:
             raise RuntimeError("Cache not initialized")
 
         try:
-            success = await self._cache.set(key, value, ttl, category, priority)
+            success = await self._cache.set(
+                key, value, ttl, category, priority
+            )
             if success:
                 self._stats.sets += 1
             return success
@@ -281,7 +294,9 @@ class ConsolidatedCacheManager:
         except Exception as e:
             return False
 
-    async def get_many(self, keys: List[str], category: str = "default") -> Dict[str, Any]:
+    async def get_many(
+        self, keys: List[str], category: str = "default"
+    ) -> Dict[str, Any]:
         """Get multiple values"""
         if not self._cache:
             raise RuntimeError("Cache not initialized")
@@ -296,7 +311,7 @@ class ConsolidatedCacheManager:
         self,
         key_value_pairs: Dict[str, Any],
         ttl: Optional[int] = None,
-        category: str = "default"
+        category: str = "default",
     ) -> int:
         """Set multiple values"""
         if not self._cache:
@@ -353,12 +368,14 @@ class ConsolidatedCacheManager:
                 "manager_type": "consolidated_cache",
                 "running": self._running,
                 "migrated": self._migrated,
-                "uptime_seconds": (datetime.now() - self._start_time).total_seconds(),
+                "uptime_seconds": (
+                    datetime.now() - self._start_time
+                ).total_seconds(),
                 "components": {
                     "cache": self._cache is not None,
                     "warmer": self._warmer is not None,
                     "monitor": self._monitor is not None,
-                    "migrator": self._migrator is not None
+                    "migrator": self._migrator is not None,
                 },
                 "manager_stats": {
                     "hits": self._stats.hits,
@@ -366,8 +383,8 @@ class ConsolidatedCacheManager:
                     "sets": self._stats.sets,
                     "deletes": self._stats.deletes,
                     "total_requests": self._stats.total_requests,
-                    "hit_rate": self._stats.hit_rate
-                }
+                    "hit_rate": self._stats.hit_rate,
+                },
             }
 
             # Add warmer stats if available
@@ -448,7 +465,7 @@ class ConsolidatedCacheManager:
 
             return {
                 "cache_optimization": cache_result,
-                "warmer_optimization": warmer_result
+                "warmer_optimization": warmer_result,
             }
 
         except Exception as e:
@@ -486,17 +503,23 @@ class ConsolidatedCacheManager:
 
     # Model-specific methods (for backward compatibility)
 
-    async def get_models(self, provider_name: str, base_url: str) -> Optional[List[Dict[str, Any]]]:
+    async def get_models(
+        self, provider_name: str, base_url: str
+    ) -> Optional[List[Dict[str, Any]]]:
         """Get cached models for a provider (backward compatibility)"""
         key = f"models:{provider_name}:{base_url}"
         return await self.get(key, category="models")
 
-    async def set_models(self, provider_name: str, base_url: str, models: List[Dict[str, Any]]) -> bool:
+    async def set_models(
+        self, provider_name: str, base_url: str, models: List[Dict[str, Any]]
+    ) -> bool:
         """Cache models for a provider (backward compatibility)"""
         key = f"models:{provider_name}:{base_url}"
         return await self.set(key, models, category="models")
 
-    async def invalidate_models(self, provider_name: str, base_url: str) -> bool:
+    async def invalidate_models(
+        self, provider_name: str, base_url: str
+    ) -> bool:
         """Invalidate cached models (backward compatibility)"""
         key = f"models:{provider_name}:{base_url}"
         return await self.delete(key)
@@ -507,7 +530,9 @@ class ConsolidatedCacheManager:
         """Get cached response (SmartCache compatibility)"""
         return await self.get(key, category="responses")
 
-    async def set_response(self, key: str, response: Any, ttl: Optional[int] = None) -> bool:
+    async def set_response(
+        self, key: str, response: Any, ttl: Optional[int] = None
+    ) -> bool:
         """Cache response (SmartCache compatibility)"""
         return await self.set(key, response, ttl, category="responses")
 
@@ -517,17 +542,16 @@ class ConsolidatedCacheManager:
         """Get cached summary (SmartCache compatibility)"""
         return await self.get(key, category="summaries")
 
-    async def set_summary(self, key: str, summary: Any, ttl: Optional[int] = None) -> bool:
+    async def set_summary(
+        self, key: str, summary: Any, ttl: Optional[int] = None
+    ) -> bool:
         """Cache summary (SmartCache compatibility)"""
         return await self.set(key, summary, ttl, category="summaries")
 
     # Warming methods
 
     async def warm_provider_models(
-        self,
-        provider_name: str,
-        base_url: str,
-        getter_func: Callable
+        self, provider_name: str, base_url: str, getter_func: Callable
     ) -> bool:
         """Warm cache with provider models"""
         if not self._warmer:

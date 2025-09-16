@@ -13,10 +13,11 @@ import sys
 import os
 
 # Add src to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 
 from core.metrics import MetricsCollector, metrics_collector
 from core.telemetry import telemetry, TracedSpan
+
 
 def simulate_cpu_load(duration_seconds: int, target_percent: float):
     """Simulate CPU load by busy waiting"""
@@ -26,6 +27,7 @@ def simulate_cpu_load(duration_seconds: int, target_percent: float):
         # Busy wait to consume CPU
         for _ in range(10000):
             _ = 1 + 1
+
 
 def simulate_memory_load(size_mb: int):
     """Simulate memory usage"""
@@ -38,10 +40,15 @@ def simulate_memory_load(size_mb: int):
 
     return memory_blocks
 
-async def simulate_requests(metrics_collector: MetricsCollector, num_requests: int, delay: float = 0.01):
+
+async def simulate_requests(
+    metrics_collector: MetricsCollector, num_requests: int, delay: float = 0.01
+):
     """Simulate API requests with telemetry"""
     for i in range(num_requests):
-        with TracedSpan(f"test_request_{i}", {"provider": "test", "model": "gpt-4"}) as span:
+        with TracedSpan(
+            f"test_request_{i}", {"provider": "test", "model": "gpt-4"}
+        ) as span:
             span.set_attribute("request_id", i)
             span.set_attribute("tokens", 100)
 
@@ -51,6 +58,7 @@ async def simulate_requests(metrics_collector: MetricsCollector, num_requests: i
             # Simulate occasional errors
             if i % 100 == 0:
                 span.record_error(Exception("Simulated error"))
+
 
 async def test_adaptive_sampling():
     """Test adaptive sampling under different load conditions"""
@@ -63,7 +71,9 @@ async def test_adaptive_sampling():
     metrics_collector.sampling_rate = 0.1
 
     print(f"Initial sampling rate: {metrics_collector.sampling_rate}")
-    print(f"Adaptive sampling enabled: {metrics_collector.enable_adaptive_sampling}")
+    print(
+        f"Adaptive sampling enabled: {metrics_collector.enable_adaptive_sampling}"
+    )
 
     # Test 1: Low load scenario
     print("\n--- Test 1: Low Load Scenario ---")
@@ -81,13 +91,19 @@ async def test_adaptive_sampling():
     metrics_collector._adjust_sampling_rate()
 
     stats = metrics_collector.get_all_stats()
-    sampling_info = stats.get('sampling', {})
-    adaptive_info = sampling_info.get('adaptive', {})
+    sampling_info = stats.get("sampling", {})
+    adaptive_info = sampling_info.get("adaptive", {})
 
-    print(f"Sampling rate after low load: {metrics_collector.sampling_rate:.3f}")
+    print(
+        f"Sampling rate after low load: {metrics_collector.sampling_rate:.3f}"
+    )
     print(f"Load score: {adaptive_info.get('current_load_score', 0):.3f}")
-    print(f"Request volume: {adaptive_info.get('current_request_volume', 0):.1f} req/sec")
-    print(f"Total requests tracked: {len(metrics_collector._request_timestamps)}")
+    print(
+        f"Request volume: {adaptive_info.get('current_request_volume', 0):.1f} req/sec"
+    )
+    print(
+        f"Total requests tracked: {len(metrics_collector._request_timestamps)}"
+    )
 
     # Test 2: High load scenario
     print("\n--- Test 2: High Load Scenario ---")
@@ -108,13 +124,19 @@ async def test_adaptive_sampling():
     metrics_collector._adjust_sampling_rate()
 
     stats = metrics_collector.get_all_stats()
-    sampling_info = stats.get('sampling', {})
-    adaptive_info = sampling_info.get('adaptive', {})
+    sampling_info = stats.get("sampling", {})
+    adaptive_info = sampling_info.get("adaptive", {})
 
-    print(f"Sampling rate after high load: {metrics_collector.sampling_rate:.3f}")
+    print(
+        f"Sampling rate after high load: {metrics_collector.sampling_rate:.3f}"
+    )
     print(f"Load score: {adaptive_info.get('current_load_score', 0):.3f}")
-    print(f"Request volume: {adaptive_info.get('current_request_volume', 0):.1f} req/sec")
-    print(f"Total requests tracked: {len(metrics_collector._request_timestamps)}")
+    print(
+        f"Request volume: {adaptive_info.get('current_request_volume', 0):.1f} req/sec"
+    )
+    print(
+        f"Total requests tracked: {len(metrics_collector._request_timestamps)}"
+    )
 
     # Clean up memory
     del memory_blocks
@@ -163,6 +185,7 @@ async def test_adaptive_sampling():
     # Test completed - global metrics collector will continue running
 
     print("\nAdaptive sampling test completed!")
+
 
 if __name__ == "__main__":
     asyncio.run(test_adaptive_sampling())

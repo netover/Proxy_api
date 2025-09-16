@@ -27,14 +27,14 @@ from .models import (
     ModelDetailResponse,
     RefreshResponse,
     ModelInfoExtended,
-    ProviderConfig
+    ProviderConfig,
 )
 from .exceptions import (
     ProxyAPIException,
     InvalidRequestError,
     NotFoundError,
     AuthenticationError,
-    RateLimitError
+    RateLimitError,
 )
 from .auth import verify_api_key, get_api_key_from_request
 from .rate_limiter import rate_limiter

@@ -14,8 +14,11 @@ import httpx
 logger = logging.getLogger(__name__)
 
 # Import retry strategies
-from src.core.retry_strategies import (RetryConfig, create_retry_strategy,
-                                       retry_strategy_registry)
+from src.core.retry_strategies import (
+    RetryConfig,
+    create_retry_strategy,
+    retry_strategy_registry,
+)
 
 
 class AdvancedHTTPClient:
@@ -38,7 +41,7 @@ class AdvancedHTTPClient:
         connect_timeout: float = 10.0,
         retry_config: Optional[RetryConfig] = None,
         circuit_breaker=None,
-        provider_name: str = ""
+        provider_name: str = "",
     ):
         self.max_keepalive_connections = max_keepalive_connections
         self.max_connections = max_connections
@@ -52,7 +55,9 @@ class AdvancedHTTPClient:
         self.retry_config = retry_config or RetryConfig()
 
         # Create retry strategy for this provider
-        self.retry_strategy = create_retry_strategy(provider_name or "default", self.retry_config)
+        self.retry_strategy = create_retry_strategy(
+            provider_name or "default", self.retry_config
+        )
 
         # Metrics
         self.request_count = 0
@@ -83,29 +88,26 @@ class AdvancedHTTPClient:
         limits = httpx.Limits(
             max_keepalive_connections=self.max_keepalive_connections,
             max_connections=self.max_connections,
-            keepalive_expiry=self.keepalive_expiry
+            keepalive_expiry=self.keepalive_expiry,
         )
 
-        timeout = httpx.Timeout(
-            self.timeout,
-            connect=self.connect_timeout
-        )
+        timeout = httpx.Timeout(self.timeout, connect=self.connect_timeout)
 
         self._client = httpx.AsyncClient(
             limits=limits,
             timeout=timeout,
             follow_redirects=True,
-            http2=True  # Enable HTTP/2 for better performance
+            http2=True,  # Enable HTTP/2 for better performance
         )
 
         logger.info(
             f"Advanced HTTP client initialized for {self.provider_name}",
             extra={
-                'max_keepalive': self.max_keepalive_connections,
-                'max_connections': self.max_connections,
-                'timeout': self.timeout,
-                'retry_strategy': type(self.retry_strategy).__name__
-            }
+                "max_keepalive": self.max_keepalive_connections,
+                "max_connections": self.max_connections,
+                "timeout": self.timeout,
+                "retry_strategy": type(self.retry_strategy).__name__,
+            },
         )
 
     async def close(self):
@@ -113,7 +115,9 @@ class AdvancedHTTPClient:
         if self._client and not self._closed:
             await self._client.aclose()
             self._closed = True
-            logger.info(f"Advanced HTTP client closed for {self.provider_name}")
+            logger.info(
+                f"Advanced HTTP client closed for {self.provider_name}"
+            )
 
     async def request(
         self,
@@ -125,7 +129,7 @@ class AdvancedHTTPClient:
         data: Optional[Dict[str, Any]] = None,
         params: Optional[Dict[str, Any]] = None,
         stream: bool = False,
-        **kwargs
+        **kwargs,
     ) -> httpx.Response:
         """
         Make HTTP request with advanced retry strategies and monitoring
@@ -138,16 +142,30 @@ class AdvancedHTTPClient:
 
         # Circuit breaker check
         if self.circuit_breaker:
+
             async def make_request():
                 return await self._make_request_with_retry(
-                    method, url, headers=headers, json=json,
-                    data=data, params=params, stream=stream, **kwargs
+                    method,
+                    url,
+                    headers=headers,
+                    json=json,
+                    data=data,
+                    params=params,
+                    stream=stream,
+                    **kwargs,
                 )
+
             return await self.circuit_breaker.execute(make_request)
 
         return await self._make_request_with_retry(
-            method, url, headers=headers, json=json,
-            data=data, params=params, stream=stream, **kwargs
+            method,
+            url,
+            headers=headers,
+            json=json,
+            data=data,
+            params=params,
+            stream=stream,
+            **kwargs,
         )
 
     async def _make_request_with_retry(
@@ -160,7 +178,7 @@ class AdvancedHTTPClient:
         data: Optional[Dict[str, Any]] = None,
         params: Optional[Dict[str, Any]] = None,
         stream: bool = False,
-        **kwargs
+        **kwargs,
     ) -> httpx.Response:
         """Internal request method with advanced retry logic"""
 
@@ -169,12 +187,22 @@ class AdvancedHTTPClient:
 
             # Track connection info before request
             connection_info = None
-            if self._client and hasattr(self._client, '_pool'):
+            if self._client and hasattr(self._client, "_pool"):
                 pool = self._client._pool
-                if hasattr(pool, 'connections'):
+                if hasattr(pool, "connections"):
                     connection_info = {
-                        'total_connections': len(pool.connections),
-                        'available_connections': len([c for c in pool.connections if c.is_available()]) if hasattr(pool.connections[0], 'is_available') else 0
+                        "total_connections": len(pool.connections),
+                        "available_connections": (
+                            len(
+                                [
+                                    c
+                                    for c in pool.connections
+                                    if c.is_available()
+                                ]
+                            )
+                            if hasattr(pool.connections[0], "is_available")
+                            else 0
+                        ),
                     }
 
             # Make request
@@ -185,7 +213,7 @@ class AdvancedHTTPClient:
                 json=json,
                 data=data,
                 params=params,
-                **kwargs
+                **kwargs,
             )
 
             response_time = time.time() - start_time
@@ -196,12 +224,16 @@ class AdvancedHTTPClient:
             if self.request_count > 1:
                 # For demonstration, assume connections are being reused after the first request
                 # In production, you might use more sophisticated monitoring
-                if self.request_count <= 3:  # First few requests might create new connections
+                if (
+                    self.request_count <= 3
+                ):  # First few requests might create new connections
                     self.new_connection_count += 1
                 else:  # Subsequent requests likely reuse connections
                     self.connection_reuse_count += 1
-                logger.debug(f"Request {self.request_count} for {self.provider_name} - "
-                           f"Reuse: {self.connection_reuse_count}, New: {self.new_connection_count}")
+                logger.debug(
+                    f"Request {self.request_count} for {self.provider_name} - "
+                    f"Reuse: {self.connection_reuse_count}, New: {self.new_connection_count}"
+                )
 
             # Update metrics
             self.request_count += 1
@@ -211,31 +243,33 @@ class AdvancedHTTPClient:
             logger.info(
                 f"HTTP request successful for {self.provider_name}",
                 extra={
-                    'method': method,
-                    'url': url,
-                    'status_code': response.status_code,
-                    'response_time': round(response_time * 1000, 2),  # ms
-                    'provider': self.provider_name,
-                    'connection_reused': self.connection_reuse_count > 0
-                }
+                    "method": method,
+                    "url": url,
+                    "status_code": response.status_code,
+                    "response_time": round(response_time * 1000, 2),  # ms
+                    "provider": self.provider_name,
+                    "connection_reused": self.connection_reuse_count > 0,
+                },
             )
 
             return response
 
         # Execute with retry strategy
         try:
-            return await self.retry_strategy.execute_with_retry(execute_request)
+            return await self.retry_strategy.execute_with_retry(
+                execute_request
+            )
         except Exception as e:
             self.error_count += 1
             logger.error(
                 f"HTTP request failed after retries for {self.provider_name}",
                 extra={
-                    'method': method,
-                    'url': url,
-                    'error': str(e),
-                    'error_type': type(e).__name__,
-                    'provider': self.provider_name
-                }
+                    "method": method,
+                    "url": url,
+                    "error": str(e),
+                    "error_type": type(e).__name__,
+                    "provider": self.provider_name,
+                },
             )
             raise
 
@@ -243,55 +277,72 @@ class AdvancedHTTPClient:
         """Get client performance metrics including connection reuse stats"""
         avg_response_time = (
             self.total_response_time / self.request_count
-            if self.request_count > 0 else 0
+            if self.request_count > 0
+            else 0
         )
 
         # Get connection pool info
         pool_info = {}
-        if self._client and hasattr(self._client, '_pool'):
+        if self._client and hasattr(self._client, "_pool"):
             pool = self._client._pool
-            if hasattr(pool, 'connections'):
+            if hasattr(pool, "connections"):
                 pool_info = {
-                    'total_connections': len(pool.connections),
-                    'available_connections': len([c for c in pool.connections if hasattr(c, 'is_available') and c.is_available()]),
-                    'pending_connections': len([c for c in pool.connections if hasattr(c, 'is_pending') and c.is_pending()])
+                    "total_connections": len(pool.connections),
+                    "available_connections": len(
+                        [
+                            c
+                            for c in pool.connections
+                            if hasattr(c, "is_available") and c.is_available()
+                        ]
+                    ),
+                    "pending_connections": len(
+                        [
+                            c
+                            for c in pool.connections
+                            if hasattr(c, "is_pending") and c.is_pending()
+                        ]
+                    ),
                 }
 
         return {
-            'requests_total': self.request_count,
-            'errors_total': self.error_count,
-            'avg_response_time_ms': round(avg_response_time * 1000, 2),
-            'error_rate': (
+            "requests_total": self.request_count,
+            "errors_total": self.error_count,
+            "avg_response_time_ms": round(avg_response_time * 1000, 2),
+            "error_rate": (
                 self.error_count / self.request_count
-                if self.request_count > 0 else 0
+                if self.request_count > 0
+                else 0
             ),
-            'max_connections': self.max_connections,
-            'max_keepalive_connections': self.max_keepalive_connections,
-            'connection_reuse_count': self.connection_reuse_count,
-            'new_connection_count': self.new_connection_count,
-            'connection_reuse_rate': (
-                self.connection_reuse_count / (self.connection_reuse_count + self.new_connection_count)
-                if (self.connection_reuse_count + self.new_connection_count) > 0 else 0
+            "max_connections": self.max_connections,
+            "max_keepalive_connections": self.max_keepalive_connections,
+            "connection_reuse_count": self.connection_reuse_count,
+            "new_connection_count": self.new_connection_count,
+            "connection_reuse_rate": (
+                self.connection_reuse_count
+                / (self.connection_reuse_count + self.new_connection_count)
+                if (self.connection_reuse_count + self.new_connection_count)
+                > 0
+                else 0
             ),
-            'pool_info': pool_info,
-            'provider': self.provider_name,
-            'retry_strategy': type(self.retry_strategy).__name__,
-            'retry_config': {
-                'max_attempts': self.retry_config.max_attempts,
-                'base_delay': self.retry_config.base_delay,
-                'max_delay': self.retry_config.max_delay
-            }
+            "pool_info": pool_info,
+            "provider": self.provider_name,
+            "retry_strategy": type(self.retry_strategy).__name__,
+            "retry_config": {
+                "max_attempts": self.retry_config.max_attempts,
+                "base_delay": self.retry_config.base_delay,
+                "max_delay": self.retry_config.max_delay,
+            },
         }
 
     def get_retry_metrics(self) -> Dict[str, Any]:
         """Get retry strategy metrics"""
         return {
-            'provider': self.provider_name,
-            'strategy_type': type(self.retry_strategy).__name__,
-            'success_rate': self.retry_strategy.history.get_success_rate(),
-            'total_attempts': len(self.retry_strategy.history.attempts),
-            'consecutive_failures': self.retry_strategy.history.consecutive_failures,
-            'average_delay': self.retry_strategy.history.get_average_delay()
+            "provider": self.provider_name,
+            "strategy_type": type(self.retry_strategy).__name__,
+            "success_rate": self.retry_strategy.history.get_success_rate(),
+            "total_attempts": len(self.retry_strategy.history.attempts),
+            "consecutive_failures": self.retry_strategy.history.consecutive_failures,
+            "average_delay": self.retry_strategy.history.get_average_delay(),
         }
 
 
@@ -303,7 +354,7 @@ _http_clients_lock = threading.Lock()
 def get_advanced_http_client(
     provider_name: str = "default",
     retry_config: Optional[RetryConfig] = None,
-    **kwargs
+    **kwargs,
 ) -> AdvancedHTTPClient:
     """Get or create provider-specific HTTP client instance"""
     key = provider_name
@@ -313,13 +364,15 @@ def get_advanced_http_client(
             _http_clients[key] = AdvancedHTTPClient(
                 provider_name=provider_name,
                 retry_config=retry_config,
-                **kwargs
+                **kwargs,
             )
 
     return _http_clients[key]
 
 
-async def get_http_client(provider_name: str = "default") -> AdvancedHTTPClient:
+async def get_http_client(
+    provider_name: str = "default",
+) -> AdvancedHTTPClient:
     """Get HTTP client for provider (backward compatibility)"""
     return get_advanced_http_client(provider_name)
 

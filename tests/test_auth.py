@@ -19,7 +19,9 @@ class TestAPIKeyAuth:
 
         assert len(auth.valid_api_key_hashes) == 3
         # Verify keys are hashed
-        expected_hashes = {hashlib.sha256(key.encode()).hexdigest() for key in api_keys}
+        expected_hashes = {
+            hashlib.sha256(key.encode()).hexdigest() for key in api_keys
+        }
         assert auth.valid_api_key_hashes == expected_hashes
 
     def test_init_with_empty_keys(self):
@@ -73,7 +75,9 @@ class TestAPIKeyAuth:
         short_time = time.time() - start_time
 
         start_time = time.time()
-        auth.verify_api_key("a_very_long_key_that_should_take_more_time_to_hash_but_does_not_due_to_constant_time")
+        auth.verify_api_key(
+            "a_very_long_key_that_should_take_more_time_to_hash_but_does_not_due_to_constant_time"
+        )
         long_time = time.time() - start_time
 
         # Times should be very close (within 10% difference)
@@ -96,8 +100,12 @@ class TestAPIKeyAuth:
         auth = APIKeyAuth(api_keys)
 
         assert auth.verify_api_key("key-with_special.chars!@#") is True
-        assert auth.verify_api_key("key-with_special.chars!@# ") is False  # Extra space
-        assert auth.verify_api_key("key-with_special.chars!@") is False   # Missing chars
+        assert (
+            auth.verify_api_key("key-with_special.chars!@# ") is False
+        )  # Extra space
+        assert (
+            auth.verify_api_key("key-with_special.chars!@") is False
+        )  # Missing chars
 
     def test_verify_api_key_unicode(self):
         """Test verify_api_key with unicode characters"""
@@ -122,7 +130,7 @@ class TestVerifyAPIKeyDependency:
         mock_request.headers = {"x-api-key": "test_key_123"}
         mock_request.app.state.api_key_auth = auth
 
-        with patch('src.core.auth.config_manager') as mock_config_manager:
+        with patch("src.core.auth.config_manager") as mock_config_manager:
             mock_config = Mock()
             mock_config.settings.api_key_header = "x-api-key"
             mock_config_manager.load_config.return_value = mock_config
@@ -141,9 +149,11 @@ class TestVerifyAPIKeyDependency:
         mock_request.headers = {"authorization": "Bearer test_key_123"}
         mock_request.app.state.api_key_auth = auth
 
-        with patch('src.core.auth.config_manager') as mock_config_manager:
+        with patch("src.core.auth.config_manager") as mock_config_manager:
             mock_config = Mock()
-            mock_config.settings.api_key_header = "x-api-key"  # Different from actual header
+            mock_config.settings.api_key_header = (
+                "x-api-key"  # Different from actual header
+            )
             mock_config_manager.load_config.return_value = mock_config
 
             result = await verify_api_key(mock_request)
@@ -161,7 +171,7 @@ class TestVerifyAPIKeyDependency:
         mock_request.url.path = "/test/endpoint"
         mock_request.app.state.api_key_auth = auth
 
-        with patch('src.core.auth.config_manager') as mock_config_manager:
+        with patch("src.core.auth.config_manager") as mock_config_manager:
             mock_config = Mock()
             mock_config.settings.api_key_header = "x-api-key"
             mock_config_manager.load_config.return_value = mock_config
@@ -184,7 +194,7 @@ class TestVerifyAPIKeyDependency:
         mock_request.url.path = "/test/endpoint"
         mock_request.app.state.api_key_auth = auth
 
-        with patch('src.core.auth.config_manager') as mock_config_manager:
+        with patch("src.core.auth.config_manager") as mock_config_manager:
             mock_config = Mock()
             mock_config.settings.api_key_header = "x-api-key"
             mock_config_manager.load_config.return_value = mock_config
@@ -207,7 +217,7 @@ class TestVerifyAPIKeyDependency:
         mock_request.url.path = "/test/endpoint"
         mock_request.app.state.api_key_auth = auth
 
-        with patch('src.core.auth.config_manager') as mock_config_manager:
+        with patch("src.core.auth.config_manager") as mock_config_manager:
             mock_config = Mock()
             mock_config.settings.api_key_header = "x-api-key"
             mock_config_manager.load_config.return_value = mock_config
@@ -230,7 +240,7 @@ class TestVerifyAPIKeyDependency:
         mock_request.url.path = "/test/endpoint"
         mock_request.app.state.api_key_auth = auth
 
-        with patch('src.core.auth.config_manager') as mock_config_manager:
+        with patch("src.core.auth.config_manager") as mock_config_manager:
             mock_config = Mock()
             mock_config.settings.api_key_header = "x-api-key"
             mock_config_manager.load_config.return_value = mock_config
@@ -252,7 +262,7 @@ class TestVerifyAPIKeyDependency:
         mock_request.headers = {"X-API-KEY": "test_key_123"}
         mock_request.app.state.api_key_auth = auth
 
-        with patch('src.core.auth.config_manager') as mock_config_manager:
+        with patch("src.core.auth.config_manager") as mock_config_manager:
             mock_config = Mock()
             mock_config.settings.api_key_header = "x-api-key"
             mock_config_manager.load_config.return_value = mock_config
@@ -297,7 +307,7 @@ class TestAuthIntegration:
     def test_secrets_compare_digest_usage(self):
         """Test that secrets.compare_digest is used for secure comparison"""
         # This is more of a code review test to ensure secure practices
-        with patch('secrets.compare_digest') as mock_compare:
+        with patch("secrets.compare_digest") as mock_compare:
             mock_compare.return_value = True
 
             auth = APIKeyAuth(["test_key"])

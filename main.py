@@ -24,31 +24,40 @@ except ImportError:
     orjson = None
 
 # New API router imports
-from src.api.router import (main_router, root_router, setup_exception_handlers,
-                            setup_middleware)
+from src.api.router import (
+    main_router,
+    root_router,
+    setup_exception_handlers,
+    setup_middleware,
+)
 from src.core.alerting import alert_manager
 from src.core.app_state import app_state
 from src.core.auth import APIKeyAuth
 from src.core.chaos_engineering import chaos_monkey
+
 # Core imports
 from src.core.config import settings
+
 # Performance optimization imports
 from src.core.http_client_v2 import get_advanced_http_client
 from src.core.logging import ContextualLogger, setup_logging
 from src.core.memory_manager import get_memory_manager, shutdown_memory_manager
 from src.core.provider_factory import provider_factory
 from src.core.retry_strategies import RetryConfig
-from src.core.smart_cache import (get_response_cache, get_summary_cache,
-                                  shutdown_caches)
+from src.core.smart_cache import (
+    get_response_cache,
+    get_summary_cache,
+    shutdown_caches,
+)
 from src.core.telemetry import TracedSpan, telemetry
 
 # Setup logging with environment variable support
 import os
-log_level = os.getenv("LOG_LEVEL", "DEBUG" if settings.debug else "INFO").upper()
-setup_logging(
-    log_level=log_level,
-    log_file=settings.log_file
-)
+
+log_level = os.getenv(
+    "LOG_LEVEL", "DEBUG" if settings.debug else "INFO"
+).upper()
+setup_logging(log_level=log_level)
 logger = ContextualLogger(__name__)
 
 # Rate limiting
@@ -68,20 +77,20 @@ async def lifespan(app: FastAPI):
         # Initialize app state with the new approach
         await app_state.initialize()
         config = app_state.config
-        
+
         # Set config in app state for backward compatibility
         app.state.config = config
         app.state.condensation_config = config.settings.condensation
 
         # Initialize performance systems
         logger.info("Initializing performance optimization systems...")
-    
+
         # Configure OpenTelemetry
         telemetry.configure(settings)
         telemetry.instrument_fastapi(app)
         telemetry.instrument_httpx()
         logger.info("OpenTelemetry configured successfully")
-    
+
         # Initialize HTTP client
         with TracedSpan("http_client.initialize") as span:
             http_client = get_advanced_http_client(retry_config=RetryConfig())
@@ -89,7 +98,7 @@ async def lifespan(app: FastAPI):
             app.state.http_client = http_client
             span.set_attribute("http.client.initialized", True)
             logger.info("HTTP client initialized")
-    
+
         # Initialize caches
         with TracedSpan("cache.initialize") as span:
             app.state.response_cache = await get_response_cache()
@@ -106,12 +115,19 @@ async def lifespan(app: FastAPI):
 
         # Initialize context condensation cache with persistence
         from src.utils.context_condenser import AsyncLRUCache
-        persist_file = 'cache.json' if config.settings.condensation.cache_persist else None
-        redis_url = getattr(config.settings.condensation, 'cache_redis_url', None)
+
+        persist_file = (
+            "cache.json"
+            if config.settings.condensation.cache_persist
+            else None
+        )
+        redis_url = getattr(
+            config.settings.condensation, "cache_redis_url", None
+        )
         app.state.lru_cache = AsyncLRUCache(
             maxsize=config.settings.condensation.cache_size,
             persist_file=persist_file,
-            redis_url=redis_url
+            redis_url=redis_url,
         )
         if persist_file:
             await app.state.lru_cache.initialize()
@@ -127,12 +143,13 @@ async def lifespan(app: FastAPI):
 
         # Configure rate limiter
         from src.core.rate_limiter import rate_limiter
+
         rate_limiter.configure_from_config(config)
         app.state.rate_limiter = rate_limiter
         logger.info("Rate limiter configured and initialized")
 
         # Configure chaos engineering
-        chaos_monkey.configure(config.settings.get('chaos_engineering', {}))
+        chaos_monkey.configure(config.settings.get("chaos_engineering", {}))
         logger.info("Chaos engineering configured")
 
         # Start alerting system
@@ -147,8 +164,11 @@ async def lifespan(app: FastAPI):
         def start_web_ui():
             try:
                 from web_ui import app as web_app
+
                 logger.info("Starting web UI on port 10000")
-                web_app.run(host='0.0.0.0', port=10000, debug=False, use_reloader=False)
+                web_app.run(
+                    host="0.0.0.0", port=10000, debug=False, use_reloader=False
+                )
             except Exception as e:
                 logger.error(f"Failed to start web UI: {e}")
 
@@ -178,14 +198,14 @@ async def lifespan(app: FastAPI):
         # Shutdown performance systems in reverse order with proper async handling
         shutdown_tasks = []
 
-        if hasattr(app.state, 'memory_manager'):
+        if hasattr(app.state, "memory_manager"):
             shutdown_tasks.append(shutdown_memory_manager())
 
-        if hasattr(app.state, 'response_cache'):
+        if hasattr(app.state, "response_cache"):
             shutdown_tasks.append(shutdown_caches())
 
         # Shutdown context condensation cache
-        if hasattr(app.state, 'lru_cache') and app.state.lru_cache:
+        if hasattr(app.state, "lru_cache") and app.state.lru_cache:
             shutdown_tasks.append(app.state.lru_cache.shutdown())
 
         # Shutdown alerting system
@@ -214,13 +234,12 @@ async def lifespan(app: FastAPI):
     logger.info("LLM Proxy API shutdown complete")
 
 
-
 # FastAPI app setup
 app = FastAPI(
     title=settings.app_name,
     version=settings.app_version,
     description="High-performance LLM proxy with intelligent routing and fallback",
-    lifespan=lifespan
+    lifespan=lifespan,
 )
 
 # Include new API routers
@@ -261,12 +280,12 @@ app.add_middleware(GZipMiddleware, minimum_size=1000)
 # Additional models endpoint is now handled by the new model controller
 
 # Global exception handler is now managed by the error handling framework in src/api/errors/
-            
+
 if __name__ == "__main__":
     uvicorn.run(
         app,
         host=settings.host,
         port=settings.port,
         reload=settings.debug,
-        log_level=log_level.lower()
+        log_level=log_level.lower(),
     )

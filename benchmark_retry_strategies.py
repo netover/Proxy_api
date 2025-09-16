@@ -19,8 +19,10 @@ from src.core.http_client_v2 import AdvancedHTTPClient
 logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
 
+
 class RetryBenchmarkResult:
     """Container for retry benchmark results"""
+
     def __init__(self, client_name: str):
         self.client_name = client_name
         self.total_requests: int = 0
@@ -39,15 +41,22 @@ class RetryBenchmarkResult:
 
     @property
     def success_rate(self) -> float:
-        return (self.successful_requests / self.total_requests * 100) if self.total_requests > 0 else 0
+        return (
+            (self.successful_requests / self.total_requests * 100)
+            if self.total_requests > 0
+            else 0
+        )
 
     @property
     def avg_response_time(self) -> float:
-        return statistics.mean(self.response_times) if self.response_times else 0
+        return (
+            statistics.mean(self.response_times) if self.response_times else 0
+        )
 
     @property
     def avg_retry_delay(self) -> float:
         return statistics.mean(self.retry_delays) if self.retry_delays else 0
+
 
 async def benchmark_retry_strategies():
     """Benchmark retry strategies performance for both HTTP clients"""
@@ -60,23 +69,23 @@ async def benchmark_retry_strategies():
         {
             "name": "Normal Operation (200 OK)",
             "url": "https://httpbin.org/status/200",
-            "expected_failures": 0
+            "expected_failures": 0,
         },
         {
             "name": "Temporary Server Error (500)",
             "url": "https://httpbin.org/status/500",
-            "expected_failures": 1  # Should retry and eventually succeed with delay
+            "expected_failures": 1,  # Should retry and eventually succeed with delay
         },
         {
             "name": "Rate Limiting (429)",
             "url": "https://httpbin.org/status/429",
-            "expected_failures": 1
+            "expected_failures": 1,
         },
         {
             "name": "Timeout Simulation",
             "url": "https://httpbin.org/delay/15",  # 15 second delay
-            "expected_failures": 1
-        }
+            "expected_failures": 1,
+        },
     ]
 
     num_requests_per_scenario = 10
@@ -97,7 +106,7 @@ async def benchmark_retry_strategies():
             OptimizedHTTPClient,
             "OptimizedHTTPClient_v1",
             scenario["url"],
-            num_requests_per_scenario
+            num_requests_per_scenario,
         )
 
         # Test AdvancedHTTPClient (v2)
@@ -106,20 +115,21 @@ async def benchmark_retry_strategies():
             AdvancedHTTPClient,
             "AdvancedHTTPClient_v2",
             scenario["url"],
-            num_requests_per_scenario
+            num_requests_per_scenario,
         )
 
-        results[scenario["name"]] = {
-            "v1": v1_result,
-            "v2": v2_result
-        }
+        results[scenario["name"]] = {"v1": v1_result, "v2": v2_result}
 
         # Print scenario results
         print(f"  Results for {scenario['name']}:")
         print(f"    V1 Success Rate: {v1_result.success_rate:.1f}%")
         print(f"    V2 Success Rate: {v2_result.success_rate:.1f}%")
-        print(f"    V1 Avg Response Time: {v1_result.avg_response_time*1000:.2f}ms")
-        print(f"    V2 Avg Response Time: {v2_result.avg_response_time*1000:.2f}ms")
+        print(
+            f"    V1 Avg Response Time: {v1_result.avg_response_time*1000:.2f}ms"
+        )
+        print(
+            f"    V2 Avg Response Time: {v2_result.avg_response_time*1000:.2f}ms"
+        )
         print(f"    V1 Total Retries: {v1_result.total_retries}")
         print(f"    V2 Total Retries: {v2_result.total_retries}")
         print()
@@ -129,12 +139,20 @@ async def benchmark_retry_strategies():
     print("RETRY STRATEGIES BENCHMARK SUMMARY")
     print("=" * 60)
 
-    total_v1_success = sum(r["v1"].successful_requests for r in results.values())
-    total_v2_success = sum(r["v2"].successful_requests for r in results.values())
+    total_v1_success = sum(
+        r["v1"].successful_requests for r in results.values()
+    )
+    total_v2_success = sum(
+        r["v2"].successful_requests for r in results.values()
+    )
     total_requests = sum(r["v1"].total_requests for r in results.values())
 
-    overall_v1_success_rate = total_v1_success / total_requests * 100 if total_requests > 0 else 0
-    overall_v2_success_rate = total_v2_success / total_requests * 100 if total_requests > 0 else 0
+    overall_v1_success_rate = (
+        total_v1_success / total_requests * 100 if total_requests > 0 else 0
+    )
+    overall_v2_success_rate = (
+        total_v2_success / total_requests * 100 if total_requests > 0 else 0
+    )
 
     print(f"Overall Success Rate:")
     print(f"  V1 (Optimized): {overall_v1_success_rate:.1f}%")
@@ -150,25 +168,27 @@ async def benchmark_retry_strategies():
         v2_rate = scenario_results["v2"].success_rate
         improvement = v2_rate - v1_rate
         print(f"  {scenario_name}:")
-        print(".1f"
-              ".1f"
-              "+.1f")
+        print(".1f" ".1f" "+.1f")
 
     # Detailed metrics
     print("\nDetailed Metrics by Scenario:")
     print("-" * 35)
     for scenario_name, scenario_results in results.items():
         print(f"\n{scenario_name}:")
-        print("  V1 Metrics:", json.dumps(scenario_results["v1"].metrics, indent=4, default=str))
-        print("  V2 Metrics:", json.dumps(scenario_results["v2"].metrics, indent=4, default=str))
+        print(
+            "  V1 Metrics:",
+            json.dumps(scenario_results["v1"].metrics, indent=4, default=str),
+        )
+        print(
+            "  V2 Metrics:",
+            json.dumps(scenario_results["v2"].metrics, indent=4, default=str),
+        )
 
     return results
 
+
 async def run_retry_test(
-    client_class,
-    client_name: str,
-    url: str,
-    num_requests: int
+    client_class, client_name: str, url: str, num_requests: int
 ) -> RetryBenchmarkResult:
     """Run retry test for a specific client and scenario"""
 
@@ -182,14 +202,14 @@ async def run_retry_test(
             max_connections=20,
             timeout=10.0,
             retry_attempts=3,
-            retry_backoff_factor=0.5
+            retry_backoff_factor=0.5,
         )
     else:  # AdvancedHTTPClient
         client = client_class(
             provider_name="retry_test",
             max_keepalive_connections=10,
             max_connections=20,
-            timeout=10.0
+            timeout=10.0,
         )
 
     async with client:
@@ -222,12 +242,13 @@ async def run_retry_test(
     try:
         result.metrics = client.get_metrics()
         # Add retry-specific metrics for v2
-        if hasattr(client, 'get_retry_metrics'):
-            result.metrics['retry_metrics'] = client.get_retry_metrics()
+        if hasattr(client, "get_retry_metrics"):
+            result.metrics["retry_metrics"] = client.get_retry_metrics()
     except Exception as e:
         result.metrics = {"error": str(e)}
 
     return result
+
 
 if __name__ == "__main__":
     asyncio.run(benchmark_retry_strategies())

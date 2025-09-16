@@ -15,6 +15,7 @@ from opentelemetry.trace.status import Status, StatusCode
 
 # --- Structlog Configuration ---
 
+
 def setup_logging(log_level: str = "INFO"):
     """
     Configures the logging system to use structlog with OpenTelemetry integration.
@@ -31,7 +32,8 @@ def setup_logging(log_level: str = "INFO"):
 
     # Configure structlog to wrap the standard logging library
     structlog.configure(
-        processors=shared_processors + [
+        processors=shared_processors
+        + [
             # Prepare event dict for the renderer.
             structlog.stdlib.ProcessorFormatter.wrap_for_formatter,
         ],
@@ -70,6 +72,7 @@ class StructuredLogger:
     """
     A telemetry-aware logger that creates structured logs and integrates with OpenTelemetry spans.
     """
+
     def __init__(self, name: str):
         self.logger = structlog.get_logger(name)
         self.tracer = trace.get_tracer(name)
@@ -84,7 +87,9 @@ class StructuredLogger:
             name: The name of the span (e.g., "proxy_request").
             attributes: A dictionary of attributes to add to the span.
         """
-        with self.tracer.start_as_current_span(name, attributes=attributes) as span:
+        with self.tracer.start_as_current_span(
+            name, attributes=attributes
+        ) as span:
             span_context = span.get_span_context()
             context = {
                 "trace_id": f"0x{span_context.trace_id:032x}",
@@ -117,6 +122,10 @@ class StructuredLogger:
         """Logs a debug message."""
         self.logger.debug(message, **kwargs)
 
+
 # For backward compatibility, provide a logger instance.
 # In a real app, this would be instantiated per-module.
 logger = StructuredLogger(__name__)
+
+# Alias for backward compatibility with older tests and modules
+ContextualLogger = StructuredLogger

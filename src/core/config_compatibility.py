@@ -44,7 +44,7 @@ class LegacyFormatDetector:
             return False
 
         try:
-            with open(path, 'r', encoding='utf-8') as f:
+            with open(path, "r", encoding="utf-8") as f:
                 data = json.load(f)
 
             # Legacy format: {"provider": "model_name"}
@@ -53,7 +53,7 @@ class LegacyFormatDetector:
                 for key, value in data.items():
                     if isinstance(value, str):
                         return True  # Legacy format detected
-                    elif isinstance(value, dict) and 'model_name' in value:
+                    elif isinstance(value, dict) and "model_name" in value:
                         continue  # New format
                     else:
                         return False  # Invalid format
@@ -68,7 +68,7 @@ class LegacyFormatDetector:
             return False
 
         try:
-            with open(path, 'r', encoding='utf-8') as f:
+            with open(path, "r", encoding="utf-8") as f:
                 data = yaml.safe_load(f)
 
             if not isinstance(data, dict):
@@ -78,13 +78,20 @@ class LegacyFormatDetector:
             # - Flat structure instead of nested
             # - Different key names
             legacy_indicators = [
-                'providers' in data and isinstance(data['providers'], list) and
-                len(data['providers']) > 0 and
-                isinstance(data['providers'][0], dict) and
-                'name' in data['providers'][0] and
-                'type' not in data['providers'][0],  # Legacy doesn't have 'type'
-                'host' in data and 'port' in data and 'providers' not in data,  # Flat structure
-                'api_keys' in data and isinstance(data['api_keys'], str),  # Legacy api_keys as string
+                "providers" in data
+                and isinstance(data["providers"], list)
+                and len(data["providers"]) > 0
+                and isinstance(data["providers"][0], dict)
+                and "name" in data["providers"][0]
+                and "type"
+                not in data["providers"][0],  # Legacy doesn't have 'type'
+                "host" in data
+                and "port" in data
+                and "providers" not in data,  # Flat structure
+                "api_keys" in data
+                and isinstance(
+                    data["api_keys"], str
+                ),  # Legacy api_keys as string
             ]
 
             return any(legacy_indicators)
@@ -98,14 +105,14 @@ class LegacyFormatDetector:
             return False
 
         try:
-            with open(path, 'r', encoding='utf-8') as f:
+            with open(path, "r", encoding="utf-8") as f:
                 content = f.read()
 
             # Legacy indicators in Python files:
             legacy_indicators = [
-                'PRODUCTION_CONFIG' in content and 'old_key_name' in content,
-                'legacy_config_format' in content,
-                'deprecated_config_keys' in content,
+                "PRODUCTION_CONFIG" in content and "old_key_name" in content,
+                "legacy_config_format" in content,
+                "deprecated_config_keys" in content,
             ]
 
             return any(legacy_indicators)
@@ -119,10 +126,12 @@ class LegacyConfigMigrator:
     def __init__(self):
         self.migration_warnings: List[str] = []
 
-    def migrate_model_selections(self, legacy_path: Path, new_path: Path) -> bool:
+    def migrate_model_selections(
+        self, legacy_path: Path, new_path: Path
+    ) -> bool:
         """Migrate legacy model selections to new format"""
         try:
-            with open(legacy_path, 'r', encoding='utf-8') as f:
+            with open(legacy_path, "r", encoding="utf-8") as f:
                 legacy_data = json.load(f)
 
             # Convert legacy format to new format
@@ -132,18 +141,18 @@ class LegacyConfigMigrator:
                     new_data[provider] = {
                         "model_name": model_name,
                         "editable": True,
-                        "last_updated": datetime.now().isoformat()
+                        "last_updated": datetime.now().isoformat(),
                     }
                 else:
                     # Already in new format
                     new_data[provider] = model_name
 
             # Write migrated data
-            with open(new_path, 'w', encoding='utf-8') as f:
+            with open(new_path, "w", encoding="utf-8") as f:
                 json.dump(new_data, f, indent=2, ensure_ascii=False)
 
             # Backup legacy file
-            backup_path = legacy_path.with_suffix('.legacy.json')
+            backup_path = legacy_path.with_suffix(".legacy.json")
             legacy_path.rename(backup_path)
 
             self.migration_warnings.append(
@@ -151,7 +160,9 @@ class LegacyConfigMigrator:
                 f"Legacy file backed up as {backup_path}"
             )
 
-            logger.info(f"Successfully migrated model selections from {legacy_path} to {new_path}")
+            logger.info(
+                f"Successfully migrated model selections from {legacy_path} to {new_path}"
+            )
             return True
 
         except Exception as e:
@@ -161,18 +172,24 @@ class LegacyConfigMigrator:
     def migrate_yaml_config(self, legacy_path: Path, new_path: Path) -> bool:
         """Migrate legacy YAML configuration to new format"""
         try:
-            with open(legacy_path, 'r', encoding='utf-8') as f:
+            with open(legacy_path, "r", encoding="utf-8") as f:
                 legacy_data = yaml.safe_load(f)
 
             # Convert legacy flat structure to new nested structure
             new_data = self._convert_legacy_yaml_structure(legacy_data)
 
             # Write migrated data
-            with open(new_path, 'w', encoding='utf-8') as f:
-                yaml.safe_dump(new_data, f, default_flow_style=False, allow_unicode=True, indent=2)
+            with open(new_path, "w", encoding="utf-8") as f:
+                yaml.safe_dump(
+                    new_data,
+                    f,
+                    default_flow_style=False,
+                    allow_unicode=True,
+                    indent=2,
+                )
 
             # Backup legacy file
-            backup_path = legacy_path.with_suffix('.legacy.yaml')
+            backup_path = legacy_path.with_suffix(".legacy.yaml")
             legacy_path.rename(backup_path)
 
             self.migration_warnings.append(
@@ -180,7 +197,9 @@ class LegacyConfigMigrator:
                 f"Legacy file backed up as {backup_path}"
             )
 
-            logger.info(f"Successfully migrated YAML config from {legacy_path} to {new_path}")
+            logger.info(
+                f"Successfully migrated YAML config from {legacy_path} to {new_path}"
+            )
             return True
 
         except Exception as e:
@@ -194,11 +213,11 @@ class LegacyConfigMigrator:
             # and import the legacy config to extract values
             new_config_content = self._generate_new_python_config()
 
-            with open(new_path, 'w', encoding='utf-8') as f:
+            with open(new_path, "w", encoding="utf-8") as f:
                 f.write(new_config_content)
 
             # Backup legacy file
-            backup_path = legacy_path.with_suffix('.legacy.py')
+            backup_path = legacy_path.with_suffix(".legacy.py")
             legacy_path.rename(backup_path)
 
             self.migration_warnings.append(
@@ -206,14 +225,18 @@ class LegacyConfigMigrator:
                 f"Legacy file backed up as {backup_path}"
             )
 
-            logger.info(f"Successfully migrated Python config from {legacy_path} to {new_path}")
+            logger.info(
+                f"Successfully migrated Python config from {legacy_path} to {new_path}"
+            )
             return True
 
         except Exception as e:
             logger.error(f"Failed to migrate Python config: {e}")
             return False
 
-    def _convert_legacy_yaml_structure(self, legacy_data: Dict[str, Any]) -> Dict[str, Any]:
+    def _convert_legacy_yaml_structure(
+        self, legacy_data: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Convert legacy YAML structure to new format"""
         new_data = {}
 
@@ -221,54 +244,73 @@ class LegacyConfigMigrator:
         settings = {}
 
         # Handle global settings
-        settings_keys = ['app_name', 'app_version', 'debug', 'host', 'port', 'api_keys']
+        settings_keys = [
+            "app_name",
+            "app_version",
+            "debug",
+            "host",
+            "port",
+            "api_keys",
+        ]
         for key in settings_keys:
             if key in legacy_data:
                 settings[key] = legacy_data[key]
 
         # Handle api_keys conversion
-        if 'api_keys' in legacy_data and isinstance(legacy_data['api_keys'], str):
-            settings['api_keys'] = [k.strip() for k in legacy_data['api_keys'].split(',') if k.strip()]
+        if "api_keys" in legacy_data and isinstance(
+            legacy_data["api_keys"], str
+        ):
+            settings["api_keys"] = [
+                k.strip()
+                for k in legacy_data["api_keys"].split(",")
+                if k.strip()
+            ]
 
         # Set default values for missing settings
-        settings.setdefault('app_name', 'LLM Proxy API')
-        settings.setdefault('app_version', '2.0.0')
-        settings.setdefault('debug', False)
-        settings.setdefault('host', '127.0.0.1')
-        settings.setdefault('port', 8000)
-        settings.setdefault('api_keys', [])
+        settings.setdefault("app_name", "LLM Proxy API")
+        settings.setdefault("app_version", "2.0.0")
+        settings.setdefault("debug", False)
+        settings.setdefault("host", "127.0.0.1")
+        settings.setdefault("port", 8000)
+        settings.setdefault("api_keys", [])
 
-        new_data['settings'] = settings
+        new_data["settings"] = settings
 
         # Handle providers
-        if 'providers' in legacy_data:
-            new_data['providers'] = []
-            for provider in legacy_data['providers']:
+        if "providers" in legacy_data:
+            new_data["providers"] = []
+            for provider in legacy_data["providers"]:
                 new_provider = {
-                    'name': provider.get('name', ''),
-                    'type': provider.get('type', 'openai'),  # Default to openai
-                    'base_url': provider.get('base_url', 'https://api.openai.com/v1'),
-                    'api_key_env': provider.get('api_key_env', 'API_KEY'),
-                    'models': provider.get('models', []),
-                    'enabled': provider.get('enabled', True),
-                    'priority': provider.get('priority', 100),
-                    'timeout': provider.get('timeout', 30),
-                    'max_retries': provider.get('max_retries', 3),
+                    "name": provider.get("name", ""),
+                    "type": provider.get(
+                        "type", "openai"
+                    ),  # Default to openai
+                    "base_url": provider.get(
+                        "base_url", "https://api.openai.com/v1"
+                    ),
+                    "api_key_env": provider.get("api_key_env", "API_KEY"),
+                    "models": provider.get("models", []),
+                    "enabled": provider.get("enabled", True),
+                    "priority": provider.get("priority", 100),
+                    "timeout": provider.get("timeout", 30),
+                    "max_retries": provider.get("max_retries", 3),
                 }
-                new_data['providers'].append(new_provider)
+                new_data["providers"].append(new_provider)
         else:
             # Default provider if none specified
-            new_data['providers'] = [{
-                'name': 'openai_default',
-                'type': 'openai',
-                'base_url': 'https://api.openai.com/v1',
-                'api_key_env': 'OPENAI_API_KEY',
-                'models': ['gpt-3.5-turbo'],
-                'enabled': True,
-                'priority': 100,
-                'timeout': 30,
-                'max_retries': 3,
-            }]
+            new_data["providers"] = [
+                {
+                    "name": "openai_default",
+                    "type": "openai",
+                    "base_url": "https://api.openai.com/v1",
+                    "api_key_env": "OPENAI_API_KEY",
+                    "models": ["gpt-3.5-turbo"],
+                    "enabled": True,
+                    "priority": 100,
+                    "timeout": 30,
+                    "max_retries": 3,
+                }
+            ]
 
         return new_data
 
@@ -310,29 +352,43 @@ class ConfigCompatibilityLayer:
     def enable_migration(self, enabled: bool = True):
         """Enable or disable automatic migration"""
         self._migration_enabled = enabled
-        logger.info(f"Configuration migration {'enabled' if enabled else 'disabled'}")
+        logger.info(
+            f"Configuration migration {'enabled' if enabled else 'disabled'}"
+        )
 
     def enable_rollback(self, enabled: bool = True):
         """Enable or disable rollback capability"""
         self._rollback_enabled = enabled
-        logger.info(f"Configuration rollback {'enabled' if enabled else 'disabled'}")
+        logger.info(
+            f"Configuration rollback {'enabled' if enabled else 'disabled'}"
+        )
 
-    def migrate_on_demand(self, format_type: str, config_path: Optional[Path] = None) -> bool:
+    def migrate_on_demand(
+        self, format_type: str, config_path: Optional[Path] = None
+    ) -> bool:
         """Perform migration on demand for specific format type"""
         config_path = config_path or Path("config.yaml")
 
         success = False
         if format_type == "model_selections":
             model_selections_path = Path("config/model_selections.json")
-            if self.detector.detect_legacy_model_selections(model_selections_path):
-                success = self.migrator.migrate_model_selections(model_selections_path, model_selections_path)
+            if self.detector.detect_legacy_model_selections(
+                model_selections_path
+            ):
+                success = self.migrator.migrate_model_selections(
+                    model_selections_path, model_selections_path
+                )
         elif format_type == "yaml_config":
             if self.detector.detect_legacy_yaml_config(config_path):
-                success = self.migrator.migrate_yaml_config(config_path, config_path)
+                success = self.migrator.migrate_yaml_config(
+                    config_path, config_path
+                )
         elif format_type == "python_config":
             python_config_path = Path("production_config.py")
             if self.detector.detect_legacy_python_config(python_config_path):
-                success = self.migrator.migrate_python_config(python_config_path, python_config_path)
+                success = self.migrator.migrate_python_config(
+                    python_config_path, python_config_path
+                )
 
         if success:
             self._record_migration(format_type, "manual")
@@ -340,7 +396,9 @@ class ConfigCompatibilityLayer:
 
         return success
 
-    def rollback_migration(self, format_type: str, config_path: Optional[Path] = None) -> bool:
+    def rollback_migration(
+        self, format_type: str, config_path: Optional[Path] = None
+    ) -> bool:
         """Rollback migration for specific format type"""
         if not self._rollback_enabled:
             logger.warning("Rollback is disabled")
@@ -356,7 +414,9 @@ class ConfigCompatibilityLayer:
             elif format_type == "python_config":
                 return self._rollback_python_config()
             else:
-                logger.error(f"Unknown format type for rollback: {format_type}")
+                logger.error(
+                    f"Unknown format type for rollback: {format_type}"
+                )
                 return False
         except Exception as e:
             logger.error(f"Failed to rollback {format_type}: {e}")
@@ -368,12 +428,14 @@ class ConfigCompatibilityLayer:
         current_path = Path("config/model_selections.json")
 
         if not legacy_path.exists():
-            logger.warning("No legacy model selections backup found for rollback")
+            logger.warning(
+                "No legacy model selections backup found for rollback"
+            )
             return False
 
         # Backup current file
         if current_path.exists():
-            current_path.rename(current_path.with_suffix('.rollback.json'))
+            current_path.rename(current_path.with_suffix(".rollback.json"))
 
         # Restore legacy file
         legacy_path.rename(current_path)
@@ -383,20 +445,24 @@ class ConfigCompatibilityLayer:
 
     def _rollback_yaml_config(self, config_path: Path) -> bool:
         """Rollback YAML config migration"""
-        legacy_path = config_path.with_suffix('.legacy.yaml')
+        legacy_path = config_path.with_suffix(".legacy.yaml")
 
         if not legacy_path.exists():
-            logger.warning(f"No legacy YAML config backup found for rollback: {legacy_path}")
+            logger.warning(
+                f"No legacy YAML config backup found for rollback: {legacy_path}"
+            )
             return False
 
         # Backup current file
         if config_path.exists():
-            config_path.rename(config_path.with_suffix('.rollback.yaml'))
+            config_path.rename(config_path.with_suffix(".rollback.yaml"))
 
         # Restore legacy file
         legacy_path.rename(config_path)
 
-        logger.info(f"Successfully rolled back YAML config migration: {config_path}")
+        logger.info(
+            f"Successfully rolled back YAML config migration: {config_path}"
+        )
         return True
 
     def _rollback_python_config(self) -> bool:
@@ -410,7 +476,7 @@ class ConfigCompatibilityLayer:
 
         # Backup current file
         if current_path.exists():
-            current_path.rename(current_path.with_suffix('.rollback.py'))
+            current_path.rename(current_path.with_suffix(".rollback.py"))
 
         # Restore legacy file
         legacy_path.rename(current_path)
@@ -420,28 +486,40 @@ class ConfigCompatibilityLayer:
 
     def _record_migration(self, format_type: str, migration_type: str):
         """Record migration in history"""
-        self._migration_history.append({
-            "format_type": format_type,
-            "migration_type": migration_type,
-            "timestamp": datetime.now().isoformat(),
-            "version": "1.0"
-        })
+        self._migration_history.append(
+            {
+                "format_type": format_type,
+                "migration_type": migration_type,
+                "timestamp": datetime.now().isoformat(),
+                "version": "1.0",
+            }
+        )
 
     def get_migration_history(self) -> List[Dict[str, Any]]:
         """Get migration history"""
         return self._migration_history.copy()
 
-    def check_legacy_formats(self, config_path: Optional[Path] = None) -> Dict[str, bool]:
+    def check_legacy_formats(
+        self, config_path: Optional[Path] = None
+    ) -> Dict[str, bool]:
         """Check which legacy formats are present"""
         config_path = config_path or Path("config.yaml")
 
         return {
-            "model_selections": self.detector.detect_legacy_model_selections(Path("config/model_selections.json")),
-            "yaml_config": self.detector.detect_legacy_yaml_config(config_path),
-            "python_config": self.detector.detect_legacy_python_config(Path("production_config.py"))
+            "model_selections": self.detector.detect_legacy_model_selections(
+                Path("config/model_selections.json")
+            ),
+            "yaml_config": self.detector.detect_legacy_yaml_config(
+                config_path
+            ),
+            "python_config": self.detector.detect_legacy_python_config(
+                Path("production_config.py")
+            ),
         }
 
-    def load_config_with_compatibility(self, config_path: Optional[Path] = None) -> Any:
+    def load_config_with_compatibility(
+        self, config_path: Optional[Path] = None
+    ) -> Any:
         """Load configuration with legacy format compatibility"""
         config_path = config_path or Path("config.yaml")
 
@@ -462,14 +540,18 @@ class ConfigCompatibilityLayer:
         if self.detector.detect_legacy_model_selections(model_selections_path):
             self._migrate_with_warning(
                 "model_selections",
-                lambda: self.migrator.migrate_model_selections(model_selections_path, model_selections_path)
+                lambda: self.migrator.migrate_model_selections(
+                    model_selections_path, model_selections_path
+                ),
             )
 
         # Check YAML config
         if self.detector.detect_legacy_yaml_config(config_path):
             self._migrate_with_warning(
                 "yaml_config",
-                lambda: self.migrator.migrate_yaml_config(config_path, config_path)
+                lambda: self.migrator.migrate_yaml_config(
+                    config_path, config_path
+                ),
             )
 
         # Check Python config
@@ -477,7 +559,9 @@ class ConfigCompatibilityLayer:
         if self.detector.detect_legacy_python_config(python_config_path):
             self._migrate_with_warning(
                 "python_config",
-                lambda: self.migrator.migrate_python_config(python_config_path, python_config_path)
+                lambda: self.migrator.migrate_python_config(
+                    python_config_path, python_config_path
+                ),
             )
 
     def _migrate_with_warning(self, format_type: str, migration_func):
@@ -490,7 +574,7 @@ class ConfigCompatibilityLayer:
                 "Automatic migration will be performed. "
                 "Please update your configuration to use the new format.",
                 DeprecationWarning,
-                stacklevel=3
+                stacklevel=3,
             )
             self._warnings_shown.add(warning_key)
 
@@ -519,7 +603,7 @@ class ConfigCompatibilityLayer:
             "migration_warnings": self.migrator.migration_warnings.copy(),
             "migration_history": self.get_migration_history(),
             "legacy_formats_detected": legacy_formats,
-            "migration_needed": any(legacy_formats.values())
+            "migration_needed": any(legacy_formats.values()),
         }
 
 
@@ -548,7 +632,9 @@ def migrate_legacy_configs():
     config_compatibility._check_and_migrate_legacy_formats(Path("config.yaml"))
 
 
-def migrate_specific_format(format_type: str, config_path: Optional[Path] = None):
+def migrate_specific_format(
+    format_type: str, config_path: Optional[Path] = None
+):
     """Migrate a specific legacy format on demand"""
     return config_compatibility.migrate_on_demand(format_type, config_path)
 
@@ -571,11 +657,13 @@ def get_migration_report():
     return {
         **status,
         "recommendations": _generate_migration_recommendations(legacy_check),
-        "next_steps": _generate_next_steps(legacy_check)
+        "next_steps": _generate_next_steps(legacy_check),
     }
 
 
-def _generate_migration_recommendations(legacy_check: Dict[str, bool]) -> List[str]:
+def _generate_migration_recommendations(
+    legacy_check: Dict[str, bool],
+) -> List[str]:
     """Generate migration recommendations based on detected legacy formats"""
     recommendations = []
 
@@ -595,7 +683,9 @@ def _generate_migration_recommendations(legacy_check: Dict[str, bool]) -> List[s
         )
 
     if not any(legacy_check.values()):
-        recommendations.append("No legacy formats detected - system is up to date")
+        recommendations.append(
+            "No legacy formats detected - system is up to date"
+        )
 
     return recommendations
 
@@ -605,15 +695,19 @@ def _generate_next_steps(legacy_check: Dict[str, bool]) -> List[str]:
     next_steps = []
 
     if any(legacy_check.values()):
-        next_steps.extend([
-            "1. Review migration recommendations above",
-            "2. Backup your current configuration files",
-            "3. Run individual migrations using migrate_specific_format()",
-            "4. Test your application with migrated configurations",
-            "5. Remove legacy backup files after verification"
-        ])
+        next_steps.extend(
+            [
+                "1. Review migration recommendations above",
+                "2. Backup your current configuration files",
+                "3. Run individual migrations using migrate_specific_format()",
+                "4. Test your application with migrated configurations",
+                "5. Remove legacy backup files after verification",
+            ]
+        )
     else:
-        next_steps.append("No action required - all configurations are current")
+        next_steps.append(
+            "No action required - all configurations are current"
+        )
 
     return next_steps
 
@@ -632,7 +726,7 @@ if __name__ == "__main__":
     print()
 
     # Show legacy format status
-    legacy_formats = report['legacy_formats_detected']
+    legacy_formats = report["legacy_formats_detected"]
     print("Legacy format detection:")
     for format_type, detected in legacy_formats.items():
         status = "DETECTED" if detected else "Not detected"
@@ -641,27 +735,29 @@ if __name__ == "__main__":
     print()
 
     # Show recommendations
-    if report['recommendations']:
+    if report["recommendations"]:
         print("Migration recommendations:")
-        for rec in report['recommendations']:
+        for rec in report["recommendations"]:
             print(f"  • {rec}")
 
     print()
 
     # Show next steps
-    if report['next_steps']:
+    if report["next_steps"]:
         print("Next steps:")
-        for step in report['next_steps']:
+        for step in report["next_steps"]:
             print(f"  {step}")
 
     print()
 
     # Show migration history
-    history = report['migration_history']
+    history = report["migration_history"]
     if history:
         print("Migration history:")
         for migration in history:
-            print(f"  • {migration['format_type']} ({migration['migration_type']}) - {migration['timestamp']}")
+            print(
+                f"  • {migration['format_type']} ({migration['migration_type']}) - {migration['timestamp']}"
+            )
     else:
         print("No migration history available.")
 

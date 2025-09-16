@@ -10,6 +10,7 @@ import aiohttp
 import json
 from typing import Dict, List
 
+
 class RateLimitTester:
     """Test per-route rate limiting functionality"""
 
@@ -33,11 +34,13 @@ class RateLimitTester:
             default_headers.update(headers)
 
         try:
-            async with self.session.get(url, headers=default_headers) as response:
+            async with self.session.get(
+                url, headers=default_headers
+            ) as response:
                 result = {
                     "status": response.status,
                     "endpoint": endpoint,
-                    "rate_limit_hit": False
+                    "rate_limit_hit": False,
                 }
 
                 if response.status == 429:
@@ -46,18 +49,18 @@ class RateLimitTester:
 
                 return result
         except Exception as e:
-            return {
-                "status": "error",
-                "endpoint": endpoint,
-                "error": str(e)
-            }
+            return {"status": "error", "endpoint": endpoint, "error": str(e)}
 
-    async def test_rate_limits(self, endpoints: List[str], requests_per_endpoint: int = 10) -> Dict:
+    async def test_rate_limits(
+        self, endpoints: List[str], requests_per_endpoint: int = 10
+    ) -> Dict:
         """Test rate limits for multiple endpoints"""
         results = {}
 
         for endpoint in endpoints:
-            print(f"Testing {endpoint} with {requests_per_endpoint} requests...")
+            print(
+                f"Testing {endpoint} with {requests_per_endpoint} requests..."
+            )
             endpoint_results = []
 
             # Make requests in quick succession to trigger rate limits
@@ -84,28 +87,38 @@ class RateLimitTester:
         analysis = {}
 
         for endpoint, requests in results.items():
-            rate_limit_hits = sum(1 for r in requests if r.get("rate_limit_hit"))
+            rate_limit_hits = sum(
+                1 for r in requests if r.get("rate_limit_hit")
+            )
             total_requests = len(requests)
-            first_hit_index = next((i for i, r in enumerate(requests) if r.get("rate_limit_hit")), None)
+            first_hit_index = next(
+                (i for i, r in enumerate(requests) if r.get("rate_limit_hit")),
+                None,
+            )
 
             analysis[endpoint] = {
                 "total_requests": total_requests,
                 "rate_limit_hits": rate_limit_hits,
                 "first_rate_limit_at": first_hit_index,
-                "rate_limit_percentage": (rate_limit_hits / total_requests) * 100 if total_requests > 0 else 0
+                "rate_limit_percentage": (
+                    (rate_limit_hits / total_requests) * 100
+                    if total_requests > 0
+                    else 0
+                ),
             }
 
         return analysis
 
+
 async def main():
     """Main test function"""
     endpoints_to_test = [
-        "/health",           # Should allow 1000/minute
-        "/v1/health",        # Should allow 1000/minute
-        "/v1/models",        # Should allow 200/minute
-        "/v1/status",        # Should allow 500/minute
-        "/v1/metrics",       # Should allow 500/minute
-        "/v1/providers",     # Should allow 200/minute
+        "/health",  # Should allow 1000/minute
+        "/v1/health",  # Should allow 1000/minute
+        "/v1/models",  # Should allow 200/minute
+        "/v1/status",  # Should allow 500/minute
+        "/v1/metrics",  # Should allow 500/minute
+        "/v1/providers",  # Should allow 200/minute
     ]
 
     print("Starting per-route rate limiting tests...")
@@ -120,7 +133,9 @@ async def main():
 
     async with RateLimitTester() as tester:
         # Test with fewer requests to avoid overwhelming the server
-        results = await tester.test_rate_limits(endpoints_to_test, requests_per_endpoint=5)
+        results = await tester.test_rate_limits(
+            endpoints_to_test, requests_per_endpoint=5
+        )
 
         print("\nTest Results:")
         analysis = tester.analyze_results(results)
@@ -130,11 +145,14 @@ async def main():
             print(f"  Requests made: {stats['total_requests']}")
             print(f"  Rate limit hits: {stats['rate_limit_hits']}")
             print(".1f")
-            if stats['first_rate_limit_at'] is not None:
-                print(f"  First rate limit at request: {stats['first_rate_limit_at'] + 1}")
+            if stats["first_rate_limit_at"] is not None:
+                print(
+                    f"  First rate limit at request: {stats['first_rate_limit_at'] + 1}"
+                )
             print()
 
         print("Test completed!")
+
 
 if __name__ == "__main__":
     asyncio.run(main())

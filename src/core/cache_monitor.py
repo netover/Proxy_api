@@ -13,6 +13,7 @@ from .metrics import metrics_collector
 from .model_discovery import ModelDiscoveryService
 from .provider_discovery import provider_discovery
 from .unified_cache import get_unified_cache
+from src.providers.registry import ProviderConfig
 
 logger = ContextualLogger(__name__)
 
@@ -20,6 +21,7 @@ logger = ContextualLogger(__name__)
 @dataclass
 class CacheAlert:
     """Cache performance alert"""
+
     alert_type: str
     message: str
     severity: str  # 'low', 'medium', 'high', 'critical'
@@ -55,7 +57,9 @@ class CacheMonitor:
 
         self._running = True
         self._monitoring_task = asyncio.create_task(self._monitoring_loop())
-        logger.info("Cache monitor started", target_hit_rate=self.target_hit_rate)
+        logger.info(
+            "Cache monitor started", target_hit_rate=self.target_hit_rate
+        )
 
     async def stop_monitoring(self):
         """Stop cache monitoring"""
@@ -84,7 +88,7 @@ class CacheMonitor:
             cache = await self._get_cache()
             stats = await cache.get_stats()
 
-            hit_rate = stats.get('hit_rate', 0)
+            hit_rate = stats.get("hit_rate", 0)
             self._last_check_time = time.time()
 
             # Update metrics collector with cache performance data
@@ -99,14 +103,16 @@ class CacheMonitor:
                     severity=severity,
                     timestamp=time.time(),
                     hit_rate=hit_rate,
-                    target_hit_rate=self.target_hit_rate
+                    target_hit_rate=self.target_hit_rate,
                 )
                 self._alerts.append(alert)
-                logger.warning("Cache performance alert",
-                             message=alert.message,
-                             hit_rate=alert.hit_rate,
-                             target_hit_rate=alert.target_hit_rate,
-                             severity=alert.severity)
+                logger.warning(
+                    "Cache performance alert",
+                    message=alert.message,
+                    hit_rate=alert.hit_rate,
+                    target_hit_rate=alert.target_hit_rate,
+                    severity=alert.severity,
+                )
 
                 # Log additional cache statistics
                 logger.info(
@@ -152,8 +158,10 @@ class CacheMonitor:
 
         provider_stats = await provider_discovery.get_cache_stats()
 
-        hit_rate = stats.get('hit_rate', 0)
-        health_status = "healthy" if hit_rate >= self.target_hit_rate else "unhealthy"
+        hit_rate = stats.get("hit_rate", 0)
+        health_status = (
+            "healthy" if hit_rate >= self.target_hit_rate else "unhealthy"
+        )
 
         report = {
             "timestamp": time.time(),
@@ -164,39 +172,51 @@ class CacheMonitor:
             "cache_stats": stats,
             "model_cache_stats": model_stats,
             "provider_cache_stats": provider_stats,
-            "active_alerts": len([a for a in self._alerts if time.time() - a.timestamp < 3600]),  # Last hour
+            "active_alerts": len(
+                [a for a in self._alerts if time.time() - a.timestamp < 3600]
+            ),  # Last hour
             "recent_alerts": [
                 {
                     "type": alert.alert_type,
                     "message": alert.message,
                     "severity": alert.severity,
                     "timestamp": alert.timestamp,
-                    "hit_rate": alert.hit_rate
+                    "hit_rate": alert.hit_rate,
                 }
                 for alert in self._alerts[-10:]  # Last 10 alerts
             ],
-            "recommendations": self._generate_recommendations(hit_rate, stats)
+            "recommendations": self._generate_recommendations(hit_rate, stats),
         }
 
         return report
 
-    def _generate_recommendations(self, hit_rate: float, stats: Dict[str, Any]) -> List[str]:
+    def _generate_recommendations(
+        self, hit_rate: float, stats: Dict[str, Any]
+    ) -> List[str]:
         """Generate recommendations based on cache performance"""
         recommendations = []
 
         if hit_rate < self.target_hit_rate:
-            recommendations.append(f"Cache hit rate is {hit_rate:.2%}, below target {self.target_hit_rate:.2%}")
+            recommendations.append(
+                f"Cache hit rate is {hit_rate:.2%}, below target {self.target_hit_rate:.2%}"
+            )
 
-            if stats.get('evictions', 0) > 100:
-                recommendations.append("High eviction rate detected - consider increasing cache size")
+            if stats.get("evictions", 0) > 100:
+                recommendations.append(
+                    "High eviction rate detected - consider increasing cache size"
+                )
 
-            memory_usage = stats.get('memory_usage_mb', 0)
-            max_memory = stats.get('max_memory_mb', 0)
+            memory_usage = stats.get("memory_usage_mb", 0)
+            max_memory = stats.get("max_memory_mb", 0)
             if memory_usage > max_memory * 0.9:
-                recommendations.append("Cache memory usage is high - consider increasing memory limit")
+                recommendations.append(
+                    "Cache memory usage is high - consider increasing memory limit"
+                )
 
-        if stats.get('entries', 0) < 10:
-            recommendations.append("Cache has very few entries - ensure cache warming is working")
+        if stats.get("entries", 0) < 10:
+            recommendations.append(
+                "Cache has very few entries - ensure cache warming is working"
+            )
 
         return recommendations
 
@@ -205,16 +225,13 @@ class CacheMonitor:
         start_time = time.time()
         logger.info("Starting cache warming process")
 
-        results = {
-            "models_warmed": 0,
-            "providers_warmed": 0,
-            "errors": []
-        }
+        results = {"models_warmed": 0, "providers_warmed": 0, "errors": []}
 
         try:
             # Warm model cache
             model_service = ModelDiscoveryService()
             from src.core.unified_config import config_manager
+
             config = config_manager.load_config()
 
             for provider in config.providers:
@@ -224,23 +241,29 @@ class CacheMonitor:
                             name=provider.name,
                             base_url=provider.base_url,
                             api_key=provider.api_key,
-                            organization=getattr(provider, 'organization', None)
+                            organization=getattr(
+                                provider, "organization", None
+                            ),
                         )
                         await model_service.discover_models(provider_config)
                         results["models_warmed"] += 1
                     except Exception as e:
-                        results["errors"].append(f"Model warming failed for {provider.name}: {e}")
+                        results["errors"].append(
+                            f"Model warming failed for {provider.name}: {e}"
+                        )
 
             # Warm provider cache
             await provider_discovery.get_provider_performance_report()
             results["providers_warmed"] = 1
 
             response_time = time.time() - start_time
-            logger.info("Cache warming completed",
-                       response_time=response_time,
-                       models_warmed=results.get("models_warmed", 0),
-                       providers_warmed=results.get("providers_warmed", 0),
-                       errors=len(results.get("errors", [])))
+            logger.info(
+                "Cache warming completed",
+                response_time=response_time,
+                models_warmed=results.get("models_warmed", 0),
+                providers_warmed=results.get("providers_warmed", 0),
+                errors=len(results.get("errors", [])),
+            )
 
         except Exception as e:
             logger.error(f"Cache warming failed: {e}")

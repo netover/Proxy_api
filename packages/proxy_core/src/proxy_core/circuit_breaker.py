@@ -16,14 +16,16 @@ logger = ContextualLogger(__name__)
 
 class CircuitState(Enum):
     """Circuit breaker states"""
-    CLOSED = "closed"      # Normal operation
-    OPEN = "open"          # Tripped, rejecting requests
-    HALF_OPEN = "half_open" # Testing if service recovered
+
+    CLOSED = "closed"  # Normal operation
+    OPEN = "open"  # Tripped, rejecting requests
+    HALF_OPEN = "half_open"  # Testing if service recovered
 
 
 @dataclass
 class CircuitBreakerMetrics:
     """Metrics for circuit breaker performance"""
+
     total_requests: int = 0
     successful_requests: int = 0
     failed_requests: int = 0
@@ -64,7 +66,7 @@ class ProductionCircuitBreaker:
         success_threshold: int = 3,  # Successes needed to close from half-open
         min_failure_threshold: int = 3,
         max_failure_threshold: int = 20,
-        adaptive_thresholds: bool = True
+        adaptive_thresholds: bool = True,
     ):
         self.name = name
         self.failure_threshold = failure_threshold
@@ -96,12 +98,12 @@ class ProductionCircuitBreaker:
         logger.info(
             f"Circuit breaker initialized for {name}",
             extra={
-                'failure_threshold': failure_threshold,
-                'recovery_timeout': recovery_timeout,
-                'adaptive': adaptive_thresholds
-            }
+                "failure_threshold": failure_threshold,
+                "recovery_timeout": recovery_timeout,
+                "adaptive": adaptive_thresholds,
+            },
         )
-    
+
     def is_closed(self) -> bool:
         """Check if circuit is closed"""
         return self.state == CircuitState.CLOSED
@@ -128,7 +130,9 @@ class ProductionCircuitBreaker:
         if self.ema_success_rate is None:
             self.ema_success_rate = 1.0 if success else 0.0
         else:
-            self.ema_success_rate = (self.ema_alpha * success) + (1 - self.ema_alpha) * self.ema_success_rate
+            self.ema_success_rate = (self.ema_alpha * success) + (
+                1 - self.ema_alpha
+            ) * self.ema_success_rate
 
     def _adapt_thresholds(self):
         """Adapt failure threshold based on success rate"""
@@ -140,14 +144,12 @@ class ProductionCircuitBreaker:
         if success_rate > 0.95:  # Very high success rate
             # Lower threshold - service is reliable
             self.failure_threshold = max(
-                self.min_failure_threshold,
-                self.failure_threshold - 1
+                self.min_failure_threshold, self.failure_threshold - 1
             )
         elif success_rate < 0.80:  # Low success rate
             # Higher threshold - service is unreliable
             self.failure_threshold = min(
-                self.max_failure_threshold,
-                self.failure_threshold + 1
+                self.max_failure_threshold, self.failure_threshold + 1
             )
 
     async def can_execute(self) -> bool:
@@ -158,8 +160,11 @@ class ProductionCircuitBreaker:
 
             if self.state == CircuitState.OPEN:
                 # Check if recovery timeout has elapsed
-                if self.last_failure_time and \
-                   (time.time() - self.last_failure_time) >= self.recovery_timeout:
+                if (
+                    self.last_failure_time
+                    and (time.time() - self.last_failure_time)
+                    >= self.recovery_timeout
+                ):
                     await self._change_state(CircuitState.HALF_OPEN)
                     return True
                 return False
@@ -183,11 +188,11 @@ class ProductionCircuitBreaker:
         logger.info(
             f"Circuit breaker {self.name} state changed",
             extra={
-                'from_state': old_state.value,
-                'to_state': new_state.value,
-                'failure_count': self.failure_count,
-                'success_rate': round(self.get_success_rate(), 3)
-            }
+                "from_state": old_state.value,
+                "to_state": new_state.value,
+                "failure_count": self.failure_count,
+                "success_rate": round(self.get_success_rate(), 3),
+            },
         )
 
     async def on_success(self):
@@ -209,7 +214,7 @@ class ProductionCircuitBreaker:
                     self.failure_count = 0
                     logger.info(
                         f"Circuit breaker {self.name} recovered",
-                        extra={'success_threshold': self.success_threshold}
+                        extra={"success_threshold": self.success_threshold},
                     )
             else:
                 # Reset failure count on success in closed state
@@ -233,7 +238,7 @@ class ProductionCircuitBreaker:
                 self.failure_count = 1
                 logger.error(
                     f"Circuit breaker {self.name} tripped from HALF_OPEN",
-                    extra={'error': str(exception)}
+                    extra={"error": str(exception)},
                 )
             elif self.state == CircuitState.CLOSED:
                 # Increment failure count
@@ -241,10 +246,10 @@ class ProductionCircuitBreaker:
                 logger.warning(
                     f"Circuit breaker {self.name} failure",
                     extra={
-                        'failure_count': self.failure_count,
-                        'threshold': self.failure_threshold,
-                        'error': str(exception)
-                    }
+                        "failure_count": self.failure_count,
+                        "threshold": self.failure_threshold,
+                        "error": str(exception),
+                    },
                 )
 
                 # Check if we should trip the circuit
@@ -252,7 +257,9 @@ class ProductionCircuitBreaker:
                     await self._change_state(CircuitState.OPEN)
                     logger.error(f"Circuit breaker {self.name} TRIPPED")
 
-    async def execute(self, func: Callable[..., Awaitable[Any]], *args, **kwargs) -> Any:
+    async def execute(
+        self, func: Callable[..., Awaitable[Any]], *args, **kwargs
+    ) -> Any:
         """Execute function with circuit breaker protection"""
         if not await self.can_execute():
             retry_after = None
@@ -275,22 +282,25 @@ class ProductionCircuitBreaker:
     def get_metrics(self) -> Dict[str, Any]:
         """Get comprehensive circuit breaker metrics"""
         return {
-            'name': self.name,
-            'state': self.state.value,
-            'failure_threshold': self.failure_threshold,
-            'recovery_timeout': self.recovery_timeout,
-            'current_failure_count': self.failure_count,
-            'success_rate': round(self.get_success_rate(), 4),
-            'total_requests': self.metrics.total_requests,
-            'successful_requests': self.metrics.successful_requests,
-            'failed_requests': self.metrics.failed_requests,
-            'rejected_requests': self.metrics.rejected_requests,
-            'state_changes': self.metrics.state_changes,
-            'total_downtime_seconds': round(self.metrics.total_downtime_seconds, 2),
-            'last_failure_time': self.last_failure_time,
-            'last_success_time': self.last_success_time,
-            'adaptive_thresholds': self.adaptive_thresholds
+            "name": self.name,
+            "state": self.state.value,
+            "failure_threshold": self.failure_threshold,
+            "recovery_timeout": self.recovery_timeout,
+            "current_failure_count": self.failure_count,
+            "success_rate": round(self.get_success_rate(), 4),
+            "total_requests": self.metrics.total_requests,
+            "successful_requests": self.metrics.successful_requests,
+            "failed_requests": self.metrics.failed_requests,
+            "rejected_requests": self.metrics.rejected_requests,
+            "state_changes": self.metrics.state_changes,
+            "total_downtime_seconds": round(
+                self.metrics.total_downtime_seconds, 2
+            ),
+            "last_failure_time": self.last_failure_time,
+            "last_success_time": self.last_success_time,
+            "adaptive_thresholds": self.adaptive_thresholds,
         }
+
 
 # Backward compatibility - keep old CircuitBreaker class
 class CircuitBreaker:
@@ -301,7 +311,7 @@ class CircuitBreaker:
         name: str,
         failure_threshold: int = 5,
         recovery_timeout: int = 60,
-        expected_exception: tuple = (Exception,)
+        expected_exception: tuple = (Exception,),
     ):
         # Create a production circuit breaker internally
         self._breaker = ProductionCircuitBreaker(
@@ -309,7 +319,7 @@ class CircuitBreaker:
             failure_threshold=failure_threshold,
             recovery_timeout=recovery_timeout,
             expected_exceptions=expected_exception,
-            adaptive_thresholds=False  # Disable for backward compatibility
+            adaptive_thresholds=False,  # Disable for backward compatibility
         )
 
     def is_closed(self) -> bool:
@@ -330,7 +340,9 @@ class CircuitBreaker:
     async def on_failure(self, exception: Exception):
         await self._breaker.on_failure(exception)
 
-    async def execute(self, func: Callable[..., Awaitable[Any]], *args, **kwargs) -> Any:
+    async def execute(
+        self, func: Callable[..., Awaitable[Any]], *args, **kwargs
+    ) -> Any:
         return await self._breaker.execute(func, *args, **kwargs)
 
     def __getattr__(self, name):
@@ -343,11 +355,12 @@ _circuit_breakers: Dict[str, ProductionCircuitBreaker] = {}
 
 from .config import config_manager
 
+
 def get_circuit_breaker(
     name: str,
     failure_threshold: Optional[int] = None,
     recovery_timeout: Optional[int] = None,
-    expected_exception: Tuple[Type[Exception], ...] = (Exception,)
+    expected_exception: Tuple[Type[Exception], ...] = (Exception,),
 ) -> ProductionCircuitBreaker:
     """Get or create circuit breaker using unified config defaults"""
     config = config_manager.load_config()
@@ -359,17 +372,19 @@ def get_circuit_breaker(
             name=name,
             failure_threshold=threshold,
             recovery_timeout=timeout,
-            expected_exceptions=expected_exception
+            expected_exceptions=expected_exception,
         )
         logger.info(
             f"Created circuit breaker for {name}",
-            extra={'threshold': threshold, 'timeout': timeout}
+            extra={"threshold": threshold, "timeout": timeout},
         )
     return _circuit_breakers[name]
+
 
 def get_all_circuit_breakers() -> Dict[str, ProductionCircuitBreaker]:
     """Get all circuit breakers"""
     return _circuit_breakers.copy()
+
 
 def get_circuit_breaker_metrics() -> Dict[str, Dict[str, Any]]:
     """Get metrics for all circuit breakers"""
@@ -377,6 +392,7 @@ def get_circuit_breaker_metrics() -> Dict[str, Dict[str, Any]]:
         name: breaker.get_metrics()
         for name, breaker in _circuit_breakers.items()
     }
+
 
 async def reset_all_circuit_breakers():
     """Reset all circuit breakers to closed state"""

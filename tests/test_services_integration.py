@@ -8,20 +8,24 @@ from main import app
 from context_service.app import app as context_app
 from health_worker.app import app as health_app
 
+
 @pytest.fixture
 def client():
     """Main proxy test client"""
     return TestClient(app)
+
 
 @pytest.fixture
 def context_client():
     """Context service test client"""
     return TestClient(context_app)
 
+
 @pytest.fixture
 def health_client():
     """Health worker test client"""
     return TestClient(health_app)
+
 
 class TestServiceIntegration:
     """Test integration between main proxy and microservices"""
@@ -30,10 +34,9 @@ class TestServiceIntegration:
     async def test_context_service_condensation(self, context_client):
         """Test context service condensation endpoint"""
         test_chunks = ["This is a test chunk", "Another chunk for testing"]
-        response = context_client.post("/condense", json={
-            "chunks": test_chunks,
-            "max_tokens": 100
-        })
+        response = context_client.post(
+            "/condense", json={"chunks": test_chunks, "max_tokens": 100}
+        )
 
         assert response.status_code == 200
         data = response.json()
@@ -67,7 +70,7 @@ class TestServiceIntegration:
     async def test_main_proxy_health_with_services(self, client):
         """Test main proxy health endpoint with mocked services"""
         # Mock the external service calls
-        with patch('httpx.AsyncClient') as mock_client:
+        with patch("httpx.AsyncClient") as mock_client:
             # Mock context service response
             mock_context_response = AsyncMock()
             mock_context_response.status_code = 200
@@ -80,13 +83,13 @@ class TestServiceIntegration:
                 "providers": {},
                 "total_providers": 0,
                 "healthy_providers": 0,
-                "unhealthy_providers": 0
+                "unhealthy_providers": 0,
             }
 
             # Configure mock client
             mock_client.return_value.__aenter__.return_value.get.side_effect = [
                 mock_health_response,  # First call for health worker
-                mock_context_response  # Second call for context service
+                mock_context_response,  # Second call for context service
             ]
 
             response = client.get("/health")
@@ -101,9 +104,11 @@ class TestServiceIntegration:
     @pytest.mark.asyncio
     async def test_main_proxy_health_service_unavailable(self, client):
         """Test main proxy health when services are unavailable"""
-        with patch('httpx.AsyncClient') as mock_client:
+        with patch("httpx.AsyncClient") as mock_client:
             # Mock connection errors
-            mock_client.return_value.__aenter__.return_value.get.side_effect = httpx.RequestError("Connection failed")
+            mock_client.return_value.__aenter__.return_value.get.side_effect = httpx.RequestError(
+                "Connection failed"
+            )
 
             response = client.get("/health")
             assert response.status_code == 200
@@ -120,13 +125,15 @@ class TestServiceIntegration:
 
         test_chunks = ["Test chunk 1", "Test chunk 2"]
 
-        with patch('httpx.AsyncClient') as mock_client:
+        with patch("httpx.AsyncClient") as mock_client:
             mock_response = AsyncMock()
             mock_response.status_code = 200
             mock_response.json.return_value = {"summary": "Mocked summary"}
             mock_response.raise_for_status.return_value = None
 
-            mock_client.return_value.__aenter__.return_value.post.return_value = mock_response
+            mock_client.return_value.__aenter__.return_value.post.return_value = (
+                mock_response
+            )
 
             result = await condense_context_via_service(test_chunks, 100)
 
@@ -138,7 +145,7 @@ class TestServiceIntegration:
         """Test error handling in condense_context_via_service"""
         from main import condense_context_via_service
 
-        with patch('httpx.AsyncClient') as mock_client:
+        with patch("httpx.AsyncClient") as mock_client:
             # Mock HTTP error
             mock_response = AsyncMock()
             mock_response.status_code = 500
@@ -146,9 +153,13 @@ class TestServiceIntegration:
                 "Server error", request=Mock(), response=mock_response
             )
 
-            mock_client.return_value.__aenter__.return_value.post.return_value = mock_response
+            mock_client.return_value.__aenter__.return_value.post.return_value = (
+                mock_response
+            )
 
-            with pytest.raises(Exception):  # Should raise ServiceUnavailableError
+            with pytest.raises(
+                Exception
+            ):  # Should raise ServiceUnavailableError
                 await condense_context_via_service(["test"], 100)
 
     @pytest.mark.asyncio
@@ -162,7 +173,9 @@ class TestServiceIntegration:
 
         test_chunks = ["Background test chunk"]
 
-        with patch('main.condense_context_via_service', new_callable=AsyncMock) as mock_condense:
+        with patch(
+            "main.condense_context_via_service", new_callable=AsyncMock
+        ) as mock_condense:
             mock_condense.return_value = "Background summary"
 
             await background_condense(request_id, mock_request, test_chunks)
@@ -190,6 +203,7 @@ class TestServiceIntegration:
         assert data["status"] == "healthy"
         assert data["service"] == "health-worker"
 
+
 class TestEnvironmentConfiguration:
     """Test environment variable configuration"""
 
@@ -207,6 +221,7 @@ class TestEnvironmentConfiguration:
             # Re-import to pick up new env vars
             import importlib
             import context_service.utils.context_condenser_impl as impl
+
             importlib.reload(impl)
 
             config = impl.get_config()
@@ -231,18 +246,22 @@ class TestEnvironmentConfiguration:
             # The functions should use these URLs
             from main import condense_context_via_service
 
-            with patch('httpx.AsyncClient') as mock_client:
+            with patch("httpx.AsyncClient") as mock_client:
                 mock_response = AsyncMock()
                 mock_response.status_code = 200
                 mock_response.json.return_value = {"summary": "test"}
                 mock_response.raise_for_status.return_value = None
 
-                mock_client.return_value.__aenter__.return_value.post.return_value = mock_response
+                mock_client.return_value.__aenter__.return_value.post.return_value = (
+                    mock_response
+                )
 
                 await condense_context_via_service(["test"], 100)
 
                 # Verify the correct URL was used
-                call_args = mock_client.return_value.__aenter__.return_value.post.call_args
+                call_args = (
+                    mock_client.return_value.__aenter__.return_value.post.call_args
+                )
                 assert call_args[0][0] == "http://test-context:8001/condense"
 
         finally:

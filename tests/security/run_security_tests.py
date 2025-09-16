@@ -25,11 +25,11 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
+    format="%(asctime)s - %(levelname)s - %(message)s",
     handlers=[
-        logging.FileHandler('security_test_results.log'),
-        logging.StreamHandler(sys.stdout)
-    ]
+        logging.FileHandler("security_test_results.log"),
+        logging.StreamHandler(sys.stdout),
+    ],
 )
 logger = logging.getLogger(__name__)
 
@@ -37,7 +37,9 @@ logger = logging.getLogger(__name__)
 class SecurityTestRunner:
     """Main security test runner class"""
 
-    def __init__(self, base_url: str = "http://localhost:8000", verbose: bool = False):
+    def __init__(
+        self, base_url: str = "http://localhost:8000", verbose: bool = False
+    ):
         self.base_url = base_url
         self.verbose = verbose
         self.results = {
@@ -45,7 +47,7 @@ class SecurityTestRunner:
             "target": base_url,
             "tests_run": [],
             "vulnerabilities_found": [],
-            "summary": {}
+            "summary": {},
         }
 
     def run_all_tests(self) -> Dict[str, Any]:
@@ -61,18 +63,22 @@ class SecurityTestRunner:
         ]
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
-            futures = [executor.submit(test_suite) for test_suite in test_suites]
+            futures = [
+                executor.submit(test_suite) for test_suite in test_suites
+            ]
             for future in concurrent.futures.as_completed(futures):
                 try:
                     result = future.result()
                     self.results["tests_run"].append(result)
                 except Exception as e:
                     logger.error(f"Test suite failed: {e}")
-                    self.results["tests_run"].append({
-                        "name": "unknown",
-                        "status": "failed",
-                        "error": str(e)
-                    })
+                    self.results["tests_run"].append(
+                        {
+                            "name": "unknown",
+                            "status": "failed",
+                            "error": str(e),
+                        }
+                    )
 
         self._generate_summary()
         return self.results
@@ -85,7 +91,7 @@ class SecurityTestRunner:
             "name": "vulnerability_scanning",
             "status": "running",
             "start_time": time.time(),
-            "findings": []
+            "findings": [],
         }
 
         try:
@@ -116,12 +122,14 @@ class SecurityTestRunner:
             "name": "authentication_tests",
             "status": "running",
             "start_time": time.time(),
-            "findings": []
+            "findings": [],
         }
 
         try:
             # Run pytest on authentication tests
-            auth_test_result = self._run_pytest_suite("tests/security/test_authentication_security.py")
+            auth_test_result = self._run_pytest_suite(
+                "tests/security/test_authentication_security.py"
+            )
             result["findings"].extend(auth_test_result)
 
             result["status"] = "completed"
@@ -143,12 +151,14 @@ class SecurityTestRunner:
             "name": "input_validation_tests",
             "status": "running",
             "start_time": time.time(),
-            "findings": []
+            "findings": [],
         }
 
         try:
             # Run pytest on input validation tests
-            validation_test_result = self._run_pytest_suite("tests/security/test_input_validation_security.py")
+            validation_test_result = self._run_pytest_suite(
+                "tests/security/test_input_validation_security.py"
+            )
             result["findings"].extend(validation_test_result)
 
             result["status"] = "completed"
@@ -170,12 +180,14 @@ class SecurityTestRunner:
             "name": "penetration_tests",
             "status": "running",
             "start_time": time.time(),
-            "findings": []
+            "findings": [],
         }
 
         try:
             # Run pytest on penetration tests
-            pentest_result = self._run_pytest_suite("tests/security/test_penetration_testing.py")
+            pentest_result = self._run_pytest_suite(
+                "tests/security/test_penetration_testing.py"
+            )
             result["findings"].extend(pentest_result)
 
             result["status"] = "completed"
@@ -197,7 +209,7 @@ class SecurityTestRunner:
             "name": "dependency_scanning",
             "status": "running",
             "start_time": time.time(),
-            "findings": []
+            "findings": [],
         }
 
         try:
@@ -222,20 +234,29 @@ class SecurityTestRunner:
 
         try:
             cmd = ["bandit", "-r", "src/", "-f", "json"]
-            result = subprocess.run(cmd, capture_output=True, text=True, cwd=Path(__file__).parent.parent.parent)
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                cwd=Path(__file__).parent.parent.parent,
+            )
 
             if result.returncode == 0:
                 bandit_data = json.loads(result.stdout)
                 for issue in bandit_data.get("results", []):
-                    findings.append({
-                        "tool": "bandit",
-                        "severity": issue.get("issue_severity", "UNKNOWN"),
-                        "type": "code_vulnerability",
-                        "description": issue.get("issue_text", ""),
-                        "file": issue.get("filename", ""),
-                        "line": issue.get("line_number", 0),
-                        "confidence": issue.get("issue_confidence", "UNKNOWN")
-                    })
+                    findings.append(
+                        {
+                            "tool": "bandit",
+                            "severity": issue.get("issue_severity", "UNKNOWN"),
+                            "type": "code_vulnerability",
+                            "description": issue.get("issue_text", ""),
+                            "file": issue.get("filename", ""),
+                            "line": issue.get("line_number", 0),
+                            "confidence": issue.get(
+                                "issue_confidence", "UNKNOWN"
+                            ),
+                        }
+                    )
             else:
                 logger.warning(f"Bandit scan failed: {result.stderr}")
 
@@ -252,20 +273,27 @@ class SecurityTestRunner:
 
         try:
             cmd = ["safety", "check", "--json"]
-            result = subprocess.run(cmd, capture_output=True, text=True, cwd=Path(__file__).parent.parent.parent)
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                cwd=Path(__file__).parent.parent.parent,
+            )
 
             if result.returncode == 0:
                 safety_data = json.loads(result.stdout)
                 for vuln in safety_data:
-                    findings.append({
-                        "tool": "safety",
-                        "severity": "HIGH",  # Safety reports critical vulnerabilities
-                        "type": "dependency_vulnerability",
-                        "description": vuln.get("advisory", ""),
-                        "package": vuln.get("package", ""),
-                        "version": vuln.get("vulnerable_version", ""),
-                        "cve": vuln.get("cve", "")
-                    })
+                    findings.append(
+                        {
+                            "tool": "safety",
+                            "severity": "HIGH",  # Safety reports critical vulnerabilities
+                            "type": "dependency_vulnerability",
+                            "description": vuln.get("advisory", ""),
+                            "package": vuln.get("package", ""),
+                            "version": vuln.get("vulnerable_version", ""),
+                            "cve": vuln.get("cve", ""),
+                        }
+                    )
             else:
                 logger.warning(f"Safety scan failed: {result.stderr}")
 
@@ -281,39 +309,70 @@ class SecurityTestRunner:
         findings = []
 
         try:
-            cmd = ["python", "-m", "pytest", test_file, "-v", "--tb=short", "--json-report"]
-            result = subprocess.run(cmd, capture_output=True, text=True, cwd=Path(__file__).parent.parent.parent)
+            cmd = [
+                "python",
+                "-m",
+                "pytest",
+                test_file,
+                "-v",
+                "--tb=short",
+                "--json-report",
+            ]
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                cwd=Path(__file__).parent.parent.parent,
+            )
 
             # Parse pytest JSON output if available
             if result.returncode != 0:
-                findings.append({
-                    "tool": "pytest",
-                    "severity": "MEDIUM",
-                    "type": "test_failure",
-                    "description": f"Test suite failed: {test_file}",
-                    "output": result.stderr[:500]  # Truncate long output
-                })
+                findings.append(
+                    {
+                        "tool": "pytest",
+                        "severity": "MEDIUM",
+                        "type": "test_failure",
+                        "description": f"Test suite failed: {test_file}",
+                        "output": result.stderr[:500],  # Truncate long output
+                    }
+                )
 
         except Exception as e:
             logger.error(f"Pytest execution error: {e}")
-            findings.append({
-                "tool": "pytest",
-                "severity": "HIGH",
-                "type": "execution_error",
-                "description": f"Failed to run test suite: {test_file}",
-                "error": str(e)
-            })
+            findings.append(
+                {
+                    "tool": "pytest",
+                    "severity": "HIGH",
+                    "type": "execution_error",
+                    "description": f"Failed to run test suite: {test_file}",
+                    "error": str(e),
+                }
+            )
 
         return findings
 
     def _generate_summary(self):
         """Generate test summary"""
         total_tests = len(self.results["tests_run"])
-        completed_tests = sum(1 for test in self.results["tests_run"] if test["status"] == "completed")
-        failed_tests = sum(1 for test in self.results["tests_run"] if test["status"] == "failed")
+        completed_tests = sum(
+            1
+            for test in self.results["tests_run"]
+            if test["status"] == "completed"
+        )
+        failed_tests = sum(
+            1
+            for test in self.results["tests_run"]
+            if test["status"] == "failed"
+        )
 
         # Count vulnerabilities by severity
-        severity_counts = {"CRITICAL": 0, "HIGH": 0, "MEDIUM": 0, "LOW": 0, "UNKNOWN": 0}
+        severity_counts = {
+            "CRITICAL": 0,
+            "HIGH": 0,
+            "MEDIUM": 0,
+            "LOW": 0,
+            "UNKNOWN": 0,
+        }
 
         for test in self.results["tests_run"]:
             for finding in test.get("findings", []):
@@ -329,7 +388,9 @@ class SecurityTestRunner:
             "failed_test_suites": failed_tests,
             "vulnerability_counts": severity_counts,
             "total_vulnerabilities": sum(severity_counts.values()),
-            "scan_duration": sum(test.get("duration", 0) for test in self.results["tests_run"])
+            "scan_duration": sum(
+                test.get("duration", 0) for test in self.results["tests_run"]
+            ),
         }
 
     def save_report(self, output_file: str = None):
@@ -338,7 +399,7 @@ class SecurityTestRunner:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             output_file = f"security_test_report_{timestamp}.json"
 
-        with open(output_file, 'w') as f:
+        with open(output_file, "w") as f:
             json.dump(self.results, f, indent=2)
 
         logger.info(f"Security test report saved to: {output_file}")
@@ -348,9 +409,9 @@ class SecurityTestRunner:
         """Print test summary to console"""
         summary = self.results["summary"]
 
-        print("\n" + "="*60)
+        print("\n" + "=" * 60)
         print("SECURITY TEST SUMMARY")
-        print("="*60)
+        print("=" * 60)
         print(f"Target: {self.results['target']}")
         print(f"Timestamp: {self.results['timestamp']}")
         print(f"Test Suites Run: {summary['total_test_suites']}")
@@ -360,30 +421,39 @@ class SecurityTestRunner:
         print("\nVULNERABILITIES FOUND:")
         print("-" * 30)
 
-        vuln_counts = summary['vulnerability_counts']
+        vuln_counts = summary["vulnerability_counts"]
         for severity, count in vuln_counts.items():
             if count > 0:
                 print(f"{severity}: {count}")
 
-        total_vulns = summary['total_vulnerabilities']
+        total_vulns = summary["total_vulnerabilities"]
         if total_vulns == 0:
             print("\n🎉 No vulnerabilities detected!")
         else:
             print(f"\n⚠️  Total vulnerabilities: {total_vulns}")
 
-        print("="*60)
+        print("=" * 60)
 
 
 def main():
-    parser = argparse.ArgumentParser(description="LLM Proxy API Security Test Runner")
-    parser.add_argument("--url", default="http://localhost:8000",
-                       help="Target URL to test (default: http://localhost:8000)")
-    parser.add_argument("--output", "-o",
-                       help="Output file for test results")
-    parser.add_argument("--verbose", "-v", action="store_true",
-                       help="Verbose output")
-    parser.add_argument("--test-type", choices=["all", "vuln", "auth", "input", "pentest", "deps"],
-                       default="all", help="Type of tests to run")
+    parser = argparse.ArgumentParser(
+        description="LLM Proxy API Security Test Runner"
+    )
+    parser.add_argument(
+        "--url",
+        default="http://localhost:8000",
+        help="Target URL to test (default: http://localhost:8000)",
+    )
+    parser.add_argument("--output", "-o", help="Output file for test results")
+    parser.add_argument(
+        "--verbose", "-v", action="store_true", help="Verbose output"
+    )
+    parser.add_argument(
+        "--test-type",
+        choices=["all", "vuln", "auth", "input", "pentest", "deps"],
+        default="all",
+        help="Type of tests to run",
+    )
 
     args = parser.parse_args()
 

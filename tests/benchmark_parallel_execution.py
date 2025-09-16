@@ -12,7 +12,10 @@ from concurrent.futures import ThreadPoolExecutor
 import json
 import os
 
-from src.core.parallel_fallback import parallel_fallback_engine, ParallelExecutionMode
+from src.core.parallel_fallback import (
+    parallel_fallback_engine,
+    ParallelExecutionMode,
+)
 from src.core.provider_discovery import provider_discovery
 from src.core.circuit_breaker_pool import circuit_breaker_pool
 from src.core.load_balancer import load_balancer
@@ -21,6 +24,7 @@ from src.core.load_balancer import load_balancer
 @dataclass
 class BenchmarkResult:
     """Result of a benchmark test"""
+
     test_name: str
     total_requests: int
     successful_requests: int
@@ -38,17 +42,24 @@ class BenchmarkResult:
 class MockBenchmarkProvider:
     """Benchmark provider with configurable performance characteristics"""
 
-    def __init__(self, name: str, latency_ms: float, failure_rate: float = 0.0):
+    def __init__(
+        self, name: str, latency_ms: float, failure_rate: float = 0.0
+    ):
         self.name = name
         self.latency_ms = latency_ms
         self.failure_rate = failure_rate
         self.requests_served = 0
 
-    async def execute_request(self, request_data: Dict[str, Any]) -> Dict[str, Any]:
+    async def execute_request(
+        self, request_data: Dict[str, Any]
+    ) -> Dict[str, Any]:
         self.requests_served += 1
 
         # Simulate failure
-        if self.failure_rate > 0 and (self.requests_served % int(1/self.failure_rate)) == 0:
+        if (
+            self.failure_rate > 0
+            and (self.requests_served % int(1 / self.failure_rate)) == 0
+        ):
             await asyncio.sleep(self.latency_ms / 1000)
             raise Exception(f"Benchmark failure in {self.name}")
 
@@ -56,8 +67,14 @@ class MockBenchmarkProvider:
         await asyncio.sleep(self.latency_ms / 1000)
 
         return {
-            "choices": [{"message": {"content": f"Benchmark response from {self.name}"}}],
-            "usage": {"total_tokens": 100}
+            "choices": [
+                {
+                    "message": {
+                        "content": f"Benchmark response from {self.name}"
+                    }
+                }
+            ],
+            "usage": {"total_tokens": 100},
         }
 
 
@@ -67,10 +84,18 @@ class ParallelExecutionBenchmark:
     def __init__(self):
         self.results: List[BenchmarkResult] = []
         self.test_providers = {
-            "fast_provider": MockBenchmarkProvider("fast_provider", latency_ms=200, failure_rate=0.02),
-            "medium_provider": MockBenchmarkProvider("medium_provider", latency_ms=500, failure_rate=0.05),
-            "slow_provider": MockBenchmarkProvider("slow_provider", latency_ms=1200, failure_rate=0.10),
-            "unreliable_provider": MockBenchmarkProvider("unreliable_provider", latency_ms=300, failure_rate=0.50)
+            "fast_provider": MockBenchmarkProvider(
+                "fast_provider", latency_ms=200, failure_rate=0.02
+            ),
+            "medium_provider": MockBenchmarkProvider(
+                "medium_provider", latency_ms=500, failure_rate=0.05
+            ),
+            "slow_provider": MockBenchmarkProvider(
+                "slow_provider", latency_ms=1200, failure_rate=0.10
+            ),
+            "unreliable_provider": MockBenchmarkProvider(
+                "unreliable_provider", latency_ms=300, failure_rate=0.50
+            ),
         }
 
     async def run_full_benchmark_suite(self) -> Dict[str, Any]:
@@ -120,29 +145,41 @@ class ParallelExecutionBenchmark:
                     model="gpt-3.5-turbo",
                     request_data=request_data,
                     execution_mode=ParallelExecutionMode.FIRST_SUCCESS,
-                    timeout=5.0
+                    timeout=5.0,
                 )
 
     async def _benchmark_sequential_vs_parallel(self):
         """Benchmark sequential vs parallel execution performance"""
         print("\n🔬 Benchmarking Sequential vs Parallel Execution")
 
-        request_data = {"messages": [{"role": "user", "content": "Performance test"}]}
+        request_data = {
+            "messages": [{"role": "user", "content": "Performance test"}]
+        }
         num_requests = 50
 
         # Test sequential execution (simulated)
         print("  📊 Testing sequential execution...")
-        sequential_latencies = await self._run_sequential_simulation(num_requests, request_data)
-        sequential_result = self._analyze_latencies("sequential", sequential_latencies, num_requests)
+        sequential_latencies = await self._run_sequential_simulation(
+            num_requests, request_data
+        )
+        sequential_result = self._analyze_latencies(
+            "sequential", sequential_latencies, num_requests
+        )
 
         # Test parallel execution
         print("  📊 Testing parallel execution...")
-        parallel_latencies = await self._run_parallel_execution(num_requests, request_data)
-        parallel_result = self._analyze_latencies("parallel", parallel_latencies, num_requests)
+        parallel_latencies = await self._run_parallel_execution(
+            num_requests, request_data
+        )
+        parallel_result = self._analyze_latencies(
+            "parallel", parallel_latencies, num_requests
+        )
 
         # Calculate improvement
-        improvement_pct = ((sequential_result.avg_latency - parallel_result.avg_latency) /
-                          sequential_result.avg_latency) * 100
+        improvement_pct = (
+            (sequential_result.avg_latency - parallel_result.avg_latency)
+            / sequential_result.avg_latency
+        ) * 100
 
         print(f"  📈 Latency Improvement: {improvement_pct:.1f}%")
         print(f"  ⚡ Sequential P95: {sequential_result.p95_latency:.1f}ms")
@@ -155,7 +192,9 @@ class ParallelExecutionBenchmark:
 
         self.results.extend([sequential_result, parallel_result])
 
-    async def _run_sequential_simulation(self, num_requests: int, request_data: Dict) -> List[float]:
+    async def _run_sequential_simulation(
+        self, num_requests: int, request_data: Dict
+    ) -> List[float]:
         """Simulate sequential execution (calling providers one by one)"""
         latencies = []
 
@@ -165,7 +204,11 @@ class ParallelExecutionBenchmark:
 
                 # Simulate sequential fallback (try fast, then medium, then slow)
                 success = False
-                for provider_name in ["fast_provider", "medium_provider", "slow_provider"]:
+                for provider_name in [
+                    "fast_provider",
+                    "medium_provider",
+                    "slow_provider",
+                ]:
                     try:
                         provider = self.test_providers[provider_name]
                         await provider.execute_request(request_data)
@@ -178,16 +221,22 @@ class ParallelExecutionBenchmark:
                 if not success:
                     # Use unreliable as last resort
                     try:
-                        await self.test_providers["unreliable_provider"].execute_request(request_data)
+                        await self.test_providers[
+                            "unreliable_provider"
+                        ].execute_request(request_data)
                     except (Exception, asyncio.TimeoutError, ValueError) as e:
-                        print(f"Unreliable provider failed as last resort: {e}")
+                        print(
+                            f"Unreliable provider failed as last resort: {e}"
+                        )
                         pass
 
                 latencies.append((time.time() - start_time) * 1000)
 
         return latencies
 
-    async def _run_parallel_execution(self, num_requests: int, request_data: Dict) -> List[float]:
+    async def _run_parallel_execution(
+        self, num_requests: int, request_data: Dict
+    ) -> List[float]:
         """Run parallel execution benchmark"""
         latencies = []
 
@@ -200,7 +249,7 @@ class ParallelExecutionBenchmark:
                         request_data=request_data,
                         execution_mode=ParallelExecutionMode.FIRST_SUCCESS,
                         timeout=3.0,
-                        max_providers=4
+                        max_providers=4,
                     )
                 )
                 tasks.append(task)
@@ -208,8 +257,8 @@ class ParallelExecutionBenchmark:
             results = await asyncio.gather(*tasks, return_exceptions=True)
 
             for result in results:
-                if isinstance(result, dict) and result.get('success'):
-                    latencies.append(result.get('latency_ms', 3000))
+                if isinstance(result, dict) and result.get("success"):
+                    latencies.append(result.get("latency_ms", 3000))
                 else:
                     latencies.append(3000)  # Timeout penalty
 
@@ -225,8 +274,12 @@ class ParallelExecutionBenchmark:
         for concurrent in concurrent_levels:
             print(f"  📊 Testing {concurrent} concurrent requests...")
 
-            latencies = await self._run_high_concurrency_test(concurrent, request_data)
-            result = self._analyze_latencies(f"concurrent_{concurrent}", latencies, concurrent)
+            latencies = await self._run_high_concurrency_test(
+                concurrent, request_data
+            )
+            result = self._analyze_latencies(
+                f"concurrent_{concurrent}", latencies, concurrent
+            )
 
             print(f"  📊 Throughput: {result.throughput_rps:.0f} req/s")
             # Check throughput target (500+ req/s)
@@ -237,7 +290,9 @@ class ParallelExecutionBenchmark:
 
             self.results.append(result)
 
-    async def _run_high_concurrency_test(self, num_concurrent: int, request_data: Dict) -> List[float]:
+    async def _run_high_concurrency_test(
+        self, num_concurrent: int, request_data: Dict
+    ) -> List[float]:
         """Run high concurrency test"""
         latencies = []
 
@@ -251,7 +306,7 @@ class ParallelExecutionBenchmark:
                         model="gpt-3.5-turbo",
                         request_data=request_data,
                         execution_mode=ParallelExecutionMode.FIRST_SUCCESS,
-                        timeout=5.0
+                        timeout=5.0,
                     )
                 )
                 tasks.append(task)
@@ -261,7 +316,7 @@ class ParallelExecutionBenchmark:
 
             for result in results:
                 if isinstance(result, dict):
-                    latencies.append(result.get('latency_ms', 5000))
+                    latencies.append(result.get("latency_ms", 5000))
                 else:
                     latencies.append(5000)
 
@@ -275,12 +330,20 @@ class ParallelExecutionBenchmark:
         self.test_providers["fast_provider"].failure_rate = 0.20
         self.test_providers["medium_provider"].failure_rate = 0.40
 
-        request_data = {"messages": [{"role": "user", "content": "Failure resilience test"}]}
+        request_data = {
+            "messages": [
+                {"role": "user", "content": "Failure resilience test"}
+            ]
+        }
         num_requests = 100
 
         print("  📊 Testing under failure conditions...")
-        latencies = await self._run_parallel_execution(num_requests, request_data)
-        result = self._analyze_latencies("failure_resilience", latencies, num_requests)
+        latencies = await self._run_parallel_execution(
+            num_requests, request_data
+        )
+        result = self._analyze_latencies(
+            "failure_resilience", latencies, num_requests
+        )
 
         error_rate = result.error_rate * 100
         print(f"  📊 Error Rate: {error_rate:.1f}%")
@@ -302,13 +365,15 @@ class ParallelExecutionBenchmark:
         """Benchmark provider selection optimization"""
         print("\n🔬 Benchmarking Provider Selection Optimization")
 
-        request_data = {"messages": [{"role": "user", "content": "Selection test"]]}
+        request_data = {
+            "messages": [{"role": "user", "content": "Selection test"}]
+        }
         num_requests = 30
 
         # Run with different provider selection strategies
         strategies = [
             ("adaptive", ParallelExecutionMode.FIRST_SUCCESS),
-            ("load_balanced", ParallelExecutionMode.LOAD_BALANCED)
+            ("load_balanced", ParallelExecutionMode.LOAD_BALANCED),
         ]
 
         for strategy_name, mode in strategies:
@@ -321,19 +386,23 @@ class ParallelExecutionBenchmark:
                         model="gpt-3.5-turbo",
                         request_data=request_data,
                         execution_mode=mode,
-                        timeout=3.0
+                        timeout=3.0,
                     )
                     if result.success:
                         latencies.append(result.latency_ms)
                     else:
                         latencies.append(3000)
 
-            result = self._analyze_latencies(f"selection_{strategy_name}", latencies, num_requests)
+            result = self._analyze_latencies(
+                f"selection_{strategy_name}", latencies, num_requests
+            )
             self.results.append(result)
 
             print(f"  📊 Avg Latency: {result.avg_latency:.1f}ms")
 
-    async def _analyze_latencies(self, test_name: str, latencies: List[float], total_requests: int) -> BenchmarkResult:
+    async def _analyze_latencies(
+        self, test_name: str, latencies: List[float], total_requests: int
+    ) -> BenchmarkResult:
         """Analyze latency measurements and create benchmark result"""
         if not latencies:
             return BenchmarkResult(
@@ -348,20 +417,36 @@ class ParallelExecutionBenchmark:
                 p99_latency=0,
                 throughput_rps=0,
                 error_rate=1.0,
-                metadata={}
+                metadata={},
             )
 
         sorted_latencies = sorted(latencies)
-        successful_requests = len([l for l in latencies if l < 3000])  # Under timeout threshold
+        successful_requests = len(
+            [l for l in latencies if l < 3000]
+        )  # Under timeout threshold
         failed_requests = total_requests - successful_requests
 
         total_time = sum(latencies) / 1000  # Convert to seconds
         avg_latency = statistics.mean(latencies) if latencies else 0
-        p50_latency = statistics.median(sorted_latencies) if sorted_latencies else 0
-        p95_latency = sorted_latencies[int(len(sorted_latencies) * 0.95)] if len(sorted_latencies) > 1 else p50_latency
-        p99_latency = sorted_latencies[int(len(sorted_latencies) * 0.99)] if len(sorted_latencies) > 1 else p50_latency
+        p50_latency = (
+            statistics.median(sorted_latencies) if sorted_latencies else 0
+        )
+        p95_latency = (
+            sorted_latencies[int(len(sorted_latencies) * 0.95)]
+            if len(sorted_latencies) > 1
+            else p50_latency
+        )
+        p99_latency = (
+            sorted_latencies[int(len(sorted_latencies) * 0.99)]
+            if len(sorted_latencies) > 1
+            else p50_latency
+        )
 
-        throughput_rps = successful_requests / (total_time / total_requests) if total_time > 0 else 0
+        throughput_rps = (
+            successful_requests / (total_time / total_requests)
+            if total_time > 0
+            else 0
+        )
         error_rate = failed_requests / total_requests
 
         return BenchmarkResult(
@@ -376,7 +461,9 @@ class ParallelExecutionBenchmark:
             p99_latency=p99_latency,
             throughput_rps=throughput_rps,
             error_rate=error_rate,
-            metadata={"latencies": latencies[:10]}  # Sample first 10 latencies
+            metadata={
+                "latencies": latencies[:10]
+            },  # Sample first 10 latencies
         )
 
     def _generate_benchmark_report(self) -> Dict[str, Any]:
@@ -388,24 +475,29 @@ class ParallelExecutionBenchmark:
             "summary": {
                 "total_tests": len(self.results),
                 "overall_success_rate": 0.0,
-                "best_p95_latency": float('inf'),
+                "best_p95_latency": float("inf"),
                 "best_throughput": 0.0,
-                "targets_achieved": []
+                "targets_achieved": [],
             },
             "results": [],
-            "recommendations": []
+            "recommendations": [],
         }
 
         # Analyze results
         for result in self.results:
-            report["results"].append({
-                "test_name": result.test_name,
-                "success_rate": (result.successful_requests / result.total_requests) * 100,
-                "avg_latency_ms": result.avg_latency,
-                "p95_latency_ms": result.p95_latency,
-                "throughput_rps": result.throughput_rps,
-                "error_rate_pct": result.error_rate * 100
-            })
+            report["results"].append(
+                {
+                    "test_name": result.test_name,
+                    "success_rate": (
+                        result.successful_requests / result.total_requests
+                    )
+                    * 100,
+                    "avg_latency_ms": result.avg_latency,
+                    "p95_latency_ms": result.p95_latency,
+                    "throughput_rps": result.throughput_rps,
+                    "error_rate_pct": result.error_rate * 100,
+                }
+            )
 
             # Track best metrics
             if result.p95_latency < report["summary"]["best_p95_latency"]:
@@ -418,37 +510,61 @@ class ParallelExecutionBenchmark:
         if self.results:
             total_successful = sum(r.successful_requests for r in self.results)
             total_requests = sum(r.total_requests for r in self.results)
-            report["summary"]["overall_success_rate"] = (total_successful / total_requests) * 100
+            report["summary"]["overall_success_rate"] = (
+                total_successful / total_requests
+            ) * 100
 
         # Check target achievements
-        parallel_results = [r for r in self.results if "parallel" in r.test_name.lower()]
-        sequential_results = [r for r in self.results if "sequential" in r.test_name.lower()]
+        parallel_results = [
+            r for r in self.results if "parallel" in r.test_name.lower()
+        ]
+        sequential_results = [
+            r for r in self.results if "sequential" in r.test_name.lower()
+        ]
 
         if parallel_results and sequential_results:
-            avg_parallel_p95 = statistics.mean(r.p95_latency for r in parallel_results)
-            avg_sequential_p95 = statistics.mean(r.p95_latency for r in sequential_results)
-            improvement = ((avg_sequential_p95 - avg_parallel_p95) / avg_sequential_p95) * 100
+            avg_parallel_p95 = statistics.mean(
+                r.p95_latency for r in parallel_results
+            )
+            avg_sequential_p95 = statistics.mean(
+                r.p95_latency for r in sequential_results
+            )
+            improvement = (
+                (avg_sequential_p95 - avg_parallel_p95) / avg_sequential_p95
+            ) * 100
 
             if improvement >= 60:
-                report["summary"]["targets_achieved"].append("60%_latency_reduction")
+                report["summary"]["targets_achieved"].append(
+                    "60%_latency_reduction"
+                )
             if avg_parallel_p95 <= 500:
                 report["summary"]["targets_achieved"].append("p95_under_500ms")
 
-        high_load_results = [r for r in self.results if "concurrent" in r.test_name]
+        high_load_results = [
+            r for r in self.results if "concurrent" in r.test_name
+        ]
         if high_load_results:
             max_throughput = max(r.throughput_rps for r in high_load_results)
             if max_throughput >= 500:
-                report["summary"]["targets_achieved"].append("500_rps_throughput")
+                report["summary"]["targets_achieved"].append(
+                    "500_rps_throughput"
+                )
 
         # Generate recommendations
         if report["summary"]["best_p95_latency"] > 500:
-            report["recommendations"].append("Optimize provider selection algorithm")
+            report["recommendations"].append(
+                "Optimize provider selection algorithm"
+            )
 
         if report["summary"]["best_throughput"] < 200:
-            report["recommendations"].append("Improve concurrent request handling")
+            report["recommendations"].append(
+                "Improve concurrent request handling"
+            )
 
         if report["summary"]["overall_success_rate"] < 95:
-            report["recommendations"].append("Enhance error handling and retry logic")
+            report["recommendations"].append(
+                "Enhance error handling and retry logic"
+            )
 
         return report
 
@@ -457,7 +573,7 @@ class ParallelExecutionBenchmark:
         timestamp = int(time.time())
         filename = f"benchmark_results_{timestamp}.json"
 
-        with open(filename, 'w') as f:
+        with open(filename, "w") as f:
             json.dump(report, f, indent=2)
 
         print(f"💾 Benchmark results saved to {filename}")
@@ -472,18 +588,32 @@ class ParallelExecutionBenchmark:
             def mock_get_provider(name):
                 return self.test_providers.get(name)
 
-            with patch('src.core.parallel_fallback.provider_factory') as mock_factory:
-                mock_factory.get_provider = AsyncMock(side_effect=mock_get_provider)
-                mock_factory.get_all_provider_info = AsyncMock(return_value=[
-                    type('ProviderInfo', (), {
-                        'name': name,
-                        'status': 1,  # HEALTHY
-                        'models': ['gpt-3.5-turbo']
-                    })() for name in self.test_providers.keys()
-                ])
+            with patch(
+                "src.core.parallel_fallback.provider_factory"
+            ) as mock_factory:
+                mock_factory.get_provider = AsyncMock(
+                    side_effect=mock_get_provider
+                )
+                mock_factory.get_all_provider_info = AsyncMock(
+                    return_value=[
+                        type(
+                            "ProviderInfo",
+                            (),
+                            {
+                                "name": name,
+                                "status": 1,  # HEALTHY
+                                "models": ["gpt-3.5-turbo"],
+                            },
+                        )()
+                        for name in self.test_providers.keys()
+                    ]
+                )
 
-                with patch.object(provider_discovery, 'get_healthy_providers_for_model',
-                                return_value=list(self.test_providers.keys())):
+                with patch.object(
+                    provider_discovery,
+                    "get_healthy_providers_for_model",
+                    return_value=list(self.test_providers.keys()),
+                ):
                     yield
 
         return mock_context()
@@ -498,19 +628,25 @@ async def run_benchmarks():
     print("🏆 BENCHMARK SUITE COMPLETE")
     print("=" * 60)
 
-    print(f"📊 Overall Success Rate: {report['summary']['overall_success_rate']:.1f}%")
-    print(f"⚡ Best P95 Latency: {report['summary']['best_p95_latency']:.1f}ms")
-    print(f"🚀 Best Throughput: {report['summary']['best_throughput']:.0f} req/s")
+    print(
+        f"📊 Overall Success Rate: {report['summary']['overall_success_rate']:.1f}%"
+    )
+    print(
+        f"⚡ Best P95 Latency: {report['summary']['best_p95_latency']:.1f}ms"
+    )
+    print(
+        f"🚀 Best Throughput: {report['summary']['best_throughput']:.0f} req/s"
+    )
 
-    targets = report['summary']['targets_achieved']
+    targets = report["summary"]["targets_achieved"]
     if targets:
         print(f"✅ Targets Achieved: {', '.join(targets)}")
     else:
         print("❌ No targets achieved - optimization needed")
 
-    if report['recommendations']:
+    if report["recommendations"]:
         print("💡 Recommendations:")
-        for rec in report['recommendations']:
+        for rec in report["recommendations"]:
             print(f"   • {rec}")
 
     return report

@@ -18,21 +18,23 @@ logger = ContextualLogger(__name__)
 
 class ProviderHealth(Enum):
     """Provider health states for discovery"""
-    EXCELLENT = "excellent"      # <100ms average, <0.1% error rate
-    GOOD = "good"               # <300ms average, <1% error rate
-    FAIR = "fair"               # <500ms average, <5% error rate
-    POOR = "poor"               # <1000ms average, >5% error rate
-    UNHEALTHY = "unhealthy"     # Unavailable or >10% error rate
+
+    EXCELLENT = "excellent"  # <100ms average, <0.1% error rate
+    GOOD = "good"  # <300ms average, <1% error rate
+    FAIR = "fair"  # <500ms average, <5% error rate
+    POOR = "poor"  # <1000ms average, >5% error rate
+    UNHEALTHY = "unhealthy"  # Unavailable or >10% error rate
 
 
 @dataclass
 class ProviderMetrics:
     """Real-time provider performance metrics"""
+
     total_requests: int = 0
     successful_requests: int = 0
     failed_requests: int = 0
     total_latency_ms: float = 0.0
-    min_latency_ms: float = float('inf')
+    min_latency_ms: float = float("inf")
     max_latency_ms: float = 0.0
     last_request_time: float = 0.0
     error_rate_window: List[bool] = field(default_factory=list)
@@ -99,6 +101,7 @@ class ProviderMetrics:
 @dataclass(order=True)
 class ProviderPriority:
     """Priority queue element for provider selection"""
+
     priority: float
     provider_name: str
     metrics: ProviderMetrics = field(compare=False)
@@ -130,7 +133,9 @@ class ProviderDiscoveryService:
             self._cache = await get_unified_cache()
         return self._cache
 
-    def _generate_provider_cache_key(self, provider_name: str, data_type: str) -> str:
+    def _generate_provider_cache_key(
+        self, provider_name: str, data_type: str
+    ) -> str:
         """Generate cache key for provider data"""
         return f"provider:{provider_name}:{data_type}"
 
@@ -139,7 +144,9 @@ class ProviderDiscoveryService:
         if self._health_check_task and not self._health_check_task.done():
             return
 
-        self._health_check_task = asyncio.create_task(self._health_monitoring_loop())
+        self._health_check_task = asyncio.create_task(
+            self._health_monitoring_loop()
+        )
         logger.info("Started provider health monitoring")
 
     async def stop_monitoring(self):
@@ -162,7 +169,7 @@ class ProviderDiscoveryService:
                 await self._perform_health_checks()
                 await asyncio.wait_for(
                     self._shutdown_event.wait(),
-                    timeout=self._health_check_interval
+                    timeout=self._health_check_interval,
                 )
             except asyncio.TimeoutError:
                 continue
@@ -176,25 +183,34 @@ class ProviderDiscoveryService:
 
         for provider_info in provider_infos:
             try:
-                provider = await provider_factory.get_provider(provider_info.name)
+                provider = await provider_factory.get_provider(
+                    provider_info.name
+                )
                 if provider:
                     health_result = await provider.health_check()
 
                     # Record health check as a synthetic request
                     async with self._metrics_lock:
-                        metrics = self._get_or_create_metrics(provider_info.name)
+                        metrics = self._get_or_create_metrics(
+                            provider_info.name
+                        )
                         metrics.record_request(
                             success=health_result.get("healthy", False),
-                            latency_ms=health_result.get("response_time", 0) * 1000
+                            latency_ms=health_result.get("response_time", 0)
+                            * 1000,
                         )
 
             except Exception as e:
-                logger.warning(f"Health check failed for {provider_info.name}: {e}")
+                logger.warning(
+                    f"Health check failed for {provider_info.name}: {e}"
+                )
 
                 # Record failed health check
                 async with self._metrics_lock:
                     metrics = self._get_or_create_metrics(provider_info.name)
-                    metrics.record_request(success=False, latency_ms=5000)  # 5s timeout
+                    metrics.record_request(
+                        success=False, latency_ms=5000
+                    )  # 5s timeout
 
     def _get_or_create_metrics(self, provider_name: str) -> ProviderMetrics:
         """Get or create metrics for a provider"""
@@ -202,13 +218,17 @@ class ProviderDiscoveryService:
             self._provider_metrics[provider_name] = ProviderMetrics()
         return self._provider_metrics[provider_name]
 
-    async def record_request_result(self, provider_name: str, success: bool, latency_ms: float):
+    async def record_request_result(
+        self, provider_name: str, success: bool, latency_ms: float
+    ):
         """Record the result of a real request"""
         async with self._metrics_lock:
             metrics = self._get_or_create_metrics(provider_name)
             metrics.record_request(success, latency_ms)
 
-    def get_provider_metrics(self, provider_name: str) -> Optional[ProviderMetrics]:
+    def get_provider_metrics(
+        self, provider_name: str
+    ) -> Optional[ProviderMetrics]:
         """Get metrics for a specific provider"""
         return self._provider_metrics.get(provider_name)
 
@@ -219,7 +239,10 @@ class ProviderDiscoveryService:
     def get_provider_health(self, provider_name: str) -> ProviderHealth:
         """Get health status for a provider"""
         metrics = self._provider_metrics.get(provider_name)
-        if not metrics or metrics.total_requests < self._min_requests_for_reliability:
+        if (
+            not metrics
+            or metrics.total_requests < self._min_requests_for_reliability
+        ):
             return ProviderHealth.UNHEALTHY
         return metrics.health_score
 
@@ -237,7 +260,11 @@ class ProviderDiscoveryService:
             provider = provider_factory._providers[provider_name]
             if model in provider.models:
                 health = self.get_provider_health(provider_name)
-                if health in [ProviderHealth.EXCELLENT, ProviderHealth.GOOD, ProviderHealth.FAIR]:
+                if health in [
+                    ProviderHealth.EXCELLENT,
+                    ProviderHealth.GOOD,
+                    ProviderHealth.FAIR,
+                ]:
                     healthy_providers.append(provider_name)
 
         # Sort by performance score (lower is better)
@@ -250,7 +277,9 @@ class ProviderDiscoveryService:
             return 999.0  # Very low priority for unknown providers
 
         # Score based on latency (lower better) and error rate (lower better)
-        latency_score = metrics.average_latency / 1000.0  # Normalize to seconds
+        latency_score = (
+            metrics.average_latency / 1000.0
+        )  # Normalize to seconds
         error_score = metrics.error_rate * 10  # Weight errors higher
 
         return latency_score + error_score
@@ -260,7 +289,9 @@ class ProviderDiscoveryService:
         healthy_providers = self.get_healthy_providers_for_model(model)
         return healthy_providers[0] if healthy_providers else None
 
-    async def get_provider_load_distribution(self) -> Dict[str, Dict[str, Any]]:
+    async def get_provider_load_distribution(
+        self,
+    ) -> Dict[str, Dict[str, Any]]:
         """Get load distribution information for all providers with caching"""
         cache = await self._get_cache()
         cache_key = "provider:load_distribution:all"
@@ -277,19 +308,24 @@ class ProviderDiscoveryService:
             if metrics.total_requests > 0:
                 distribution[provider_name] = {
                     "total_requests": metrics.total_requests,
-                    "success_rate": metrics.successful_requests / metrics.total_requests,
+                    "success_rate": metrics.successful_requests
+                    / metrics.total_requests,
                     "average_latency_ms": metrics.average_latency,
                     "error_rate": metrics.error_rate,
                     "health": metrics.health_score.value,
-                    "last_request": metrics.last_request_time
+                    "last_request": metrics.last_request_time,
                 }
 
         # Cache the result (10 minutes TTL for provider data)
-        await cache.set(cache_key, distribution, ttl=600, category="providers", priority=2)
+        await cache.set(
+            cache_key, distribution, ttl=600, category="providers", priority=2
+        )
 
         return distribution
 
-    async def reset_provider_metrics(self, provider_name: Optional[str] = None):
+    async def reset_provider_metrics(
+        self, provider_name: Optional[str] = None
+    ):
         """Reset metrics for a provider or all providers"""
         async with self._metrics_lock:
             if provider_name:
@@ -320,8 +356,8 @@ class ProviderDiscoveryService:
                 "good_providers": 0,
                 "fair_providers": 0,
                 "poor_providers": 0,
-                "unhealthy_providers": 0
-            }
+                "unhealthy_providers": 0,
+            },
         }
 
         for provider_name, metrics in self._provider_metrics.items():
@@ -329,10 +365,14 @@ class ProviderDiscoveryService:
             report["providers"][provider_name] = {
                 "health": health.value,
                 "total_requests": metrics.total_requests,
-                "success_rate": round(metrics.successful_requests / max(metrics.total_requests, 1), 4),
+                "success_rate": round(
+                    metrics.successful_requests
+                    / max(metrics.total_requests, 1),
+                    4,
+                ),
                 "average_latency_ms": round(metrics.average_latency, 2),
                 "error_rate": round(metrics.error_rate, 4),
-                "last_request_time": metrics.last_request_time
+                "last_request_time": metrics.last_request_time,
             }
 
             # Update summary counts
@@ -348,7 +388,9 @@ class ProviderDiscoveryService:
                 report["summary"]["unhealthy_providers"] += 1
 
         # Cache the result (5 minutes TTL for performance reports)
-        await cache.set(cache_key, report, ttl=300, category="providers", priority=2)
+        await cache.set(
+            cache_key, report, ttl=300, category="providers", priority=2
+        )
 
         return report
 
@@ -376,17 +418,17 @@ class ProviderDiscoveryService:
 
         # Filter stats for provider-related entries
         provider_entries = 0
-        for category, count in stats.get('categories', {}).items():
-            if category == 'providers':
+        for category, count in stats.get("categories", {}).items():
+            if category == "providers":
                 provider_entries = count
                 break
 
         return {
-            'provider_cache_entries': provider_entries,
-            'total_cache_entries': stats.get('entries', 0),
-            'cache_hit_rate': stats.get('hit_rate', 0),
-            'cache_memory_usage_mb': stats.get('memory_usage_mb', 0),
-            'cache_max_memory_mb': stats.get('max_memory_mb', 0)
+            "provider_cache_entries": provider_entries,
+            "total_cache_entries": stats.get("entries", 0),
+            "cache_hit_rate": stats.get("hit_rate", 0),
+            "cache_memory_usage_mb": stats.get("memory_usage_mb", 0),
+            "cache_max_memory_mb": stats.get("max_memory_mb", 0),
         }
 
 

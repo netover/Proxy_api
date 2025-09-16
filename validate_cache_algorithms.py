@@ -10,7 +10,7 @@ import sys
 import os
 
 # Add src to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 
 from src.core.unified_cache import UnifiedCache
 
@@ -25,7 +25,7 @@ async def validate_lru_eviction():
         max_size=5,  # Small size to trigger eviction quickly
         default_ttl=300,
         max_memory_mb=256,
-        enable_disk_cache=False
+        enable_disk_cache=False,
     )
 
     await cache.start()
@@ -104,7 +104,7 @@ async def validate_ttl_expiration():
         max_size=100,
         default_ttl=300,
         max_memory_mb=256,
-        enable_disk_cache=False
+        enable_disk_cache=False,
     )
 
     await cache.start()
@@ -112,7 +112,9 @@ async def validate_ttl_expiration():
     # Test 1: Short TTL expiration
     print("Test 1: Short TTL (2 seconds)")
     short_ttl_key = "short_ttl_entry"
-    await cache.set(short_ttl_key, {"data": "short_ttl"}, ttl=2, category="test")
+    await cache.set(
+        short_ttl_key, {"data": "short_ttl"}, ttl=2, category="test"
+    )
     print(f"  Set entry with 2-second TTL")
 
     # Check immediately
@@ -130,7 +132,9 @@ async def validate_ttl_expiration():
     # Test 2: Long TTL (not expired)
     print("\nTest 2: Long TTL (30 seconds)")
     long_ttl_key = "long_ttl_entry"
-    await cache.set(long_ttl_key, {"data": "long_ttl"}, ttl=30, category="test")
+    await cache.set(
+        long_ttl_key, {"data": "long_ttl"}, ttl=30, category="test"
+    )
     print(f"  Set entry with 30-second TTL")
 
     # Check immediately
@@ -140,7 +144,9 @@ async def validate_ttl_expiration():
     # Test 3: Smart TTL extension
     print("\nTest 3: Smart TTL Extension")
     smart_ttl_key = "smart_ttl_entry"
-    await cache.set(smart_ttl_key, {"data": "smart_ttl"}, ttl=10, category="test")
+    await cache.set(
+        smart_ttl_key, {"data": "smart_ttl"}, ttl=10, category="test"
+    )
     print(f"  Set entry with 10-second TTL")
 
     # Access frequently to trigger smart TTL
@@ -169,7 +175,7 @@ async def validate_ttl_expiration():
     await cache.stop()
 
     short_ttl_works = True  # From the test above
-    long_ttl_works = True   # From the test above
+    long_ttl_works = True  # From the test above
 
     print("\nTTL Validation Results:")
     print(f"  Short TTL expiration: {'✓' if short_ttl_works else '✗'}")
@@ -189,7 +195,7 @@ async def validate_memory_management():
         max_size=100,
         default_ttl=300,
         max_memory_mb=1,  # Very small memory limit
-        enable_disk_cache=False
+        enable_disk_cache=False,
     )
 
     await cache.start()
@@ -206,19 +212,25 @@ async def validate_memory_management():
     # Check memory stats
     stats = await cache.get_stats()
     print("\nMemory stats:")
-    print(f"  Memory usage: {stats['memory_usage_mb']} MB / {stats['max_memory_mb']} MB")
+    print(
+        f"  Memory usage: {stats['memory_usage_mb']} MB / {stats['max_memory_mb']} MB"
+    )
     print(f"  Memory pressure events: {stats['memory_pressure_events']}")
     print(f"  Evictions: {stats['evictions']}")
 
     # Verify memory limits are respected
-    memory_within_limits = stats['memory_usage_mb'] <= stats['max_memory_mb'] * 1.5  # Allow some buffer
+    memory_within_limits = (
+        stats["memory_usage_mb"] <= stats["max_memory_mb"] * 1.5
+    )  # Allow some buffer
     print(f"  Memory within limits: {memory_within_limits}")
 
     await cache.stop()
 
     print("\nMemory Management Results:")
     print(f"  Memory limits respected: {'✓' if memory_within_limits else '✗'}")
-    print(f"  Memory pressure handling: {'✓' if stats['memory_pressure_events'] > 0 else '✗'}")
+    print(
+        f"  Memory pressure handling: {'✓' if stats['memory_pressure_events'] > 0 else '✗'}"
+    )
 
     return memory_within_limits
 
@@ -248,11 +260,15 @@ async def main():
         print(f"Memory Management:{'PASSED' if memory_success else 'FAILED'}")
 
         all_passed = lru_success and ttl_success and memory_success
-        print(f"\nOverall Status:   {'ALL TESTS PASSED' if all_passed else 'SOME TESTS FAILED'}")
+        print(
+            f"\nOverall Status:   {'ALL TESTS PASSED' if all_passed else 'SOME TESTS FAILED'}"
+        )
 
         if all_passed:
             print("\n✓ Cache algorithms are working correctly!")
-            print("✓ LRU eviction properly removes least recently used entries")
+            print(
+                "✓ LRU eviction properly removes least recently used entries"
+            )
             print("✓ TTL expiration correctly removes expired entries")
             print("✓ Memory management prevents excessive memory usage")
         else:

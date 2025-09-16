@@ -9,16 +9,17 @@ from src.core.unified_config import ConfigManager, UnifiedConfig
 
 logger = ContextualLogger(__name__)
 
+
 class AppState:
     """Centralized application state to break circular dependencies"""
-    
+
     def __init__(self):
         self.config_manager: Optional[ConfigManager] = None
         self.provider_factory: Optional[ProviderFactory] = None
         self.config: Optional[UnifiedConfig] = None
         self.initialized = False
         self._init_lock = asyncio.Lock()
-    
+
     async def initialize(self, config_path: Optional[Path] = None):
         """Initialize all components in correct order, protected by a lock."""
         async with self._init_lock:
@@ -37,14 +38,20 @@ class AppState:
 
                 # 3. Load configuration
                 self.config = self.config_manager.load_config()
-                logger.info(f"Loaded config with {len(self.config.providers)} providers")
+                logger.info(
+                    f"Loaded config with {len(self.config.providers)} providers"
+                )
 
                 # 4. Initialize providers
-                await self.provider_factory.initialize_providers(self.config.providers)
+                await self.provider_factory.initialize_providers(
+                    self.config.providers
+                )
                 logger.info("Providers initialized successfully")
 
                 # 5. Configure rate limiter
-                rate_limiter.configure_limits(self.config.settings.rate_limit_rpm)
+                rate_limiter.configure_limits(
+                    self.config.settings.rate_limit_rpm
+                )
 
                 self.initialized = True
                 logger.info("AppState initialization complete")
@@ -52,12 +59,12 @@ class AppState:
             except Exception as e:
                 logger.error(f"Failed to initialize AppState: {e}")
                 raise
-    
+
     async def shutdown(self):
         """Cleanup all resources"""
         if not self.initialized:
             return
-            
+
         logger.info("Shutting down AppState")
         try:
             if self.provider_factory:
@@ -66,6 +73,7 @@ class AppState:
             logger.info("AppState shutdown complete")
         except Exception as e:
             logger.error(f"Error during AppState shutdown: {e}")
+
 
 # Global app state instance
 app_state = AppState()

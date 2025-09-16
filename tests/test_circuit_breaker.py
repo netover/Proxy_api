@@ -10,11 +10,16 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from src.core.circuit_breaker import (
-    CircuitBreakerOpenException, CircuitState, DistributedCircuitBreaker,
-    get_circuit_breaker, initialize_circuit_breakers)
+    CircuitBreakerOpenException,
+    CircuitState,
+    DistributedCircuitBreaker,
+    get_circuit_breaker,
+    initialize_circuit_breakers,
+)
 
 # Mark all tests in this file as asyncio
 pytestmark = pytest.mark.asyncio
+
 
 @pytest.fixture
 def mock_redis():
@@ -35,6 +40,7 @@ def mock_redis():
     mock.pipeline.return_value = pipeline
     return mock
 
+
 @pytest.fixture
 async def circuit_breaker(mock_redis):
     """Fixture to create a DistributedCircuitBreaker instance with a mocked redis."""
@@ -46,13 +52,16 @@ async def circuit_breaker(mock_redis):
     )
     return breaker
 
+
 async def successful_func():
     """A function that always succeeds."""
     return "success"
 
+
 async def failing_func():
     """A function that always fails."""
     raise ValueError("Test failure")
+
 
 class TestDistributedCircuitBreaker:
     async def test_initial_state_is_closed(self, circuit_breaker, mock_redis):
@@ -61,7 +70,9 @@ class TestDistributedCircuitBreaker:
         assert state["failures"] == 0
         mock_redis.get.assert_called_once_with(circuit_breaker.key)
 
-    async def test_successful_call_in_closed_state(self, circuit_breaker, mock_redis):
+    async def test_successful_call_in_closed_state(
+        self, circuit_breaker, mock_redis
+    ):
         result = await circuit_breaker.call(successful_func)
         assert result == "success"
         # No change to state, so no set/delete calls
@@ -71,7 +82,7 @@ class TestDistributedCircuitBreaker:
     async def test_failure_increments_count(self, circuit_breaker, mock_redis):
         # Mock the pipeline to control the transaction
         pipeline = mock_redis.pipeline.return_value
-        pipeline.get.return_value = None # First call, no state exists
+        pipeline.get.return_value = None  # First call, no state exists
 
         with pytest.raises(ValueError):
             await circuit_breaker.call(failing_func)
@@ -82,7 +93,11 @@ class TestDistributedCircuitBreaker:
         pipeline.execute.assert_called_once()
 
         # Check the new state that was set
-        expected_state = {"state": CircuitState.CLOSED.value, "failures": 1, "timestamp": time.time()}
+        expected_state = {
+            "state": CircuitState.CLOSED.value,
+            "failures": 1,
+            "timestamp": time.time(),
+        }
         # Get the call arguments for the set call
         call_args = pipeline.set.call_args[0]
         actual_state = json.loads(call_args[1])
@@ -91,9 +106,17 @@ class TestDistributedCircuitBreaker:
         assert actual_state["state"] == expected_state["state"]
         assert actual_state["failures"] == expected_state["failures"]
 
-    async def test_circuit_opens_after_threshold(self, circuit_breaker, mock_redis):
+    async def test_circuit_opens_after_threshold(
+        self, circuit_breaker, mock_redis
+    ):
         # Simulate 2 existing failures
-        initial_state = json.dumps({"state": CircuitState.CLOSED.value, "failures": 2, "timestamp": time.time()})
+        initial_state = json.dumps(
+            {
+                "state": CircuitState.CLOSED.value,
+                "failures": 2,
+                "timestamp": time.time(),
+            }
+        )
         pipeline = mock_redis.pipeline.return_value
         pipeline.get.return_value = initial_state
 
@@ -107,18 +130,34 @@ class TestDistributedCircuitBreaker:
         assert actual_state["state"] == CircuitState.OPEN.value
         assert actual_state["failures"] == 3
 
-    async def test_open_circuit_rejects_calls(self, circuit_breaker, mock_redis):
+    async def test_open_circuit_rejects_calls(
+        self, circuit_breaker, mock_redis
+    ):
         # Set state to OPEN
-        open_state = json.dumps({"state": CircuitState.OPEN.value, "failures": 3, "timestamp": time.time()})
+        open_state = json.dumps(
+            {
+                "state": CircuitState.OPEN.value,
+                "failures": 3,
+                "timestamp": time.time(),
+            }
+        )
         mock_redis.get.return_value = open_state
 
         with pytest.raises(CircuitBreakerOpenException):
             await circuit_breaker.call(successful_func)
 
-    async def test_circuit_moves_to_half_open(self, circuit_breaker, mock_redis):
+    async def test_circuit_moves_to_half_open(
+        self, circuit_breaker, mock_redis
+    ):
         # Set state to OPEN, but with an expired timestamp
         expired_time = time.time() - circuit_breaker.recovery_timeout - 1
-        open_state = json.dumps({"state": CircuitState.OPEN.value, "failures": 3, "timestamp": expired_time})
+        open_state = json.dumps(
+            {
+                "state": CircuitState.OPEN.value,
+                "failures": 3,
+                "timestamp": expired_time,
+            }
+        )
         mock_redis.get.return_value = open_state
 
         # Getting the state should trigger the move to HALF_OPEN
@@ -130,9 +169,17 @@ class TestDistributedCircuitBreaker:
         actual_state = json.loads(call_args[1])
         assert actual_state["state"] == CircuitState.HALF_OPEN.value
 
-    async def test_half_open_closes_on_success(self, circuit_breaker, mock_redis):
+    async def test_half_open_closes_on_success(
+        self, circuit_breaker, mock_redis
+    ):
         # Set state to HALF_OPEN
-        half_open_state = json.dumps({"state": CircuitState.HALF_OPEN.value, "failures": 0, "timestamp": time.time()})
+        half_open_state = json.dumps(
+            {
+                "state": CircuitState.HALF_OPEN.value,
+                "failures": 0,
+                "timestamp": time.time(),
+            }
+        )
         mock_redis.get.return_value = half_open_state
 
         # A successful call should reset the circuit
@@ -141,9 +188,17 @@ class TestDistributedCircuitBreaker:
         # Verify the key was deleted (resetting to CLOSED)
         mock_redis.delete.assert_called_once_with(circuit_breaker.key)
 
-    async def test_half_open_reopens_on_failure(self, circuit_breaker, mock_redis):
+    async def test_half_open_reopens_on_failure(
+        self, circuit_breaker, mock_redis
+    ):
         # Set state to HALF_OPEN
-        half_open_state = json.dumps({"state": CircuitState.HALF_OPEN.value, "failures": 0, "timestamp": time.time()})
+        half_open_state = json.dumps(
+            {
+                "state": CircuitState.HALF_OPEN.value,
+                "failures": 0,
+                "timestamp": time.time(),
+            }
+        )
         mock_redis.get.return_value = half_open_state
 
         pipeline = mock_redis.pipeline.return_value
@@ -158,7 +213,9 @@ class TestDistributedCircuitBreaker:
         actual_state = json.loads(call_args[1])
         assert actual_state["state"] == CircuitState.OPEN.value
 
-    async def test_transaction_retry_on_watch_error(self, circuit_breaker, mock_redis):
+    async def test_transaction_retry_on_watch_error(
+        self, circuit_breaker, mock_redis
+    ):
         """Test that the failure recording logic retries if a WatchError occurs."""
         pipeline = mock_redis.pipeline.return_value
 
@@ -186,7 +243,9 @@ class TestCircuitBreakerFactory:
 
         cb1 = get_circuit_breaker("factory_test_1")
         cb2 = get_circuit_breaker("factory_test_2")
-        cb3 = get_circuit_breaker("factory_test_1")  # Should return the same instance
+        cb3 = get_circuit_breaker(
+            "factory_test_1"
+        )  # Should return the same instance
 
         assert isinstance(cb1, DistributedCircuitBreaker)
         assert cb1 is cb3
@@ -197,6 +256,7 @@ class TestCircuitBreakerFactory:
         """Test that calling get_circuit_breaker before initialization raises an error."""
         # Reset the global state for this test
         from src.core import circuit_breaker
+
         circuit_breaker._redis_client = None
         circuit_breaker._circuit_breakers = {}
 

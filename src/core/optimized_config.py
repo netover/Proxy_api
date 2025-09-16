@@ -25,6 +25,7 @@ import yaml
 try:
     from watchdog.events import FileSystemEventHandler
     from watchdog.observers import Observer
+
     WATCHDOG_AVAILABLE = True
 except ImportError:
     WATCHDOG_AVAILABLE = False
@@ -33,9 +34,11 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
+
 @dataclass
 class ConfigTiming:
     """Tracks configuration loading performance"""
+
     start_time: float
     end_time: float
     file_size: int
@@ -45,6 +48,7 @@ class ConfigTiming:
     @property
     def duration_ms(self) -> float:
         return (self.end_time - self.start_time) * 1000
+
 
 class ConfigCache:
     """Advanced configuration cache with TTL and memory management"""
@@ -57,7 +61,9 @@ class ConfigCache:
         self.ttl_seconds = ttl_seconds
         self._executor = ThreadPoolExecutor(max_workers=2)
 
-    def _get_cache_key(self, file_path: Path, section: Optional[str] = None) -> str:
+    def _get_cache_key(
+        self, file_path: Path, section: Optional[str] = None
+    ) -> str:
         """Generate cache key from file path and optional section"""
         content = f"{file_path}:{section or 'full'}"
         return hashlib.md5(content.encode()).hexdigest()
@@ -82,16 +88,19 @@ class ConfigCache:
         # If still over size limit, remove least recently used
         if len(self.cache) > self.max_size:
             # Sort by access time (oldest first)
-            sorted_keys = sorted(self.access_times.keys(),
-                               key=lambda k: self.access_times[k])
-            keys_to_remove = sorted_keys[:len(self.cache) - self.max_size]
+            sorted_keys = sorted(
+                self.access_times.keys(), key=lambda k: self.access_times[k]
+            )
+            keys_to_remove = sorted_keys[: len(self.cache) - self.max_size]
 
             for key in keys_to_remove:
                 del self.cache[key]
                 del self.timestamps[key]
                 del self.access_times[key]
 
-    def get(self, file_path: Path, section: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    def get(
+        self, file_path: Path, section: Optional[str] = None
+    ) -> Optional[Dict[str, Any]]:
         """Get cached configuration"""
         key = self._get_cache_key(file_path, section)
 
@@ -101,7 +110,12 @@ class ConfigCache:
 
         return None
 
-    def set(self, file_path: Path, data: Dict[str, Any], section: Optional[str] = None):
+    def set(
+        self,
+        file_path: Path,
+        data: Dict[str, Any],
+        section: Optional[str] = None,
+    ):
         """Cache configuration data"""
         self._evict_old_entries()
 
@@ -124,6 +138,7 @@ class ConfigCache:
         self.timestamps.clear()
         self.access_times.clear()
 
+
 class ConfigFileWatcher(FileSystemEventHandler):
     """File system watcher for configuration changes"""
 
@@ -132,24 +147,39 @@ class ConfigFileWatcher(FileSystemEventHandler):
 
     def on_modified(self, event):
         """Handle file modification events"""
-        if not event.is_directory and event.src_path.endswith(('.yaml', '.yml', '.json')):
+        if not event.is_directory and event.src_path.endswith(
+            (".yaml", ".yml", ".json")
+        ):
             file_path = Path(event.src_path)
             logger.info(f"Configuration file changed: {file_path}")
             self.config_loader.invalidate_cache(file_path)
+
 
 class OptimizedConfigLoader:
     """Optimized configuration loader with lazy loading and caching"""
 
     # Define critical vs non-critical sections
     CRITICAL_SECTIONS = {
-        'app', 'server', 'auth', 'providers', 'logging',
-        'rate_limit', 'circuit_breaker', 'health_check'
+        "app",
+        "server",
+        "auth",
+        "providers",
+        "logging",
+        "rate_limit",
+        "circuit_breaker",
+        "health_check",
     }
 
     NON_CRITICAL_SECTIONS = {
-        'telemetry', 'chaos_engineering', 'templates',
-        'condensation', 'caching', 'memory', 'http_client',
-        'load_testing', 'network_simulation'
+        "telemetry",
+        "chaos_engineering",
+        "templates",
+        "condensation",
+        "caching",
+        "memory",
+        "http_client",
+        "load_testing",
+        "network_simulation",
     }
 
     def __init__(self, config_path: Path, enable_watching: bool = True):
@@ -175,7 +205,9 @@ class OptimizedConfigLoader:
         try:
             self.observer = Observer()
             self.watcher = ConfigFileWatcher(self)
-            self.observer.schedule(self.watcher, str(self.config_path.parent), recursive=False)
+            self.observer.schedule(
+                self.watcher, str(self.config_path.parent), recursive=False
+            )
             self.observer.start()
         except Exception as e:
             logger.warning(f"Failed to setup file watching: {e}")
@@ -183,7 +215,7 @@ class OptimizedConfigLoader:
 
     def _calculate_file_hash(self, file_path: Path) -> str:
         """Calculate file hash for change detection"""
-        with open(file_path, 'rb') as f:
+        with open(file_path, "rb") as f:
             return hashlib.md5(f.read()).hexdigest()
 
     async def _load_file_async(self, file_path: Path) -> Dict[str, Any]:
@@ -194,28 +226,34 @@ class OptimizedConfigLoader:
             start_time = time.time()
             file_size = file_path.stat().st_size
 
-            with open(file_path, 'r', encoding='utf-8') as f:
-                if file_path.suffix.lower() in ['.yaml', '.yml']:
+            with open(file_path, "r", encoding="utf-8") as f:
+                if file_path.suffix.lower() in [".yaml", ".yml"]:
                     data = yaml.safe_load(f)
-                elif file_path.suffix.lower() == '.json':
+                elif file_path.suffix.lower() == ".json":
                     data = json.load(f)
                 else:
-                    raise ValueError(f"Unsupported config format: {file_path.suffix}")
+                    raise ValueError(
+                        f"Unsupported config format: {file_path.suffix}"
+                    )
 
             end_time = time.time()
-            self.timings.append(ConfigTiming(
-                start_time=start_time,
-                end_time=end_time,
-                file_size=file_size,
-                cache_hit=False,
-                lazy_loaded=False
-            ))
+            self.timings.append(
+                ConfigTiming(
+                    start_time=start_time,
+                    end_time=end_time,
+                    file_size=file_size,
+                    cache_hit=False,
+                    lazy_loaded=False,
+                )
+            )
 
             return data
 
         return await loop.run_in_executor(self._executor, _sync_load)
 
-    async def _load_file_with_validation_async(self, file_path: Path) -> Dict[str, Any]:
+    async def _load_file_with_validation_async(
+        self, file_path: Path
+    ) -> Dict[str, Any]:
         """Load configuration file with schema validation"""
         from .config_schema import config_validator
 
@@ -234,19 +272,22 @@ class OptimizedConfigLoader:
         # Check cache first
         cached = self.cache.get(self.config_path, "critical")
         if cached:
-            self.timings.append(ConfigTiming(
-                start_time=time.time(),
-                end_time=time.time(),
-                file_size=0,
-                cache_hit=True,
-                lazy_loaded=True
-            ))
+            self.timings.append(
+                ConfigTiming(
+                    start_time=time.time(),
+                    end_time=time.time(),
+                    file_size=0,
+                    cache_hit=True,
+                    lazy_loaded=True,
+                )
+            )
             return cached
 
         # Load full config and extract critical sections
         full_config = await self._load_file_async(self.config_path)
         critical_config = {
-            key: value for key, value in full_config.items()
+            key: value
+            for key, value in full_config.items()
             if key in self.CRITICAL_SECTIONS
         }
 
@@ -289,13 +330,15 @@ class OptimizedConfigLoader:
         # Check cache
         cached = self.cache.get(self.config_path)
         if cached:
-            self.timings.append(ConfigTiming(
-                start_time=time.time(),
-                end_time=time.time(),
-                file_size=0,
-                cache_hit=True,
-                lazy_loaded=False
-            ))
+            self.timings.append(
+                ConfigTiming(
+                    start_time=time.time(),
+                    end_time=time.time(),
+                    file_size=0,
+                    cache_hit=True,
+                    lazy_loaded=False,
+                )
+            )
             return cached
 
         # Load fresh with validation
@@ -317,7 +360,11 @@ class OptimizedConfigLoader:
     def get_performance_stats(self) -> Dict[str, Any]:
         """Get performance statistics"""
         if not self.timings:
-            return {"total_loads": 0, "average_duration_ms": 0, "cache_hit_rate": 0}
+            return {
+                "total_loads": 0,
+                "average_duration_ms": 0,
+                "cache_hit_rate": 0,
+            }
 
         total_loads = len(self.timings)
         cache_hits = sum(1 for t in self.timings if t.cache_hit)
@@ -326,35 +373,42 @@ class OptimizedConfigLoader:
         return {
             "total_loads": total_loads,
             "average_duration_ms": total_duration / total_loads,
-            "cache_hit_rate": cache_hits / total_loads if total_loads > 0 else 0,
+            "cache_hit_rate": (
+                cache_hits / total_loads if total_loads > 0 else 0
+            ),
             "total_file_size_loaded": sum(t.file_size for t in self.timings),
-            "lazy_loads": sum(1 for t in self.timings if t.lazy_loaded)
+            "lazy_loads": sum(1 for t in self.timings if t.lazy_loaded),
         }
 
     async def shutdown(self):
         """Cleanup resources"""
-        if hasattr(self, 'observer') and self.observer:
+        if hasattr(self, "observer") and self.observer:
             self.observer.stop()
             self.observer.join()
 
         self._executor.shutdown(wait=True)
         self.cache.clear()
 
+
 # Global instance
 config_loader = OptimizedConfigLoader(Path("config.yaml"))
+
 
 # Convenience functions
 async def load_critical_config() -> Dict[str, Any]:
     """Load critical configuration sections only"""
     return await config_loader.load_critical_config()
 
+
 async def load_config_section(section: str) -> Optional[Any]:
     """Load a specific configuration section lazily"""
     return await config_loader.load_section_lazy(section)
 
+
 async def load_full_config() -> Dict[str, Any]:
     """Load complete configuration"""
     return await config_loader.load_full_config()
+
 
 def get_config_performance_stats() -> Dict[str, Any]:
     """Get configuration loading performance statistics"""

@@ -16,7 +16,7 @@ from proxy_context.feature_flags import (
     is_feature_enabled,
     enable_feature_flag,
     disable_feature_flag,
-    CACHE_FEATURE_FLAGS
+    CACHE_FEATURE_FLAGS,
 )
 
 
@@ -29,7 +29,7 @@ class TestFeatureFlag:
             name="test_flag",
             enabled=True,
             rollout_percentage=50,
-            description="Test flag"
+            description="Test flag",
         )
 
         assert flag.name == "test_flag"
@@ -44,7 +44,7 @@ class TestFeatureFlag:
             enabled=True,
             rollout_percentage=75,
             description="Test flag",
-            conditions={"env": "test"}
+            conditions={"env": "test"},
         )
 
         data = flag.to_dict()
@@ -58,7 +58,9 @@ class TestFeatureFlag:
 
     def test_rollout_percentage_full(self):
         """Test 100% rollout"""
-        flag = FeatureFlag(name="test_flag", enabled=True, rollout_percentage=100)
+        flag = FeatureFlag(
+            name="test_flag", enabled=True, rollout_percentage=100
+        )
 
         # Should always be enabled regardless of context
         assert flag.is_enabled_for() is True
@@ -66,7 +68,9 @@ class TestFeatureFlag:
 
     def test_rollout_percentage_zero(self):
         """Test 0% rollout"""
-        flag = FeatureFlag(name="test_flag", enabled=True, rollout_percentage=0)
+        flag = FeatureFlag(
+            name="test_flag", enabled=True, rollout_percentage=0
+        )
 
         # Should never be enabled
         assert flag.is_enabled_for() is False
@@ -74,7 +78,9 @@ class TestFeatureFlag:
 
     def test_rollout_percentage_partial(self):
         """Test partial rollout with deterministic hashing"""
-        flag = FeatureFlag(name="test_flag", enabled=True, rollout_percentage=50)
+        flag = FeatureFlag(
+            name="test_flag", enabled=True, rollout_percentage=50
+        )
 
         # Test with known user IDs to verify deterministic behavior
         # These specific user IDs are chosen to fall within/outside the 50% rollout
@@ -87,7 +93,7 @@ class TestFeatureFlag:
             name="test_flag",
             enabled=True,
             rollout_percentage=100,
-            conditions={"env": "production"}
+            conditions={"env": "production"},
         )
 
         # Should be enabled only when condition matches
@@ -97,7 +103,9 @@ class TestFeatureFlag:
 
     def test_disabled_flag(self):
         """Test disabled flag"""
-        flag = FeatureFlag(name="test_flag", enabled=False, rollout_percentage=100)
+        flag = FeatureFlag(
+            name="test_flag", enabled=False, rollout_percentage=100
+        )
 
         assert flag.is_enabled_for() is False
         assert flag.is_enabled_for({"user_id": "user1"}) is False
@@ -120,7 +128,12 @@ class TestFeatureFlagManager:
         manager = FeatureFlagManager()
 
         # Set a flag
-        manager.set_flag("test_flag", enabled=True, rollout_percentage=100, description="Test")
+        manager.set_flag(
+            "test_flag",
+            enabled=True,
+            rollout_percentage=100,
+            description="Test",
+        )
 
         # Check if it exists
         flag = manager.get_flag("test_flag")
@@ -149,14 +162,14 @@ class TestFeatureFlagManager:
                     "name": "flag1",
                     "enabled": True,
                     "rollout_percentage": 100,
-                    "description": "Flag 1"
+                    "description": "Flag 1",
                 },
                 {
                     "name": "flag2",
                     "enabled": False,
                     "rollout_percentage": 50,
-                    "description": "Flag 2"
-                }
+                    "description": "Flag 2",
+                },
             ]
         }
 
@@ -164,7 +177,7 @@ class TestFeatureFlagManager:
             config_file = Path(temp_dir) / "feature_flags.json"
 
             # Write config file
-            with open(config_file, 'w') as f:
+            with open(config_file, "w") as f:
                 json.dump(config_data, f)
 
             # Create manager
@@ -180,13 +193,14 @@ class TestFeatureFlagManager:
         env_vars = {
             "FEATURE_TEST_ENABLED": "true",
             "FEATURE_TEST_ROLLOUT": "100",
-            "FEATURE_TEST_DESCRIPTION": "Test flag from env"
+            "FEATURE_TEST_DESCRIPTION": "Test flag from env",
         }
 
         with patch.dict(os.environ, env_vars):
             # Create a fresh manager without loading existing config
             import tempfile
             from pathlib import Path
+
             with tempfile.TemporaryDirectory() as temp_dir:
                 config_file = Path(temp_dir) / "test_flags.json"
                 manager = FeatureFlagManager(config_file=config_file)
@@ -196,7 +210,9 @@ class TestFeatureFlagManager:
                 manager._load_from_env()
 
                 # Check flag was loaded from env
-                assert "test" in manager._flags, f"Flag 'test' not found in {list(manager._flags.keys())}"
+                assert (
+                    "test" in manager._flags
+                ), f"Flag 'test' not found in {list(manager._flags.keys())}"
                 flag = manager.get_flag("test")
 
                 # Test with context that should be enabled
@@ -221,7 +237,7 @@ class TestFeatureFlagManager:
             # Verify file was created and contains correct data
             assert config_file.exists()
 
-            with open(config_file, 'r') as f:
+            with open(config_file, "r") as f:
                 data = json.load(f)
 
             assert len(data["flags"]) == 2
@@ -249,8 +265,12 @@ class TestFeatureFlagManager:
         """Test listing all flags"""
         manager = FeatureFlagManager()
 
-        manager.set_flag("flag1", enabled=True, rollout_percentage=100, description="Flag 1")
-        manager.set_flag("flag2", enabled=False, rollout_percentage=50, description="Flag 2")
+        manager.set_flag(
+            "flag1", enabled=True, rollout_percentage=100, description="Flag 1"
+        )
+        manager.set_flag(
+            "flag2", enabled=False, rollout_percentage=50, description="Flag 2"
+        )
 
         flags = manager.list_flags()
 
@@ -268,6 +288,7 @@ class TestConvenienceFunctions:
         """Test the global convenience functions"""
         # Reset the global manager
         import proxy_context.feature_flags
+
         proxy_context.feature_flags._feature_flag_manager = None
 
         # Enable a flag

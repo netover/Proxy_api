@@ -43,7 +43,7 @@ class FeatureFlag:
         # Check rollout percentage
         if self.rollout_percentage < 100:
             context = context or {}
-            user_id = context.get('user_id', 'anonymous')
+            user_id = context.get("user_id", "anonymous")
             key = f"{self.name}:{user_id}"
 
             # Use consistent hashing for deterministic rollout
@@ -58,24 +58,24 @@ class FeatureFlag:
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for serialization"""
         return {
-            'name': self.name,
-            'enabled': self.enabled,
-            'rollout_percentage': self.rollout_percentage,
-            'description': self.description,
-            'conditions': self.conditions,
-            'metadata': self.metadata
+            "name": self.name,
+            "enabled": self.enabled,
+            "rollout_percentage": self.rollout_percentage,
+            "description": self.description,
+            "conditions": self.conditions,
+            "metadata": self.metadata,
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'FeatureFlag':
+    def from_dict(cls, data: Dict[str, Any]) -> "FeatureFlag":
         """Create from dictionary"""
         return cls(
-            name=data['name'],
-            enabled=data.get('enabled', False),
-            rollout_percentage=data.get('rollout_percentage', 0),
-            description=data.get('description', ''),
-            conditions=data.get('conditions', {}),
-            metadata=data.get('metadata', {})
+            name=data["name"],
+            enabled=data.get("enabled", False),
+            rollout_percentage=data.get("rollout_percentage", 0),
+            description=data.get("description", ""),
+            conditions=data.get("conditions", {}),
+            metadata=data.get("metadata", {}),
         )
 
 
@@ -89,7 +89,7 @@ class FeatureFlagManager:
         self,
         config_file: Optional[Path] = None,
         auto_reload: bool = True,
-        reload_interval: int = 60
+        reload_interval: int = 60,
     ):
         self.config_file = config_file or Path.cwd() / "feature_flags.json"
         self.auto_reload = auto_reload
@@ -104,7 +104,9 @@ class FeatureFlagManager:
         self._load_from_config()
         self._load_from_env()
 
-        logger.info(f"FeatureFlagManager initialized with {len(self._flags)} flags")
+        logger.info(
+            f"FeatureFlagManager initialized with {len(self._flags)} flags"
+        )
 
     def _load_from_config(self):
         """Load flags from configuration file"""
@@ -113,11 +115,11 @@ class FeatureFlagManager:
             return
 
         try:
-            with open(self.config_file, 'r', encoding='utf-8') as f:
+            with open(self.config_file, "r", encoding="utf-8") as f:
                 data = json.load(f)
 
             with self._lock:
-                for flag_data in data.get('flags', []):
+                for flag_data in data.get("flags", []):
                     flag = FeatureFlag.from_dict(flag_data)
                     self._flags[flag.name] = flag
 
@@ -133,17 +135,19 @@ class FeatureFlagManager:
         # FEATURE_<FLAG_NAME>_DESCRIPTION="Description"
 
         for key, value in os.environ.items():
-            if key.startswith('FEATURE_') and key.endswith('_ENABLED'):
-                flag_name = key[8:-8].lower()  # Remove FEATURE_ and _ENABLED, convert to lowercase
-                enabled = value.lower() in ('true', '1', 'yes', 'on')
+            if key.startswith("FEATURE_") and key.endswith("_ENABLED"):
+                flag_name = key[
+                    8:-8
+                ].lower()  # Remove FEATURE_ and _ENABLED, convert to lowercase
+                enabled = value.lower() in ("true", "1", "yes", "on")
 
                 # Get rollout percentage
                 rollout_key = f"FEATURE_{flag_name.upper()}_ROLLOUT"
-                rollout_percentage = int(os.environ.get(rollout_key, '100'))
+                rollout_percentage = int(os.environ.get(rollout_key, "100"))
 
                 # Get description
                 desc_key = f"FEATURE_{flag_name.upper()}_DESCRIPTION"
-                description = os.environ.get(desc_key, '')
+                description = os.environ.get(desc_key, "")
 
                 with self._lock:
                     if flag_name not in self._flags:
@@ -151,17 +155,21 @@ class FeatureFlagManager:
                             name=flag_name,
                             enabled=enabled,
                             rollout_percentage=rollout_percentage,
-                            description=description
+                            description=description,
                         )
                     else:
                         self._flags[flag_name].enabled = enabled
-                        self._flags[flag_name].rollout_percentage = rollout_percentage
+                        self._flags[flag_name].rollout_percentage = (
+                            rollout_percentage
+                        )
                         if description:
                             self._flags[flag_name].description = description
 
         logger.debug("Loaded flags from environment variables")
 
-    def is_enabled(self, flag_name: str, context: Optional[Dict[str, Any]] = None) -> bool:
+    def is_enabled(
+        self, flag_name: str, context: Optional[Dict[str, Any]] = None
+    ) -> bool:
         """Check if a feature flag is enabled"""
         with self._lock:
             flag = self._flags.get(flag_name)
@@ -180,7 +188,7 @@ class FeatureFlagManager:
         enabled: bool = True,
         rollout_percentage: int = 100,
         description: str = "",
-        conditions: Optional[Dict[str, Any]] = None
+        conditions: Optional[Dict[str, Any]] = None,
     ):
         """Set or update a feature flag"""
         with self._lock:
@@ -193,11 +201,15 @@ class FeatureFlagManager:
                 flag.conditions = conditions
 
             self._flags[name] = flag
-            logger.info(f"Updated feature flag: {name} (enabled={enabled}, rollout={rollout_percentage}%)")
+            logger.info(
+                f"Updated feature flag: {name} (enabled={enabled}, rollout={rollout_percentage}%)"
+            )
 
     def enable_flag(self, name: str, rollout_percentage: int = 100):
         """Enable a feature flag"""
-        self.set_flag(name, enabled=True, rollout_percentage=rollout_percentage)
+        self.set_flag(
+            name, enabled=True, rollout_percentage=rollout_percentage
+        )
 
     def disable_flag(self, name: str):
         """Disable a feature flag"""
@@ -206,24 +218,21 @@ class FeatureFlagManager:
     def list_flags(self) -> Dict[str, Dict[str, Any]]:
         """List all feature flags with their status"""
         with self._lock:
-            return {
-                name: flag.to_dict()
-                for name, flag in self._flags.items()
-            }
+            return {name: flag.to_dict() for name, flag in self._flags.items()}
 
     def save_to_config(self):
         """Save current flags to configuration file"""
         try:
             data = {
-                'flags': [flag.to_dict() for flag in self._flags.values()],
-                'metadata': {
-                    'last_updated': self._last_reload,
-                    'version': '1.0'
-                }
+                "flags": [flag.to_dict() for flag in self._flags.values()],
+                "metadata": {
+                    "last_updated": self._last_reload,
+                    "version": "1.0",
+                },
             }
 
             self.config_file.parent.mkdir(parents=True, exist_ok=True)
-            with open(self.config_file, 'w', encoding='utf-8') as f:
+            with open(self.config_file, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
 
             logger.info(f"Saved {len(self._flags)} flags to config file")
@@ -235,22 +244,32 @@ class FeatureFlagManager:
         """Reload configuration from file and environment"""
         self._load_from_config()
         self._load_from_env()
-        self._last_reload = os.path.getmtime(self.config_file) if self.config_file.exists() else 0
+        self._last_reload = (
+            os.path.getmtime(self.config_file)
+            if self.config_file.exists()
+            else 0
+        )
 
     def get_stats(self) -> Dict[str, Any]:
         """Get feature flag statistics"""
         with self._lock:
-            enabled_flags = [flag for flag in self._flags.values() if flag.enabled]
+            enabled_flags = [
+                flag for flag in self._flags.values() if flag.enabled
+            ]
             enabled_count = len(enabled_flags)
-            total_rollout = sum(flag.rollout_percentage for flag in enabled_flags)
+            total_rollout = sum(
+                flag.rollout_percentage for flag in enabled_flags
+            )
 
             return {
-                'total_flags': len(self._flags),
-                'enabled_flags': enabled_count,
-                'disabled_flags': len(self._flags) - enabled_count,
-                'average_rollout_percentage': round(total_rollout / max(enabled_count, 1), 2),
-                'config_file': str(self.config_file),
-                'auto_reload': self.auto_reload
+                "total_flags": len(self._flags),
+                "enabled_flags": enabled_count,
+                "disabled_flags": len(self._flags) - enabled_count,
+                "average_rollout_percentage": round(
+                    total_rollout / max(enabled_count, 1), 2
+                ),
+                "config_file": str(self.config_file),
+                "auto_reload": self.auto_reload,
             }
 
 
@@ -268,7 +287,9 @@ def get_feature_flag_manager() -> FeatureFlagManager:
     return _feature_flag_manager
 
 
-def is_feature_enabled(flag_name: str, context: Optional[Dict[str, Any]] = None) -> bool:
+def is_feature_enabled(
+    flag_name: str, context: Optional[Dict[str, Any]] = None
+) -> bool:
     """Convenience function to check if a feature is enabled"""
     return get_feature_flag_manager().is_enabled(flag_name, context)
 
@@ -285,12 +306,12 @@ def disable_feature_flag(name: str):
 
 # Cache-specific feature flags
 CACHE_FEATURE_FLAGS = {
-    'smart_cache_compression': 'Enable compression in SmartCache',
-    'smart_cache_memory_optimization': 'Enable advanced memory optimization',
-    'model_cache_persistence': 'Enable disk persistence for ModelCache',
-    'model_cache_ttl_extension': 'Extend TTL for model cache entries',
-    'memory_manager_aggressive_gc': 'Enable aggressive garbage collection',
-    'cache_migration_mode': 'Enable migration between cache implementations',
-    'cache_performance_monitoring': 'Enable detailed performance monitoring',
-    'cache_fallback_mode': 'Enable fallback to simpler cache when needed'
+    "smart_cache_compression": "Enable compression in SmartCache",
+    "smart_cache_memory_optimization": "Enable advanced memory optimization",
+    "model_cache_persistence": "Enable disk persistence for ModelCache",
+    "model_cache_ttl_extension": "Extend TTL for model cache entries",
+    "memory_manager_aggressive_gc": "Enable aggressive garbage collection",
+    "cache_migration_mode": "Enable migration between cache implementations",
+    "cache_performance_monitoring": "Enable detailed performance monitoring",
+    "cache_fallback_mode": "Enable fallback to simpler cache when needed",
 }

@@ -10,7 +10,7 @@ import sys
 import os
 
 # Add src to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 
 from src.core.unified_cache import UnifiedCache
 from src.core.model_discovery import ModelDiscoveryService, ProviderConfig
@@ -27,7 +27,7 @@ async def demo_cache_performance():
         max_size=1000,
         default_ttl=300,  # 5 minutes
         max_memory_mb=256,
-        enable_disk_cache=False  # Disable disk for demo
+        enable_disk_cache=False,  # Disable disk for demo
     )
 
     await cache.start()
@@ -39,10 +39,26 @@ async def demo_cache_performance():
 
     # Add some test data
     test_data = {
-        "model:gpt-4": {"name": "GPT-4", "provider": "OpenAI", "context": 8192},
-        "model:gpt-3.5": {"name": "GPT-3.5", "provider": "OpenAI", "context": 4096},
-        "provider:openai": {"name": "OpenAI", "base_url": "https://api.openai.com", "models": ["gpt-4", "gpt-3.5"]},
-        "provider:anthropic": {"name": "Anthropic", "base_url": "https://api.anthropic.com", "models": ["claude-3"]}
+        "model:gpt-4": {
+            "name": "GPT-4",
+            "provider": "OpenAI",
+            "context": 8192,
+        },
+        "model:gpt-3.5": {
+            "name": "GPT-3.5",
+            "provider": "OpenAI",
+            "context": 4096,
+        },
+        "provider:openai": {
+            "name": "OpenAI",
+            "base_url": "https://api.openai.com",
+            "models": ["gpt-4", "gpt-3.5"],
+        },
+        "provider:anthropic": {
+            "name": "Anthropic",
+            "base_url": "https://api.anthropic.com",
+            "models": ["claude-3"],
+        },
     }
 
     # Cache the data
@@ -111,7 +127,9 @@ async def demo_cache_performance():
     print("-" * 30)
 
     memory_stats = await cache.get_stats()
-    print(f"Memory usage: {memory_stats['memory_usage_mb']} MB / {memory_stats['max_memory_mb']} MB")
+    print(
+        f"Memory usage: {memory_stats['memory_usage_mb']} MB / {memory_stats['max_memory_mb']} MB"
+    )
     print(f"Memory pressure events: {memory_stats['memory_pressure_events']}")
 
     # Test 5: Cache Monitoring
@@ -131,9 +149,9 @@ async def demo_cache_performance():
     print(f"Current hit rate: {health_report['current_hit_rate']:.1%}")
     print(f"Target hit rate: {health_report['target_hit_rate']:.1%}")
 
-    if health_report['recommendations']:
+    if health_report["recommendations"]:
         print("Recommendations:")
-        for rec in health_report['recommendations']:
+        for rec in health_report["recommendations"]:
             print(f"   - {rec}")
 
     # Stop monitoring
@@ -144,7 +162,7 @@ async def demo_cache_performance():
     print("=" * 50)
 
     final_stats = await cache.get_stats()
-    final_hit_rate = final_stats['hit_rate']
+    final_hit_rate = final_stats["hit_rate"]
 
     print(f"Overall Cache Hit Rate: {final_hit_rate:.1%}")
     print(f"Target Hit Rate: 90%")
@@ -154,7 +172,9 @@ async def demo_cache_performance():
     print(f"   - Total entries: {final_stats['entries']}")
     print(f"   - Memory usage: {final_stats['memory_usage_mb']} MB")
     print(f"   - Evictions: {final_stats['evictions']}")
-    print(f"   - Cache operations: {final_stats['sets'] + final_stats['total_requests']}")
+    print(
+        f"   - Cache operations: {final_stats['sets'] + final_stats['total_requests']}"
+    )
 
     # Cleanup
     await cache.stop()
@@ -209,7 +229,9 @@ async def main():
         print("Model Discovery Caching: IMPLEMENTED")
         print("Provider Metadata Caching: IMPLEMENTED")
         print("API Integration: IMPLEMENTED")
-        print(f"Cache Hit Rate Target (>90%): {'ACHIEVED' if success else 'NOT ACHIEVED'}")
+        print(
+            f"Cache Hit Rate Target (>90%): {'ACHIEVED' if success else 'NOT ACHIEVED'}"
+        )
 
         if success:
             print("\nProxyAPI Cache Implementation is READY for production!")

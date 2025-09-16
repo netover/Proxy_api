@@ -27,7 +27,7 @@ class CacheEntry:
         ttl: int = 300,
         category: str = "default",
         priority: int = 1,
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: Optional[Dict[str, Any]] = None,
     ):
         self.key = key
         self.value = value
@@ -64,7 +64,9 @@ class CacheStats:
     @property
     def hit_rate(self) -> float:
         """Calculate hit rate"""
-        return self.hits / self.total_requests if self.total_requests > 0 else 0.0
+        return (
+            self.hits / self.total_requests if self.total_requests > 0 else 0.0
+        )
 
 
 class ICache(Protocol):
@@ -86,7 +88,7 @@ class ICache(Protocol):
         value: Any,
         ttl: Optional[int] = None,
         category: str = "default",
-        priority: int = 1
+        priority: int = 1,
     ) -> bool:
         """Set value in cache"""
         ...
@@ -104,7 +106,9 @@ class ICache(Protocol):
         ...
 
     # Batch operations
-    async def get_many(self, keys: List[str], category: str = "default") -> Dict[str, Any]:
+    async def get_many(
+        self, keys: List[str], category: str = "default"
+    ) -> Dict[str, Any]:
         """Get multiple values from cache"""
         ...
 
@@ -112,7 +116,7 @@ class ICache(Protocol):
         self,
         key_value_pairs: Dict[str, Any],
         ttl: Optional[int] = None,
-        category: str = "default"
+        category: str = "default",
     ) -> int:
         """Set multiple values in cache"""
         ...
@@ -174,11 +178,15 @@ class ICache(Protocol):
 class ICacheWarmer(Protocol):
     """Cache Warmer Interface"""
 
-    async def warm_key(self, key: str, getter_func: callable, priority: int = 1) -> bool:
+    async def warm_key(
+        self, key: str, getter_func: callable, priority: int = 1
+    ) -> bool:
         """Warm a specific key"""
         ...
 
-    async def warm_category(self, category: str, priority: int = 1) -> Dict[str, Any]:
+    async def warm_category(
+        self, category: str, priority: int = 1
+    ) -> Dict[str, Any]:
         """Warm all keys in a category"""
         ...
 
@@ -211,18 +219,21 @@ class ICacheMonitor(Protocol):
 def create_memory_cache(**kwargs) -> ICache:
     """Create in-memory cache implementation"""
     from .memory_cache import MemoryCache
+
     return MemoryCache(**kwargs)
 
 
 def create_disk_cache(**kwargs) -> ICache:
     """Create disk-backed cache implementation"""
     from .disk_cache import DiskCache
+
     return DiskCache(**kwargs)
 
 
 def create_unified_cache(**kwargs) -> ICache:
     """Create unified cache implementation"""
     from .unified_cache import UnifiedCache
+
     return UnifiedCache(**kwargs)
 
 
@@ -250,6 +261,7 @@ def clear_cache_instances() -> None:
 def generate_cache_key(*args, **kwargs) -> str:
     """Generate standardized cache key"""
     import hashlib
+
     key_parts = []
 
     for arg in args:
@@ -270,7 +282,7 @@ async def get_or_set(
     key: str,
     getter_func: callable,
     ttl: Optional[int] = None,
-    category: str = "default"
+    category: str = "default",
 ) -> Any:
     """Get value from cache or set it using getter function"""
     value = await cache.get(key, category)
@@ -285,9 +297,10 @@ async def get_or_set(
 def cache_result(
     ttl: Optional[int] = None,
     category: str = "default",
-    key_func: Optional[callable] = None
+    key_func: Optional[callable] = None,
 ):
     """Decorator to cache function results"""
+
     def decorator(func):
         async def wrapper(*args, **kwargs):
             cache = get_cache_instance()
@@ -297,7 +310,10 @@ def cache_result(
             else:
                 key = generate_cache_key(func.__name__, args, kwargs)
 
-            return await get_or_set(cache, key, lambda: func(*args, **kwargs), ttl, category)
+            return await get_or_set(
+                cache, key, lambda: func(*args, **kwargs), ttl, category
+            )
 
         return wrapper
+
     return decorator

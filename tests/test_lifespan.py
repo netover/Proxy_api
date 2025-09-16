@@ -27,24 +27,38 @@ class TestLifespanInitialization:
     @pytest.mark.asyncio
     async def test_normal_startup_sequence(self, mock_app):
         """Test successful startup sequence with all components initialized"""
-        with patch('main.app_state') as mock_app_state, \
-             patch('main.telemetry') as mock_telemetry, \
-             patch('main.get_http_client') as mock_get_http_client, \
-             patch('main.get_response_cache') as mock_get_response_cache, \
-             patch('main.get_summary_cache') as mock_get_summary_cache, \
-             patch('main.get_memory_manager') as mock_get_memory_manager, \
-             patch('src.utils.context_condenser.AsyncLRUCache') as mock_lru_cache, \
-             patch('main.APIKeyAuth') as mock_api_key_auth, \
-             patch('src.core.rate_limiter.rate_limiter') as mock_rate_limiter, \
-             patch('main.chaos_monkey') as mock_chaos_monkey, \
-             patch('main.threading.Thread') as mock_thread:
+        with patch("main.app_state") as mock_app_state, patch(
+            "main.telemetry"
+        ) as mock_telemetry, patch(
+            "main.get_http_client"
+        ) as mock_get_http_client, patch(
+            "main.get_response_cache"
+        ) as mock_get_response_cache, patch(
+            "main.get_summary_cache"
+        ) as mock_get_summary_cache, patch(
+            "main.get_memory_manager"
+        ) as mock_get_memory_manager, patch(
+            "src.utils.context_condenser.AsyncLRUCache"
+        ) as mock_lru_cache, patch(
+            "main.APIKeyAuth"
+        ) as mock_api_key_auth, patch(
+            "src.core.rate_limiter.rate_limiter"
+        ) as mock_rate_limiter, patch(
+            "main.chaos_monkey"
+        ) as mock_chaos_monkey, patch(
+            "main.threading.Thread"
+        ) as mock_thread:
 
             # Setup mocks
             mock_app_state.initialize = AsyncMock()
             mock_config_manager = MagicMock()
             mock_config_manager.load_config.return_value = MagicMock()
-            mock_config_manager.load_config.return_value.settings.condensation.cache_persist = False
-            mock_config_manager.load_config.return_value.settings.condensation.cache_size = 1000
+            mock_config_manager.load_config.return_value.settings.condensation.cache_persist = (
+                False
+            )
+            mock_config_manager.load_config.return_value.settings.condensation.cache_size = (
+                1000
+            )
             mock_config_manager._last_modified = time.time()
             mock_app_state.config_manager = mock_config_manager
 
@@ -70,7 +84,9 @@ class TestLifespanInitialization:
                 mock_app_state.initialize.assert_called_once()
                 mock_config_manager.load_config.assert_called_once()
                 mock_telemetry.configure.assert_called_once()
-                mock_telemetry.instrument_fastapi.assert_called_once_with(mock_app)
+                mock_telemetry.instrument_fastapi.assert_called_once_with(
+                    mock_app
+                )
                 mock_telemetry.instrument_httpx.assert_called_once()
                 mock_get_http_client.assert_called_once()
                 mock_get_response_cache.assert_called_once()
@@ -83,42 +99,61 @@ class TestLifespanInitialization:
                 mock_thread.assert_called_once()
 
                 # Verify app state attributes
-                assert hasattr(mock_app.state, 'config')
-                assert hasattr(mock_app.state, 'condensation_config')
-                assert hasattr(mock_app.state, 'http_client')
-                assert hasattr(mock_app.state, 'response_cache')
-                assert hasattr(mock_app.state, 'summary_cache_obj')
-                assert hasattr(mock_app.state, 'memory_manager')
-                assert hasattr(mock_app.state, 'lru_cache')
-                assert hasattr(mock_app.state, 'api_key_auth')
-                assert hasattr(mock_app.state, 'rate_limiter')
-                assert hasattr(mock_app.state, 'config_mtime')
+                assert hasattr(mock_app.state, "config")
+                assert hasattr(mock_app.state, "condensation_config")
+                assert hasattr(mock_app.state, "http_client")
+                assert hasattr(mock_app.state, "response_cache")
+                assert hasattr(mock_app.state, "summary_cache_obj")
+                assert hasattr(mock_app.state, "memory_manager")
+                assert hasattr(mock_app.state, "lru_cache")
+                assert hasattr(mock_app.state, "api_key_auth")
+                assert hasattr(mock_app.state, "rate_limiter")
+                assert hasattr(mock_app.state, "config_mtime")
 
     @pytest.mark.asyncio
     async def test_normal_shutdown_sequence(self, mock_app):
         """Test successful shutdown sequence with all components cleaned up"""
-        with patch('main.app_state') as mock_app_state, \
-             patch('main.config_manager') as mock_config_manager, \
-             patch('main.telemetry') as mock_telemetry, \
-             patch('main.get_http_client') as mock_get_http_client, \
-             patch('main.get_response_cache') as mock_get_response_cache, \
-             patch('main.get_summary_cache') as mock_get_summary_cache, \
-             patch('main.get_memory_manager') as mock_get_memory_manager, \
-             patch('src.utils.context_condenser.AsyncLRUCache') as mock_lru_cache, \
-             patch('main.APIKeyAuth') as mock_api_key_auth, \
-             patch('src.core.rate_limiter.rate_limiter') as mock_rate_limiter, \
-             patch('main.chaos_monkey') as mock_chaos_monkey, \
-             patch('main.threading.Thread') as mock_thread, \
-             patch('main.shutdown_memory_manager') as mock_shutdown_memory, \
-             patch('main.shutdown_caches') as mock_shutdown_caches, \
-             patch('asyncio.all_tasks') as mock_all_tasks, \
-             patch('asyncio.gather') as mock_gather:
+        with patch("main.app_state") as mock_app_state, patch(
+            "main.config_manager"
+        ) as mock_config_manager, patch(
+            "main.telemetry"
+        ) as mock_telemetry, patch(
+            "main.get_http_client"
+        ) as mock_get_http_client, patch(
+            "main.get_response_cache"
+        ) as mock_get_response_cache, patch(
+            "main.get_summary_cache"
+        ) as mock_get_summary_cache, patch(
+            "main.get_memory_manager"
+        ) as mock_get_memory_manager, patch(
+            "src.utils.context_condenser.AsyncLRUCache"
+        ) as mock_lru_cache, patch(
+            "main.APIKeyAuth"
+        ) as mock_api_key_auth, patch(
+            "src.core.rate_limiter.rate_limiter"
+        ) as mock_rate_limiter, patch(
+            "main.chaos_monkey"
+        ) as mock_chaos_monkey, patch(
+            "main.threading.Thread"
+        ) as mock_thread, patch(
+            "main.shutdown_memory_manager"
+        ) as mock_shutdown_memory, patch(
+            "main.shutdown_caches"
+        ) as mock_shutdown_caches, patch(
+            "asyncio.all_tasks"
+        ) as mock_all_tasks, patch(
+            "asyncio.gather"
+        ) as mock_gather:
 
             # Setup mocks for startup
             mock_app_state.initialize = AsyncMock()
             mock_config_manager.load_config.return_value = MagicMock()
-            mock_config_manager.load_config.return_value.settings.condensation.cache_persist = False
-            mock_config_manager.load_config.return_value.settings.condensation.cache_size = 1000
+            mock_config_manager.load_config.return_value.settings.condensation.cache_persist = (
+                False
+            )
+            mock_config_manager.load_config.return_value.settings.condensation.cache_size = (
+                1000
+            )
             mock_config_manager._last_modified = time.time()
 
             mock_telemetry.configure = MagicMock()
@@ -160,21 +195,32 @@ class TestLifespanInitialization:
     @pytest.mark.asyncio
     async def test_startup_error_recovery(self, mock_app):
         """Test error recovery during startup phase"""
-        with patch('main.app_state') as mock_app_state, \
-             patch('main.config_manager') as mock_config_manager, \
-             patch('main.telemetry'), \
-             patch('main.get_http_client'), \
-             patch('main.get_response_cache'), \
-             patch('main.get_summary_cache'), \
-             patch('main.get_memory_manager'), \
-             patch('src.utils.context_condenser.AsyncLRUCache'), \
-             patch('main.APIKeyAuth'), \
-             patch('src.core.rate_limiter.rate_limiter'), \
-             patch('main.chaos_monkey'), \
-             patch('main.threading.Thread'):
+        with patch("main.app_state") as mock_app_state, patch(
+            "main.config_manager"
+        ) as mock_config_manager, patch("main.telemetry"), patch(
+            "main.get_http_client"
+        ), patch(
+            "main.get_response_cache"
+        ), patch(
+            "main.get_summary_cache"
+        ), patch(
+            "main.get_memory_manager"
+        ), patch(
+            "src.utils.context_condenser.AsyncLRUCache"
+        ), patch(
+            "main.APIKeyAuth"
+        ), patch(
+            "src.core.rate_limiter.rate_limiter"
+        ), patch(
+            "main.chaos_monkey"
+        ), patch(
+            "main.threading.Thread"
+        ):
 
             # Setup mocks to cause startup failure
-            mock_app_state.initialize = AsyncMock(side_effect=Exception("Startup failed"))
+            mock_app_state.initialize = AsyncMock(
+                side_effect=Exception("Startup failed")
+            )
             mock_config_manager.load_config.return_value = MagicMock()
 
             # Execute lifespan and expect exception
@@ -185,28 +231,47 @@ class TestLifespanInitialization:
     @pytest.mark.asyncio
     async def test_shutdown_error_recovery(self, mock_app):
         """Test error recovery during shutdown phase"""
-        with patch('main.app_state') as mock_app_state, \
-             patch('main.config_manager') as mock_config_manager, \
-             patch('main.telemetry') as mock_telemetry, \
-             patch('main.get_http_client') as mock_get_http_client, \
-             patch('main.get_response_cache') as mock_get_response_cache, \
-             patch('main.get_summary_cache') as mock_get_summary_cache, \
-             patch('main.get_memory_manager') as mock_get_memory_manager, \
-             patch('src.utils.context_condenser.AsyncLRUCache') as mock_lru_cache, \
-             patch('main.APIKeyAuth') as mock_api_key_auth, \
-             patch('src.core.rate_limiter.rate_limiter') as mock_rate_limiter, \
-             patch('main.chaos_monkey') as mock_chaos_monkey, \
-             patch('main.threading.Thread') as mock_thread, \
-             patch('main.shutdown_memory_manager') as mock_shutdown_memory, \
-             patch('main.shutdown_caches') as mock_shutdown_caches, \
-             patch('asyncio.all_tasks') as mock_all_tasks, \
-             patch('asyncio.gather') as mock_gather:
+        with patch("main.app_state") as mock_app_state, patch(
+            "main.config_manager"
+        ) as mock_config_manager, patch(
+            "main.telemetry"
+        ) as mock_telemetry, patch(
+            "main.get_http_client"
+        ) as mock_get_http_client, patch(
+            "main.get_response_cache"
+        ) as mock_get_response_cache, patch(
+            "main.get_summary_cache"
+        ) as mock_get_summary_cache, patch(
+            "main.get_memory_manager"
+        ) as mock_get_memory_manager, patch(
+            "src.utils.context_condenser.AsyncLRUCache"
+        ) as mock_lru_cache, patch(
+            "main.APIKeyAuth"
+        ) as mock_api_key_auth, patch(
+            "src.core.rate_limiter.rate_limiter"
+        ) as mock_rate_limiter, patch(
+            "main.chaos_monkey"
+        ) as mock_chaos_monkey, patch(
+            "main.threading.Thread"
+        ) as mock_thread, patch(
+            "main.shutdown_memory_manager"
+        ) as mock_shutdown_memory, patch(
+            "main.shutdown_caches"
+        ) as mock_shutdown_caches, patch(
+            "asyncio.all_tasks"
+        ) as mock_all_tasks, patch(
+            "asyncio.gather"
+        ) as mock_gather:
 
             # Setup mocks for successful startup
             mock_app_state.initialize = AsyncMock()
             mock_config_manager.load_config.return_value = MagicMock()
-            mock_config_manager.load_config.return_value.settings.condensation.cache_persist = False
-            mock_config_manager.load_config.return_value.settings.condensation.cache_size = 1000
+            mock_config_manager.load_config.return_value.settings.condensation.cache_persist = (
+                False
+            )
+            mock_config_manager.load_config.return_value.settings.condensation.cache_size = (
+                1000
+            )
             mock_config_manager._last_modified = time.time()
 
             mock_telemetry.configure = MagicMock()
@@ -226,7 +291,9 @@ class TestLifespanInitialization:
             mock_thread.return_value = MagicMock()
 
             # Setup shutdown mocks with error
-            mock_app_state.shutdown = AsyncMock(side_effect=Exception("Shutdown failed"))
+            mock_app_state.shutdown = AsyncMock(
+                side_effect=Exception("Shutdown failed")
+            )
             mock_shutdown_memory.return_value = AsyncMock()
             mock_shutdown_caches.return_value = AsyncMock()
             mock_lru_cache.return_value.shutdown = AsyncMock()
@@ -244,24 +311,39 @@ class TestLifespanInitialization:
     @pytest.mark.asyncio
     async def test_component_initialization_verification(self, mock_app):
         """Test that all required components are properly initialized"""
-        with patch('main.app_state') as mock_app_state, \
-             patch('main.config_manager') as mock_config_manager, \
-             patch('main.telemetry') as mock_telemetry, \
-             patch('main.get_http_client') as mock_get_http_client, \
-             patch('main.get_response_cache') as mock_get_response_cache, \
-             patch('main.get_summary_cache') as mock_get_summary_cache, \
-             patch('main.get_memory_manager') as mock_get_memory_manager, \
-             patch('src.utils.context_condenser.AsyncLRUCache') as mock_lru_cache, \
-             patch('main.APIKeyAuth') as mock_api_key_auth, \
-             patch('src.core.rate_limiter.rate_limiter') as mock_rate_limiter, \
-             patch('main.chaos_monkey') as mock_chaos_monkey, \
-             patch('main.threading.Thread') as mock_thread:
+        with patch("main.app_state") as mock_app_state, patch(
+            "main.config_manager"
+        ) as mock_config_manager, patch(
+            "main.telemetry"
+        ) as mock_telemetry, patch(
+            "main.get_http_client"
+        ) as mock_get_http_client, patch(
+            "main.get_response_cache"
+        ) as mock_get_response_cache, patch(
+            "main.get_summary_cache"
+        ) as mock_get_summary_cache, patch(
+            "main.get_memory_manager"
+        ) as mock_get_memory_manager, patch(
+            "src.utils.context_condenser.AsyncLRUCache"
+        ) as mock_lru_cache, patch(
+            "main.APIKeyAuth"
+        ) as mock_api_key_auth, patch(
+            "src.core.rate_limiter.rate_limiter"
+        ) as mock_rate_limiter, patch(
+            "main.chaos_monkey"
+        ) as mock_chaos_monkey, patch(
+            "main.threading.Thread"
+        ) as mock_thread:
 
             # Setup mocks
             mock_app_state.initialize = AsyncMock()
             mock_config_manager.load_config.return_value = MagicMock()
-            mock_config_manager.load_config.return_value.settings.condensation.cache_persist = False
-            mock_config_manager.load_config.return_value.settings.condensation.cache_size = 1000
+            mock_config_manager.load_config.return_value.settings.condensation.cache_persist = (
+                False
+            )
+            mock_config_manager.load_config.return_value.settings.condensation.cache_size = (
+                1000
+            )
             mock_config_manager._last_modified = time.time()
 
             mock_telemetry.configure = MagicMock()
@@ -295,35 +377,54 @@ class TestLifespanInitialization:
                 assert mock_app.state.config_mtime is not None
 
                 # Verify legacy compatibility
-                assert hasattr(mock_app.state, 'cache')
-                assert hasattr(mock_app.state, 'summary_cache')
+                assert hasattr(mock_app.state, "cache")
+                assert hasattr(mock_app.state, "summary_cache")
 
     @pytest.mark.asyncio
     async def test_graceful_shutdown_verification(self, mock_app):
         """Test that shutdown properly cleans up all resources"""
-        with patch('main.app_state') as mock_app_state, \
-             patch('main.telemetry') as mock_telemetry, \
-             patch('main.get_http_client') as mock_get_http_client, \
-             patch('main.get_response_cache') as mock_get_response_cache, \
-             patch('main.get_summary_cache') as mock_get_summary_cache, \
-             patch('main.get_memory_manager') as mock_get_memory_manager, \
-             patch('src.utils.context_condenser.AsyncLRUCache') as mock_lru_cache, \
-             patch('main.APIKeyAuth') as mock_api_key_auth, \
-             patch('src.core.rate_limiter.rate_limiter') as mock_rate_limiter, \
-             patch('main.chaos_monkey') as mock_chaos_monkey, \
-             patch('main.threading.Thread') as mock_thread, \
-             patch('main.shutdown_memory_manager') as mock_shutdown_memory, \
-             patch('main.shutdown_caches') as mock_shutdown_caches, \
-             patch('asyncio.all_tasks') as mock_all_tasks, \
-             patch('asyncio.gather') as mock_gather, \
-             patch('asyncio.current_task') as mock_current_task:
+        with patch("main.app_state") as mock_app_state, patch(
+            "main.telemetry"
+        ) as mock_telemetry, patch(
+            "main.get_http_client"
+        ) as mock_get_http_client, patch(
+            "main.get_response_cache"
+        ) as mock_get_response_cache, patch(
+            "main.get_summary_cache"
+        ) as mock_get_summary_cache, patch(
+            "main.get_memory_manager"
+        ) as mock_get_memory_manager, patch(
+            "src.utils.context_condenser.AsyncLRUCache"
+        ) as mock_lru_cache, patch(
+            "main.APIKeyAuth"
+        ) as mock_api_key_auth, patch(
+            "src.core.rate_limiter.rate_limiter"
+        ) as mock_rate_limiter, patch(
+            "main.chaos_monkey"
+        ) as mock_chaos_monkey, patch(
+            "main.threading.Thread"
+        ) as mock_thread, patch(
+            "main.shutdown_memory_manager"
+        ) as mock_shutdown_memory, patch(
+            "main.shutdown_caches"
+        ) as mock_shutdown_caches, patch(
+            "asyncio.all_tasks"
+        ) as mock_all_tasks, patch(
+            "asyncio.gather"
+        ) as mock_gather, patch(
+            "asyncio.current_task"
+        ) as mock_current_task:
 
             # Setup mocks for startup
             mock_app_state.initialize = AsyncMock()
             mock_config_manager = MagicMock()
             mock_config_manager.load_config.return_value = MagicMock()
-            mock_config_manager.load_config.return_value.settings.condensation.cache_persist = False
-            mock_config_manager.load_config.return_value.settings.condensation.cache_size = 1000
+            mock_config_manager.load_config.return_value.settings.condensation.cache_persist = (
+                False
+            )
+            mock_config_manager.load_config.return_value.settings.condensation.cache_size = (
+                1000
+            )
             mock_config_manager._last_modified = time.time()
             mock_app_state.config_manager = mock_config_manager
 
@@ -378,24 +479,39 @@ class TestLifespanInitialization:
     @pytest.mark.asyncio
     async def test_cache_persistence_initialization(self, mock_app):
         """Test cache persistence initialization when enabled"""
-        with patch('main.app_state') as mock_app_state, \
-             patch('main.config_manager') as mock_config_manager, \
-             patch('main.telemetry') as mock_telemetry, \
-             patch('main.get_http_client') as mock_get_http_client, \
-             patch('main.get_response_cache') as mock_get_response_cache, \
-             patch('main.get_summary_cache') as mock_get_summary_cache, \
-             patch('main.get_memory_manager') as mock_get_memory_manager, \
-             patch('src.utils.context_condenser.AsyncLRUCache') as mock_lru_cache, \
-             patch('main.APIKeyAuth') as mock_api_key_auth, \
-             patch('src.core.rate_limiter.rate_limiter') as mock_rate_limiter, \
-             patch('main.chaos_monkey') as mock_chaos_monkey, \
-             patch('main.threading.Thread') as mock_thread:
+        with patch("main.app_state") as mock_app_state, patch(
+            "main.config_manager"
+        ) as mock_config_manager, patch(
+            "main.telemetry"
+        ) as mock_telemetry, patch(
+            "main.get_http_client"
+        ) as mock_get_http_client, patch(
+            "main.get_response_cache"
+        ) as mock_get_response_cache, patch(
+            "main.get_summary_cache"
+        ) as mock_get_summary_cache, patch(
+            "main.get_memory_manager"
+        ) as mock_get_memory_manager, patch(
+            "src.utils.context_condenser.AsyncLRUCache"
+        ) as mock_lru_cache, patch(
+            "main.APIKeyAuth"
+        ) as mock_api_key_auth, patch(
+            "src.core.rate_limiter.rate_limiter"
+        ) as mock_rate_limiter, patch(
+            "main.chaos_monkey"
+        ) as mock_chaos_monkey, patch(
+            "main.threading.Thread"
+        ) as mock_thread:
 
             # Setup mocks with cache persistence enabled
             mock_app_state.initialize = AsyncMock()
             mock_config_manager.load_config.return_value = MagicMock()
-            mock_config_manager.load_config.return_value.settings.condensation.cache_persist = True
-            mock_config_manager.load_config.return_value.settings.condensation.cache_size = 1000
+            mock_config_manager.load_config.return_value.settings.condensation.cache_persist = (
+                True
+            )
+            mock_config_manager.load_config.return_value.settings.condensation.cache_size = (
+                1000
+            )
             mock_config_manager._last_modified = time.time()
 
             mock_telemetry.configure = MagicMock()
@@ -423,24 +539,39 @@ class TestLifespanInitialization:
     @pytest.mark.asyncio
     async def test_web_ui_thread_startup(self, mock_app):
         """Test web UI thread is started during initialization"""
-        with patch('main.app_state') as mock_app_state, \
-             patch('main.config_manager') as mock_config_manager, \
-             patch('main.telemetry') as mock_telemetry, \
-             patch('main.get_http_client') as mock_get_http_client, \
-             patch('main.get_response_cache') as mock_get_response_cache, \
-             patch('main.get_summary_cache') as mock_get_summary_cache, \
-             patch('main.get_memory_manager') as mock_get_memory_manager, \
-             patch('src.utils.context_condenser.AsyncLRUCache') as mock_lru_cache, \
-             patch('main.APIKeyAuth') as mock_api_key_auth, \
-             patch('src.core.rate_limiter.rate_limiter') as mock_rate_limiter, \
-             patch('main.chaos_monkey') as mock_chaos_monkey, \
-             patch('main.threading.Thread') as mock_thread:
+        with patch("main.app_state") as mock_app_state, patch(
+            "main.config_manager"
+        ) as mock_config_manager, patch(
+            "main.telemetry"
+        ) as mock_telemetry, patch(
+            "main.get_http_client"
+        ) as mock_get_http_client, patch(
+            "main.get_response_cache"
+        ) as mock_get_response_cache, patch(
+            "main.get_summary_cache"
+        ) as mock_get_summary_cache, patch(
+            "main.get_memory_manager"
+        ) as mock_get_memory_manager, patch(
+            "src.utils.context_condenser.AsyncLRUCache"
+        ) as mock_lru_cache, patch(
+            "main.APIKeyAuth"
+        ) as mock_api_key_auth, patch(
+            "src.core.rate_limiter.rate_limiter"
+        ) as mock_rate_limiter, patch(
+            "main.chaos_monkey"
+        ) as mock_chaos_monkey, patch(
+            "main.threading.Thread"
+        ) as mock_thread:
 
             # Setup mocks
             mock_app_state.initialize = AsyncMock()
             mock_config_manager.load_config.return_value = MagicMock()
-            mock_config_manager.load_config.return_value.settings.condensation.cache_persist = False
-            mock_config_manager.load_config.return_value.settings.condensation.cache_size = 1000
+            mock_config_manager.load_config.return_value.settings.condensation.cache_persist = (
+                False
+            )
+            mock_config_manager.load_config.return_value.settings.condensation.cache_size = (
+                1000
+            )
             mock_config_manager._last_modified = time.time()
 
             mock_telemetry.configure = MagicMock()
@@ -473,9 +604,9 @@ class TestLifespanIntegration:
     def test_app_creation_with_lifespan(self):
         """Test that the main app is created with the lifespan function"""
         # Verify the app has the basic FastAPI structure
-        assert hasattr(app, 'router')
-        assert hasattr(app, 'middleware')
-        assert hasattr(app, 'routes')
+        assert hasattr(app, "router")
+        assert hasattr(app, "middleware")
+        assert hasattr(app, "routes")
 
         # Verify the app has lifespan management (FastAPI handles this internally)
         # The lifespan function is passed during app creation
@@ -483,19 +614,26 @@ class TestLifespanIntegration:
 
     def test_app_startup_time_tracking(self):
         """Test that startup time is tracked"""
-        with patch('time.time', return_value=1234567890.0):
-            with patch('main.app_state'), \
-                 patch('main.config_manager'), \
-                 patch('main.telemetry'), \
-                 patch('main.get_http_client'), \
-                 patch('main.get_response_cache'), \
-                 patch('main.get_summary_cache'), \
-                 patch('main.get_memory_manager'), \
-                 patch('src.utils.context_condenser.AsyncLRUCache'), \
-                 patch('main.APIKeyAuth'), \
-                 patch('src.core.rate_limiter.rate_limiter'), \
-                 patch('main.chaos_monkey'), \
-                 patch('main.threading.Thread'):
+        with patch("time.time", return_value=1234567890.0):
+            with patch("main.app_state"), patch("main.config_manager"), patch(
+                "main.telemetry"
+            ), patch("main.get_http_client"), patch(
+                "main.get_response_cache"
+            ), patch(
+                "main.get_summary_cache"
+            ), patch(
+                "main.get_memory_manager"
+            ), patch(
+                "src.utils.context_condenser.AsyncLRUCache"
+            ), patch(
+                "main.APIKeyAuth"
+            ), patch(
+                "src.core.rate_limiter.rate_limiter"
+            ), patch(
+                "main.chaos_monkey"
+            ), patch(
+                "main.threading.Thread"
+            ):
 
                 # Create a test app with lifespan
                 test_app = FastAPI(lifespan=lifespan)
@@ -511,9 +649,9 @@ class TestLifespanIntegration:
         gzip_middleware = None
 
         for middleware in app.user_middleware:
-            if 'CORSMiddleware' in str(middleware.cls):
+            if "CORSMiddleware" in str(middleware.cls):
                 cors_middleware = middleware
-            if 'GZipMiddleware' in str(middleware.cls):
+            if "GZipMiddleware" in str(middleware.cls):
                 gzip_middleware = middleware
 
         assert cors_middleware is not None

@@ -50,7 +50,7 @@ async def unified_cache(temp_cache_dir):
         cache_dir=temp_cache_dir,
         enable_smart_ttl=True,
         enable_predictive_warming=True,
-        enable_consistency_monitoring=True
+        enable_consistency_monitoring=True,
     )
     await cache.start()
 
@@ -66,7 +66,7 @@ async def cache_warmer(unified_cache):
         cache=unified_cache,
         enable_pattern_analysis=True,
         enable_predictive_warming=True,
-        enable_scheduled_warming=False  # Disable for testing
+        enable_scheduled_warming=False,  # Disable for testing
     )
     await warmer.start()
 
@@ -78,10 +78,7 @@ async def cache_warmer(unified_cache):
 @pytest.fixture
 async def cache_monitor(unified_cache):
     """Create cache monitor instance for testing"""
-    monitor = CacheMonitor(
-        target_hit_rate=0.9,
-        check_interval=1
-    )
+    monitor = CacheMonitor(target_hit_rate=0.9, check_interval=1)
     await monitor.start()
 
     yield monitor
@@ -93,24 +90,13 @@ async def cache_monitor(unified_cache):
 def sample_model_info():
     """Create sample ModelInfo objects for testing"""
     import time
+
     current_time = int(time.time())
 
     return [
-        ModelInfo(
-            id="gpt-4",
-            created=current_time,
-            owned_by="openai"
-        ),
-        ModelInfo(
-            id="claude-3",
-            created=current_time,
-            owned_by="anthropic"
-        ),
-        ModelInfo(
-            id="gemini-pro",
-            created=current_time,
-            owned_by="google"
-        )
+        ModelInfo(id="gpt-4", created=current_time, owned_by="openai"),
+        ModelInfo(id="claude-3", created=current_time, owned_by="anthropic"),
+        ModelInfo(id="gemini-pro", created=current_time, owned_by="google"),
     ]
 
 
@@ -118,7 +104,9 @@ class TestUnifiedCacheCore:
     """Test core unified cache functionality"""
 
     @pytest.mark.asyncio
-    async def test_cache_basic_operations(self, unified_cache, sample_model_info):
+    async def test_cache_basic_operations(
+        self, unified_cache, sample_model_info
+    ):
         """Test basic cache operations"""
         # Test cache set
         key = "test:models:openai"
@@ -178,9 +166,15 @@ class TestUnifiedCacheCore:
     async def test_cache_categories(self, unified_cache, sample_model_info):
         """Test cache categorization"""
         # Set entries with different categories
-        await unified_cache.set("models:openai", sample_model_info[:1], category="models")
-        await unified_cache.set("response:123", {"result": "test"}, category="response")
-        await unified_cache.set("summary:456", {"summary": "test"}, category="summary")
+        await unified_cache.set(
+            "models:openai", sample_model_info[:1], category="models"
+        )
+        await unified_cache.set(
+            "response:123", {"result": "test"}, category="response"
+        )
+        await unified_cache.set(
+            "summary:456", {"summary": "test"}, category="summary"
+        )
 
         stats = await unified_cache.get_stats()
         assert "models" in stats["categories"]
@@ -198,7 +192,9 @@ class TestUnifiedCacheCore:
 
         stats = await unified_cache.get_stats()
         # Should have enforced memory limits
-        assert stats["memory_usage_mb"] <= unified_cache.max_memory_bytes / (1024 * 1024)
+        assert stats["memory_usage_mb"] <= unified_cache.max_memory_bytes / (
+            1024 * 1024
+        )
 
     @pytest.mark.asyncio
     async def test_disk_persistence(self, unified_cache, temp_cache_dir):
@@ -213,9 +209,7 @@ class TestUnifiedCacheCore:
 
         # Simulate cache restart by creating new instance
         new_cache = UnifiedCache(
-            max_size=1000,
-            enable_disk_cache=True,
-            cache_dir=temp_cache_dir
+            max_size=1000, enable_disk_cache=True, cache_dir=temp_cache_dir
         )
         await new_cache.start()
 
@@ -244,7 +238,7 @@ class TestCacheMigration:
             max_workers=2,
             conflict_strategy="newer_wins",
             enable_backup=True,
-            enable_validation=True
+            enable_validation=True,
         )
 
         service = CacheMigrationService(config)
@@ -339,14 +333,14 @@ class TestCacheWarmer:
         from src.core.cache_warmer import WarmingPattern
 
         pattern = WarmingPattern(
-            key="test:key",
-            access_count=20,
-            last_accessed=time.time()
+            key="test:key", access_count=20, last_accessed=time.time()
         )
 
         # Set some access times
         now = time.time()
-        pattern.access_times = [now - i * 3600 for i in range(10)]  # 10 accesses in last 10 hours
+        pattern.access_times = [
+            now - i * 3600 for i in range(10)
+        ]  # 10 accesses in last 10 hours
 
         score = pattern.get_predictive_score()
         assert score > 0  # Should have positive score
@@ -435,7 +429,9 @@ class TestCacheMonitor:
         """Test alert system"""
         # Fill cache to potentially trigger alerts
         for i in range(100):
-            await unified_cache.set(f"test:key{i}", {"data": f"value{i}"}, ttl=1)
+            await unified_cache.set(
+                f"test:key{i}", {"data": f"value{i}"}, ttl=1
+            )
 
         # Wait for monitoring to detect issues
         await asyncio.sleep(2)
@@ -452,7 +448,9 @@ class TestCacheIntegration:
     """Integration tests for cache system components"""
 
     @pytest.mark.asyncio
-    async def test_full_cache_lifecycle(self, unified_cache, cache_warmer, cache_monitor):
+    async def test_full_cache_lifecycle(
+        self, unified_cache, cache_warmer, cache_monitor
+    ):
         """Test complete cache lifecycle with all components"""
         # 1. Add data to cache
         test_data = {"integration": "test", "timestamp": time.time()}
@@ -480,6 +478,7 @@ class TestCacheIntegration:
     @pytest.mark.asyncio
     async def test_concurrent_operations(self, unified_cache):
         """Test concurrent cache operations"""
+
         async def concurrent_worker(worker_id: int):
             for i in range(10):
                 key = f"concurrent:worker{worker_id}:item{i}"
@@ -492,7 +491,9 @@ class TestCacheIntegration:
 
         # Verify all operations completed
         stats = await unified_cache.get_stats()
-        assert stats["entries"] >= 50  # At least 50 entries from 5 workers * 10 items
+        assert (
+            stats["entries"] >= 50
+        )  # At least 50 entries from 5 workers * 10 items
 
     @pytest.mark.asyncio
     async def test_memory_pressure_handling(self, unified_cache):
@@ -531,7 +532,9 @@ class TestCacheIntegration:
         assert total_time < 5.0  # Less than 5 seconds for 200 operations
 
         operations_per_second = 200 / total_time
-        logger.info(f"Cache operations per second: {operations_per_second:.2f}")
+        logger.info(
+            f"Cache operations per second: {operations_per_second:.2f}"
+        )
 
 
 class TestChaosEngineering:
@@ -560,7 +563,9 @@ class TestChaosEngineering:
         assert restored == value
 
     @pytest.mark.asyncio
-    async def test_disk_corruption_handling(self, unified_cache, temp_cache_dir):
+    async def test_disk_corruption_handling(
+        self, unified_cache, temp_cache_dir
+    ):
         """Test handling of disk corruption"""
         key = "corruption:test"
         value = {"test": "data"}
@@ -569,8 +574,10 @@ class TestChaosEngineering:
         await unified_cache.set(key, value)
 
         # Simulate disk corruption by writing invalid data
-        cache_file = temp_cache_dir / f"{unified_cache._generate_key(key)}.json"
-        with open(cache_file, 'w') as f:
+        cache_file = (
+            temp_cache_dir / f"{unified_cache._generate_key(key)}.json"
+        )
+        with open(cache_file, "w") as f:
             f.write("invalid json content")
 
         # Try to get data - should handle corruption gracefully
@@ -603,6 +610,7 @@ class TestChaosEngineering:
     @pytest.mark.asyncio
     async def test_concurrent_failure_simulation(self, unified_cache):
         """Test concurrent operations during simulated failures"""
+
         async def failing_operation(operation_id: int):
             try:
                 # Mix of successful and potentially failing operations

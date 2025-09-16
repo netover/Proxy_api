@@ -8,7 +8,9 @@ try:
     from opentelemetry import trace
     from opentelemetry.sdk.trace import TracerProvider
     from opentelemetry.sdk.trace.export import BatchSpanProcessor
-    from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+    from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import (
+        OTLPSpanExporter,
+    )
     from opentelemetry.sdk.resources import Resource
     from opentelemetry.sdk.trace.sampling import TraceIdRatioBasedSampler
 
@@ -34,7 +36,12 @@ except ImportError:
 class OpenTelemetryConfig:
     """Configuration for OpenTelemetry tracing and metrics."""
 
-    def __init__(self, service_name: str = "proxy-api", service_version: str = "1.0.0", prometheus_exporter=None):
+    def __init__(
+        self,
+        service_name: str = "proxy-api",
+        service_version: str = "1.0.0",
+        prometheus_exporter=None,
+    ):
         self.service_name = service_name
         self.service_version = service_version
         self._initialized = False
@@ -46,8 +53,8 @@ class OpenTelemetryConfig:
 
         sampling_rates = {
             "development": 1.0,  # 100%
-            "staging": 0.5,      # 50%
-            "production": 0.1    # 10%
+            "staging": 0.5,  # 50%
+            "production": 0.1,  # 10%
         }
 
         rate = sampling_rates.get(env, 1.0)  # Default to 100% if unknown env
@@ -55,7 +62,7 @@ class OpenTelemetryConfig:
             f"OpenTelemetry sampling rate for {env} environment: {rate * 100}%"
         )
         return rate
-        
+
     def configure(self) -> bool:
         """Configure OpenTelemetry if available."""
         if not OTEL_AVAILABLE:
@@ -63,15 +70,17 @@ class OpenTelemetryConfig:
                 "OpenTelemetry not available. Install with: pip install opentelemetry-api opentelemetry-sdk opentelemetry-exporter-otlp"
             )
             return False
-            
+
         if self._initialized:
             return True
-            
+
         try:
-            resource = Resource.create({
-                ResourceAttributes.SERVICE_NAME: self.service_name,
-                ResourceAttributes.SERVICE_VERSION: self.service_version,
-            })
+            resource = Resource.create(
+                {
+                    ResourceAttributes.SERVICE_NAME: self.service_name,
+                    ResourceAttributes.SERVICE_VERSION: self.service_version,
+                }
+            )
 
             # Configure sampling based on environment
             sampling_rate = self._get_sampling_rate()
@@ -79,27 +88,31 @@ class OpenTelemetryConfig:
 
             provider = TracerProvider(resource=resource, sampler=sampler)
             trace.set_tracer_provider(provider)
-            
+
             # Configure OTLP exporter if endpoint is provided
             otlp_endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
             if otlp_endpoint:
                 otlp_exporter = OTLPSpanExporter(endpoint=otlp_endpoint)
                 span_processor = BatchSpanProcessor(otlp_exporter)
                 provider.add_span_processor(span_processor)
-                
+
             self._initialized = True
 
             # Report sampling rate to Prometheus if exporter is available
             if self.prometheus_exporter:
                 sampling_rate = self._get_sampling_rate()
-                self.prometheus_exporter.set_telemetry_sampling_rate(sampling_rate)
+                self.prometheus_exporter.set_telemetry_sampling_rate(
+                    sampling_rate
+                )
 
             return True
-            
+
         except Exception as e:
-            logging.getLogger(__name__).error(f"Failed to configure OpenTelemetry: {e}")
+            logging.getLogger(__name__).error(
+                f"Failed to configure OpenTelemetry: {e}"
+            )
             return False
-    
+
     def get_tracer(self, name: str) -> Optional[Any]:
         """Get a tracer instance."""
         if not self._initialized or not OTEL_AVAILABLE:
@@ -119,5 +132,5 @@ class OpenTelemetryConfig:
             "initialized": self._initialized,
             "service_name": self.service_name,
             "service_version": self.service_version,
-            "otlp_endpoint": os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
+            "otlp_endpoint": os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT"),
         }

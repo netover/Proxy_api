@@ -4,13 +4,16 @@ import sys
 import subprocess
 import platform
 
+
 def main():
     # Check if PyInstaller is installed
     try:
         import PyInstaller
     except ImportError:
         print("PyInstaller not found. Installing...")
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "PyInstaller"])
+        subprocess.check_call(
+            [sys.executable, "-m", "pip", "install", "PyInstaller"]
+        )
         import PyInstaller
 
     # Check Python version
@@ -47,7 +50,7 @@ def main():
             "--additional-hooks-dir=hooks",
             "--workpath=buildPyInstaller",
             "--distpath=distPyInstaller",
-            "main.py"
+            "main.py",
         ]
         if target_system == "Windows":
             build_cmd.extend(["--win-private-assemblies"])
@@ -76,6 +79,7 @@ def main():
     except subprocess.CalledProcessError as e:
         print(f"Build failed: {e}")
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()

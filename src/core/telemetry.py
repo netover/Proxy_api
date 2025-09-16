@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 # Import metrics collector for integration
 try:
     from .metrics import metrics_collector
+
     METRICS_AVAILABLE = True
 except ImportError:
     METRICS_AVAILABLE = False
@@ -24,6 +25,7 @@ except ImportError:
 # Adaptive sampling configuration
 ADAPTIVE_SAMPLING_ENABLED = True
 DEFAULT_SAMPLING_RATE = 0.1  # 10% default
+
 
 class TelemetryManager:
     """Simple telemetry manager for testing."""
@@ -43,13 +45,15 @@ class TelemetryManager:
             raise RuntimeError("Telemetry not configured")
         return MockTracer()
 
-    def create_span(self, name: str, attributes: Optional[Dict[str, Any]] = None):
+    def create_span(
+        self, name: str, attributes: Optional[Dict[str, Any]] = None
+    ):
         """Create a span (mock implementation)."""
         return MockSpan(name, attributes or {})
 
     def record_error(self, span, error: Exception) -> None:
         """Record error in span (mock implementation)."""
-        if hasattr(span, 'record_error'):
+        if hasattr(span, "record_error"):
             span.record_error(error)
 
     def instrument_fastapi(self, app) -> None:
@@ -58,11 +62,13 @@ class TelemetryManager:
     def instrument_httpx(self) -> None:
         """Instrument HTTPX (mock implementation)."""
 
+
 class MockTracer:
     """Mock tracer for testing."""
 
     def start_as_current_span(self, name: str):
         return MockSpan(name)
+
 
 class MockSpan:
     """Mock span for testing."""
@@ -80,7 +86,7 @@ class MockSpan:
 
     def record_error(self, error: Exception) -> None:
         self.status.status_code = "ERROR"
-        self.attributes['error'] = str(error)
+        self.attributes["error"] = str(error)
 
     def __enter__(self):
         self._start_time = time.time()
@@ -99,33 +105,40 @@ class MockSpan:
                 logger.debug(f"Failed to track request timestamp: {e}")
 
         # Record span completion in metrics if available and sampled
-        if METRICS_AVAILABLE and hasattr(self, '_start_time'):
+        if METRICS_AVAILABLE and hasattr(self, "_start_time"):
             # Check if this span should be sampled based on adaptive sampling
             should_sample = True
-            if ADAPTIVE_SAMPLING_ENABLED and hasattr(metrics_collector, 'sampling_rate'):
+            if ADAPTIVE_SAMPLING_ENABLED and hasattr(
+                metrics_collector, "sampling_rate"
+            ):
                 import random
-                should_sample = random.random() < metrics_collector.sampling_rate
+
+                should_sample = (
+                    random.random() < metrics_collector.sampling_rate
+                )
 
             if should_sample:
                 duration = time.time() - self._start_time
                 success = exc_type is None
 
                 # Extract provider and model info from span name if available
-                provider_name = self.attributes.get('provider', 'unknown')
-                model_name = self.attributes.get('model')
+                provider_name = self.attributes.get("provider", "unknown")
+                model_name = self.attributes.get("model")
 
                 # Record in metrics collector
                 try:
                     metrics_collector.record_request(
                         provider_name=provider_name,
                         success=success,
-                        response_time=duration * 1000,  # Convert to milliseconds
-                        tokens=self.attributes.get('tokens', 0),
+                        response_time=duration
+                        * 1000,  # Convert to milliseconds
+                        tokens=self.attributes.get("tokens", 0),
                         error_type=str(exc_val) if exc_val else None,
-                        model_name=model_name
+                        model_name=model_name,
                     )
                 except Exception as e:
                     logger.debug(f"Failed to record telemetry metrics: {e}")
+
 
 @contextmanager
 def TracedSpan(name: str, attributes: Optional[Dict[str, Any]] = None):
@@ -139,8 +152,10 @@ def TracedSpan(name: str, attributes: Optional[Dict[str, Any]] = None):
     finally:
         pass  # Could log span completion here
 
+
 def traced(operation: str = None, attributes: Optional[Dict[str, Any]] = None):
     """Decorator for tracing functions."""
+
     def decorator(func: Callable):
         @wraps(func)
         async def async_wrapper(*args, **kwargs):
@@ -156,7 +171,9 @@ def traced(operation: str = None, attributes: Optional[Dict[str, Any]] = None):
                     span.record_error(e)
                     raise
                 finally:
-                    span.set_attribute("function.duration", time.time() - start_time)
+                    span.set_attribute(
+                        "function.duration", time.time() - start_time
+                    )
 
         @wraps(func)
         def sync_wrapper(*args, **kwargs):
@@ -172,22 +189,29 @@ def traced(operation: str = None, attributes: Optional[Dict[str, Any]] = None):
                     span.record_error(e)
                     raise
                 finally:
-                    span.set_attribute("function.duration", time.time() - start_time)
+                    span.set_attribute(
+                        "function.duration", time.time() - start_time
+                    )
 
-        if hasattr(func, '__call__'):
+        if hasattr(func, "__call__"):
             # Check if it's a coroutine function
             import asyncio
+
             if asyncio.iscoroutinefunction(func):
                 return async_wrapper
             else:
                 return sync_wrapper
         return sync_wrapper
+
     return decorator
+
 
 class MockStatus:
     """Mock status for spans."""
+
     def __init__(self):
         self.status_code = "OK"
+
 
 # Global telemetry instance
 telemetry = TelemetryManager()

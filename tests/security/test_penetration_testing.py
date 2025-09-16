@@ -25,14 +25,16 @@ class TestPenetrationTesting:
 
         def simulate_file_access(path: str) -> bool:
             # Simulate file access with path traversal protection
-            if '../' in path or '..\\' in path:
+            if "../" in path or "..\\" in path:
                 return False  # Block traversal
             # Check if file exists in allowed directory
-            allowed_files = ['/var/www/index.html', '/var/www/about.html']
+            allowed_files = ["/var/www/index.html", "/var/www/about.html"]
             return path in allowed_files
 
         for payload in traversal_payloads:
-            assert not simulate_file_access(payload), f"Directory traversal not blocked: {payload}"
+            assert not simulate_file_access(
+                payload
+            ), f"Directory traversal not blocked: {payload}"
 
     def test_brute_force_attack_simulation(self):
         """Simulate brute force attacks on authentication"""
@@ -46,12 +48,19 @@ class TestPenetrationTesting:
 
             # Check if account is locked
             if username in failed_attempts:
-                if now - failed_attempts[username]["last_attempt"] < lockout_duration:
+                if (
+                    now - failed_attempts[username]["last_attempt"]
+                    < lockout_duration
+                ):
                     if failed_attempts[username]["count"] >= lockout_threshold:
                         return False  # Account locked
 
             # Reset counter if lockout period passed
-            if username in failed_attempts and now - failed_attempts[username]["last_attempt"] >= lockout_duration:
+            if (
+                username in failed_attempts
+                and now - failed_attempts[username]["last_attempt"]
+                >= lockout_duration
+            ):
                 failed_attempts[username]["count"] = 0
 
             # Check credentials
@@ -63,7 +72,10 @@ class TestPenetrationTesting:
             else:
                 # Failed login - increment counter
                 if username not in failed_attempts:
-                    failed_attempts[username] = {"count": 0, "last_attempt": now}
+                    failed_attempts[username] = {
+                        "count": 0,
+                        "last_attempt": now,
+                    }
                 failed_attempts[username]["count"] += 1
                 failed_attempts[username]["last_attempt"] = now
                 return False
@@ -72,19 +84,29 @@ class TestPenetrationTesting:
         for i in range(10):
             result = authenticate("admin", f"wrong{i}")
             if i < lockout_threshold - 1:
-                assert result is False, f"Failed attempt {i} should be rejected but not locked"
+                assert (
+                    result is False
+                ), f"Failed attempt {i} should be rejected but not locked"
             elif i >= lockout_threshold:
-                assert result is False, f"Attempt {i} should be blocked due to lockout"
+                assert (
+                    result is False
+                ), f"Attempt {i} should be blocked due to lockout"
 
         # Verify account is locked
-        assert authenticate("admin", "password123") is False, "Account should be locked after brute force"
+        assert (
+            authenticate("admin", "password123") is False
+        ), "Account should be locked after brute force"
 
         # Wait for lockout to expire (simulate time passing)
         if "admin" in failed_attempts:
-            failed_attempts["admin"]["last_attempt"] = time.time() - lockout_duration - 1
+            failed_attempts["admin"]["last_attempt"] = (
+                time.time() - lockout_duration - 1
+            )
 
         # Should work after lockout expires
-        assert authenticate("admin", "password123") is True, "Login should work after lockout expires"
+        assert (
+            authenticate("admin", "password123") is True
+        ), "Login should work after lockout expires"
 
     def test_sql_injection_attack_patterns(self):
         """Test various SQL injection attack patterns"""
@@ -103,7 +125,13 @@ class TestPenetrationTesting:
             query = f"SELECT * FROM users WHERE username = '{user_input}'"
             # In real scenario, this would execute the query
             # For testing, we'll check if dangerous operations would occur
-            dangerous_operations = ['DROP', 'DELETE', 'EXEC', 'UNION', 'SELECT.*FROM.*information_schema']
+            dangerous_operations = [
+                "DROP",
+                "DELETE",
+                "EXEC",
+                "UNION",
+                "SELECT.*FROM.*information_schema",
+            ]
             for op in dangerous_operations:
                 if op.upper() in query.upper():
                     return ["malicious_result"]  # Simulated malicious result
@@ -111,7 +139,9 @@ class TestPenetrationTesting:
 
         for payload in sql_payloads:
             result = simulate_vulnerable_query(payload)
-            assert "malicious_result" in result, f"SQL injection not detected: {payload}"
+            assert (
+                "malicious_result" in result
+            ), f"SQL injection not detected: {payload}"
 
     def test_xss_attack_vectors(self):
         """Test various XSS attack vectors"""
@@ -131,12 +161,16 @@ class TestPenetrationTesting:
             return f"<div>User input: {user_input}</div>"
 
         def detect_xss_vulnerability(output: str) -> bool:
-            xss_indicators = ['<script', 'javascript:', 'onerror=', 'onload=']
-            return any(indicator in output.lower() for indicator in xss_indicators)
+            xss_indicators = ["<script", "javascript:", "onerror=", "onload="]
+            return any(
+                indicator in output.lower() for indicator in xss_indicators
+            )
 
         for payload in xss_payloads:
             output = simulate_html_output(payload)
-            assert detect_xss_vulnerability(output), f"XSS vulnerability not detected: {payload}"
+            assert detect_xss_vulnerability(
+                output
+            ), f"XSS vulnerability not detected: {payload}"
 
     def test_csrf_attack_simulation(self):
         """Simulate Cross-Site Request Forgery attacks"""
@@ -146,6 +180,7 @@ class TestPenetrationTesting:
 
         def generate_csrf_token(session_id: str) -> str:
             import secrets
+
             token = secrets.token_hex(32)
             csrf_tokens[session_id] = token
             return token
@@ -153,7 +188,9 @@ class TestPenetrationTesting:
         def validate_csrf_token(session_id: str, token: str) -> bool:
             return csrf_tokens.get(session_id) == token
 
-        def simulate_csrf_attack(session_id: str, malicious_token: str = None) -> bool:
+        def simulate_csrf_attack(
+            session_id: str, malicious_token: str = None
+        ) -> bool:
             # Simulate a state-changing operation
             token = malicious_token or "malicious_token"
             return validate_csrf_token(session_id, token)
@@ -211,26 +248,29 @@ class TestPenetrationTesting:
 
         # Attacker can now access victim's data
         hijacked_data = access_user_data(hijacked_session)
-        assert hijacked_data["balance"] == 1000, "Session hijacking successful (as expected in vulnerable system)"
+        assert (
+            hijacked_data["balance"] == 1000
+        ), "Session hijacking successful (as expected in vulnerable system)"
 
         # In a secure system, this should not be possible
         # Additional security measures would prevent this
 
     def test_clickjacking_attack_simulation(self):
         """Simulate clickjacking attacks"""
+
         def generate_iframe_html(target_url: str, opacity: float = 1.0) -> str:
             return f'<iframe src="{target_url}" style="opacity: {opacity}; position: absolute; top: 0; left: 0; width: 100%; height: 100%;"></iframe>'
 
         def detect_clickjacking_vulnerability(html: str) -> bool:
             # Check for clickjacking protection headers
             protection_headers = [
-                'X-Frame-Options: DENY',
-                'X-Frame-Options: SAMEORIGIN',
-                'Content-Security-Policy: frame-ancestors'
+                "X-Frame-Options: DENY",
+                "X-Frame-Options: SAMEORIGIN",
+                "Content-Security-Policy: frame-ancestors",
             ]
             # In a real test, check HTTP headers
             # For simulation, check if iframe is transparent
-            return 'opacity: 0' in html or 'opacity: 0.' in html
+            return "opacity: 0" in html or "opacity: 0." in html
 
         # Normal iframe (not clickjacking)
         normal_html = generate_iframe_html("https://example.com", 1.0)
@@ -253,7 +293,8 @@ class TestPenetrationTesting:
 
             # Clean old requests
             request_count[client_ip] = [
-                req_time for req_time in request_count[client_ip]
+                req_time
+                for req_time in request_count[client_ip]
                 if now - req_time < time_window
             ]
 
@@ -281,7 +322,9 @@ class TestPenetrationTesting:
         import hmac
 
         def generate_hmac(message: str, key: str) -> str:
-            return hmac.new(key.encode(), message.encode(), hashlib.sha256).hexdigest()
+            return hmac.new(
+                key.encode(), message.encode(), hashlib.sha256
+            ).hexdigest()
 
         def verify_message(message: str, signature: str, key: str) -> bool:
             expected_signature = generate_hmac(message, key)
@@ -343,7 +386,7 @@ class TestPenetrationTesting:
                 for i in range(len(chars)):
                     if random.random() < 0.1:  # 10% mutation rate
                         chars[i] = random.choice(string.printable)
-                fuzzed_inputs.append(''.join(chars))
+                fuzzed_inputs.append("".join(chars))
 
             return fuzzed_inputs
 
@@ -382,7 +425,7 @@ class TestPenetrationTesting:
                     "endpoint": "/api/users",
                     "description": "SQL injection in user search parameter",
                     "poc": "username=' OR '1'='1",
-                    "recommendation": "Use parameterized queries"
+                    "recommendation": "Use parameterized queries",
                 },
                 {
                     "severity": "MEDIUM",
@@ -390,15 +433,15 @@ class TestPenetrationTesting:
                     "endpoint": "/api/comments",
                     "description": "Reflected XSS in comment field",
                     "poc": "<script>alert('XSS')</script>",
-                    "recommendation": "Sanitize HTML input"
-                }
+                    "recommendation": "Sanitize HTML input",
+                },
             ],
             "summary": {
                 "total_vulnerabilities": 2,
                 "high_severity": 1,
                 "medium_severity": 1,
-                "low_severity": 0
-            }
+                "low_severity": 0,
+            },
         }
 
         # Verify report structure
@@ -417,18 +460,24 @@ class TestPenetrationTesting:
             "sql_injection": {
                 "payloads": ["' OR '1'='1", "'; DROP TABLE users; --"],
                 "detection_pattern": r"SQL syntax|mysql_error",
-                "success_pattern": r"admin|password|database"
+                "success_pattern": r"admin|password|database",
             },
             "xss": {
-                "payloads": ["<script>alert('XSS')</script>", "javascript:alert('XSS')"],
+                "payloads": [
+                    "<script>alert('XSS')</script>",
+                    "javascript:alert('XSS')",
+                ],
                 "detection_pattern": r"<script|javascript:",
-                "success_pattern": r"alert\('XSS'\)"
+                "success_pattern": r"alert\('XSS'\)",
             },
             "directory_traversal": {
-                "payloads": ["../../../etc/passwd", "..\\..\\..\\windows\\system32\\config\\sam"],
+                "payloads": [
+                    "../../../etc/passwd",
+                    "..\\..\\..\\windows\\system32\\config\\sam",
+                ],
                 "detection_pattern": r"root:|Administrator:",
-                "success_pattern": r"/etc/passwd|/windows/system32"
-            }
+                "success_pattern": r"/etc/passwd|/windows/system32",
+            },
         }
 
         def run_exploit(exploit_type: str, target_url: str) -> dict:
@@ -442,24 +491,29 @@ class TestPenetrationTesting:
                 "target": target_url,
                 "attempts": len(module["payloads"]),
                 "vulnerable": False,
-                "details": []
+                "details": [],
             }
 
             # Simulate testing each payload
             for payload in module["payloads"]:
                 # In real implementation, send HTTP request with payload
                 # For simulation, assume some payloads work
-                if "DROP TABLE" in payload or "<script>" in payload or "../../../etc/passwd" in payload:
+                if (
+                    "DROP TABLE" in payload
+                    or "<script>" in payload
+                    or "../../../etc/passwd" in payload
+                ):
                     results["vulnerable"] = True
-                    results["details"].append({
-                        "payload": payload,
-                        "successful": True
-                    })
+                    results["details"].append(
+                        {"payload": payload, "successful": True}
+                    )
 
             return results
 
         # Test SQL injection exploit
-        sql_result = run_exploit("sql_injection", "http://localhost:8000/api/users")
+        sql_result = run_exploit(
+            "sql_injection", "http://localhost:8000/api/users"
+        )
         assert sql_result["vulnerable"] is True
         assert len(sql_result["details"]) > 0
 
@@ -468,14 +522,16 @@ class TestPenetrationTesting:
         assert xss_result["vulnerable"] is True
 
         # Test unknown exploit
-        unknown_result = run_exploit("unknown_exploit", "http://localhost:8000")
+        unknown_result = run_exploit(
+            "unknown_exploit", "http://localhost:8000"
+        )
         assert unknown_result["success"] is False
 
 
 class TestPenetrationTestingTools:
     """Integration with penetration testing tools"""
 
-    @patch('subprocess.run')
+    @patch("subprocess.run")
     def test_nikto_integration(self, mock_subprocess):
         """Test integration with Nikto web scanner"""
         mock_result = Mock()
@@ -500,7 +556,7 @@ Nikto scan results:
         assert result["vulnerabilities_found"] == 3
         assert "user enumeration" in result["findings"][0].lower()
 
-    @patch('subprocess.run')
+    @patch("subprocess.run")
     def test_dirbuster_integration(self, mock_subprocess):
         """Test integration with directory busting tools"""
         mock_result = Mock()
@@ -527,7 +583,11 @@ File found: /.env
         # In real implementation, this would run nikto command
         return {
             "vulnerabilities_found": 3,
-            "findings": ["user enumeration", "directory indexing", "debug script"]
+            "findings": [
+                "user enumeration",
+                "directory indexing",
+                "debug script",
+            ],
         }
 
     def _run_directory_scan(self, url: str) -> dict:
@@ -535,16 +595,19 @@ File found: /.env
         return {
             "directories": ["/admin/", "/api/", "/debug/", "/backup/"],
             "files": ["/config.json", "/.env"],
-            "sensitive_files": ["/.env"]
+            "sensitive_files": ["/.env"],
         }
 
-    @patch('requests.post')
+    @patch("requests.post")
     def test_api_fuzzing(self, mock_post):
         """Test API fuzzing capabilities"""
         # Mock API responses
         mock_responses = [
             Mock(status_code=200, json=lambda: {"status": "success"}),
-            Mock(status_code=500, json=lambda: {"error": "Internal Server Error"}),
+            Mock(
+                status_code=500,
+                json=lambda: {"error": "Internal Server Error"},
+            ),
             Mock(status_code=400, json=lambda: {"error": "Bad Request"}),
         ]
         mock_post.side_effect = mock_responses
@@ -559,19 +622,27 @@ File found: /.env
         vulnerabilities = []
 
         for payload in fuzz_payloads:
-            response = requests.post("http://localhost:8000/api/login", json=payload)
+            response = requests.post(
+                "http://localhost:8000/api/login", json=payload
+            )
 
             if response.status_code == 500:
-                vulnerabilities.append({
-                    "type": "Server Error",
-                    "payload": payload,
-                    "response": "Internal Server Error"
-                })
+                vulnerabilities.append(
+                    {
+                        "type": "Server Error",
+                        "payload": payload,
+                        "response": "Internal Server Error",
+                    }
+                )
             elif "<script>" in str(payload) and response.status_code == 200:
-                vulnerabilities.append({
-                    "type": "Potential XSS",
-                    "payload": payload,
-                    "response": "XSS payload accepted"
-                })
+                vulnerabilities.append(
+                    {
+                        "type": "Potential XSS",
+                        "payload": payload,
+                        "response": "XSS payload accepted",
+                    }
+                )
 
-        assert len(vulnerabilities) > 0, "No vulnerabilities detected during fuzzing"
+        assert (
+            len(vulnerabilities) > 0
+        ), "No vulnerabilities detected during fuzzing"

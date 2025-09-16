@@ -39,7 +39,15 @@ class TestInputValidationSecurity:
             try:
                 parsed = sqlparse.parse(query)[0]
                 # Check for suspicious tokens
-                suspicious_tokens = ['DROP', 'DELETE', 'UPDATE', 'INSERT', 'EXEC', 'UNION', 'SHUTDOWN']
+                suspicious_tokens = [
+                    "DROP",
+                    "DELETE",
+                    "UPDATE",
+                    "INSERT",
+                    "EXEC",
+                    "UNION",
+                    "SHUTDOWN",
+                ]
                 query_upper = query.upper()
 
                 for token in suspicious_tokens:
@@ -53,7 +61,9 @@ class TestInputValidationSecurity:
             query = simulate_sql_query(payload)
             # In a real application, this should be sanitized
             # For testing, we verify detection
-            assert not is_sql_injection_safe(query), f"SQL injection not detected: {payload}"
+            assert not is_sql_injection_safe(
+                query
+            ), f"SQL injection not detected: {payload}"
 
     def test_xss_prevention(self):
         """Test prevention of Cross-Site Scripting (XSS) attacks"""
@@ -77,10 +87,18 @@ class TestInputValidationSecurity:
         for payload in xss_payloads:
             sanitized = sanitize_html_input(payload)
             # After sanitization, dangerous tags should be removed
-            assert '<script>' not in sanitized.lower(), f"XSS script tag not sanitized: {payload}"
-            assert 'javascript:' not in sanitized.lower(), f"JavaScript URL not sanitized: {payload}"
-            assert 'onerror' not in sanitized.lower(), f"Event handler not sanitized: {payload}"
-            assert 'onload' not in sanitized.lower(), f"Event handler not sanitized: {payload}"
+            assert (
+                "<script>" not in sanitized.lower()
+            ), f"XSS script tag not sanitized: {payload}"
+            assert (
+                "javascript:" not in sanitized.lower()
+            ), f"JavaScript URL not sanitized: {payload}"
+            assert (
+                "onerror" not in sanitized.lower()
+            ), f"Event handler not sanitized: {payload}"
+            assert (
+                "onload" not in sanitized.lower()
+            ), f"Event handler not sanitized: {payload}"
 
     def test_command_injection_prevention(self):
         """Test prevention of command injection attacks"""
@@ -104,7 +122,7 @@ class TestInputValidationSecurity:
 
         def is_command_injection_safe(command: str) -> bool:
             # Check for command injection patterns
-            dangerous_chars = [';', '|', '`', '$', '(', ')']
+            dangerous_chars = [";", "|", "`", "$", "(", ")"]
             for char in dangerous_chars:
                 if char in command:
                     return False
@@ -112,7 +130,9 @@ class TestInputValidationSecurity:
 
         for payload in command_injection_payloads:
             command = simulate_command_execution(payload)
-            assert not is_command_injection_safe(command), f"Command injection not detected: {payload}"
+            assert not is_command_injection_safe(
+                command
+            ), f"Command injection not detected: {payload}"
 
     def test_path_traversal_prevention(self):
         """Test prevention of path traversal attacks"""
@@ -132,17 +152,17 @@ class TestInputValidationSecurity:
             # URL decode
             decoded = unquote(user_path)
             # Remove path traversal sequences
-            normalized = re.sub(r'\.\./', '', decoded)
-            normalized = re.sub(r'\.\.\\', '', normalized)
+            normalized = re.sub(r"\.\./", "", decoded)
+            normalized = re.sub(r"\.\.\\", "", normalized)
             return normalized
 
         def is_path_traversal_safe(path: str) -> bool:
             # Check for path traversal patterns
             traversal_patterns = [
-                r'\.\./',
-                r'\.\.\\',
-                r'%2e%2e%2f',
-                r'%2e%2e%5c',
+                r"\.\./",
+                r"\.\.\\",
+                r"%2e%2e%2f",
+                r"%2e%2e%5c",
             ]
             for pattern in traversal_patterns:
                 if re.search(pattern, path, re.IGNORECASE):
@@ -150,13 +170,19 @@ class TestInputValidationSecurity:
             return True
 
         for payload in path_traversal_payloads:
-            assert not is_path_traversal_safe(payload), f"Path traversal not detected: {payload}"
+            assert not is_path_traversal_safe(
+                payload
+            ), f"Path traversal not detected: {payload}"
 
             # Test normalization
             normalized = normalize_path(payload)
             # After normalization, should not contain traversal sequences
-            assert '../' not in normalized, f"Path traversal not normalized: {payload}"
-            assert '..\\' not in normalized, f"Path traversal not normalized: {payload}"
+            assert (
+                "../" not in normalized
+            ), f"Path traversal not normalized: {payload}"
+            assert (
+                "..\\" not in normalized
+            ), f"Path traversal not normalized: {payload}"
 
     def test_json_injection_prevention(self):
         """Test prevention of JSON injection attacks"""
@@ -173,7 +199,7 @@ class TestInputValidationSecurity:
                 # Validate expected structure
                 if not isinstance(data, dict):
                     raise ValueError("Invalid JSON structure")
-                if 'user' not in data:
+                if "user" not in data:
                     raise ValueError("Missing user field")
                 return data
             except json.JSONDecodeError:
@@ -183,11 +209,13 @@ class TestInputValidationSecurity:
             try:
                 parsed = parse_user_json(payload)
                 # Verify that only expected fields are present
-                expected_fields = {'user', 'role'}  # Define expected schema
+                expected_fields = {"user", "role"}  # Define expected schema
                 extra_fields = set(parsed.keys()) - expected_fields
                 if extra_fields:
                     # In strict mode, reject extra fields
-                    assert False, f"JSON injection detected - extra fields: {extra_fields}"
+                    assert (
+                        False
+                    ), f"JSON injection detected - extra fields: {extra_fields}"
             except (ValueError, json.JSONDecodeError):
                 # Invalid JSON should be rejected
                 pass
@@ -212,8 +240,11 @@ class TestInputValidationSecurity:
             "a" * 25,
         ]
 
-        def test_regex_performance(pattern: str, test_input: str, timeout: float = 1.0) -> bool:
+        def test_regex_performance(
+            pattern: str, test_input: str, timeout: float = 1.0
+        ) -> bool:
             import time
+
             start_time = time.time()
             try:
                 re.search(pattern, test_input)
@@ -225,7 +256,9 @@ class TestInputValidationSecurity:
         for pattern in vulnerable_patterns:
             for test_input in redos_inputs:
                 # These should complete quickly even with vulnerable patterns
-                assert test_regex_performance(pattern, test_input), f"ReDoS vulnerability detected in pattern: {pattern}"
+                assert test_regex_performance(
+                    pattern, test_input
+                ), f"ReDoS vulnerability detected in pattern: {pattern}"
 
     def test_xml_external_entity_prevention(self):
         """Test prevention of XML External Entity (XXE) attacks"""
@@ -238,12 +271,14 @@ class TestInputValidationSecurity:
         def parse_xml_safely(xml_content: str) -> bool:
             # In a real application, use defusedxml or similar
             # For testing, we'll just check for ENTITY declarations
-            if '<!ENTITY' in xml_content:
+            if "<!ENTITY" in xml_content:
                 return False  # XXE attempt detected
             return True
 
         for payload in xxe_payloads:
-            assert not parse_xml_safely(payload), f"XXE attack not detected: {payload[:50]}..."
+            assert not parse_xml_safely(
+                payload
+            ), f"XXE attack not detected: {payload[:50]}..."
 
     def test_ldap_injection_prevention(self):
         """Test prevention of LDAP injection attacks"""
@@ -263,8 +298,8 @@ class TestInputValidationSecurity:
 
         def is_ldap_injection_safe(query: str) -> bool:
             # Check for LDAP injection patterns
-            dangerous_chars = ['*', '(', ')', '|', '&']
-            dangerous_sequences = ['*)', '(*', '))', '((', '*))', ')*)']
+            dangerous_chars = ["*", "(", ")", "|", "&"]
+            dangerous_sequences = ["*)", "(*", "))", "((", "*))", ")*)"]
 
             for seq in dangerous_sequences:
                 if seq in query:
@@ -273,7 +308,9 @@ class TestInputValidationSecurity:
 
         for payload in ldap_injection_payloads:
             query = simulate_ldap_query(payload)
-            assert not is_ldap_injection_safe(query), f"LDAP injection not detected: {payload}"
+            assert not is_ldap_injection_safe(
+                query
+            ), f"LDAP injection not detected: {payload}"
 
     def test_no_sql_injection_prevention(self):
         """Test prevention of NoSQL injection attacks"""
@@ -289,7 +326,7 @@ class TestInputValidationSecurity:
             # Simulate vulnerable MongoDB query
             try:
                 # If user input is JSON, parse it
-                if user_input.startswith('{'):
+                if user_input.startswith("{"):
                     injected = json.loads(user_input)
                     return {"username": injected}
                 else:
@@ -303,7 +340,7 @@ class TestInputValidationSecurity:
                 if not isinstance(d, dict):
                     return True
                 for key, value in d.items():
-                    if key.startswith('$'):
+                    if key.startswith("$"):
                         return False  # MongoDB operator injection
                     if isinstance(value, dict):
                         if not check_dict(value):
@@ -314,7 +351,9 @@ class TestInputValidationSecurity:
 
         for payload in nosql_injection_payloads:
             query = simulate_mongo_query(payload)
-            assert not is_nosql_injection_safe(query), f"NoSQL injection not detected: {payload}"
+            assert not is_nosql_injection_safe(
+                query
+            ), f"NoSQL injection not detected: {payload}"
 
     def test_file_upload_security(self):
         """Test file upload security"""
@@ -328,30 +367,36 @@ class TestInputValidationSecurity:
             "malware.sh",
         ]
 
-        safe_extensions = ['.txt', '.jpg', '.png', '.pdf', '.docx']
+        safe_extensions = [".txt", ".jpg", ".png", ".pdf", ".docx"]
 
         def is_file_upload_safe(filename: str) -> bool:
             # Check file extension
-            if not any(filename.lower().endswith(ext) for ext in safe_extensions):
+            if not any(
+                filename.lower().endswith(ext) for ext in safe_extensions
+            ):
                 return False
 
             # Check for path traversal
-            if '../' in filename or '..\\' in filename:
+            if "../" in filename or "..\\" in filename:
                 return False
 
             # Check for null bytes
-            if '\x00' in filename:
+            if "\x00" in filename:
                 return False
 
             return True
 
         for filename in dangerous_files:
-            assert not is_file_upload_safe(filename), f"Dangerous file upload not blocked: {filename}"
+            assert not is_file_upload_safe(
+                filename
+            ), f"Dangerous file upload not blocked: {filename}"
 
         # Test safe files
         for ext in safe_extensions:
             safe_filename = f"document{ext}"
-            assert is_file_upload_safe(safe_filename), f"Safe file incorrectly blocked: {safe_filename}"
+            assert is_file_upload_safe(
+                safe_filename
+            ), f"Safe file incorrectly blocked: {safe_filename}"
 
     def test_input_length_limits(self):
         """Test input length limits to prevent buffer overflow"""
@@ -381,11 +426,13 @@ class TestInputValidationSecurity:
 
         for homoglyph, normal in homograph_pairs:
             # Normalize to NFC form
-            normalized_homoglyph = unicodedata.normalize('NFC', homoglyph)
-            normalized_normal = unicodedata.normalize('NFC', normal)
+            normalized_homoglyph = unicodedata.normalize("NFC", homoglyph)
+            normalized_normal = unicodedata.normalize("NFC", normal)
 
             # They should be different after normalization if they are true homoglyphs
-            assert normalized_homoglyph != normalized_normal, f"Homoglyph not detected: {homoglyph} vs {normal}"
+            assert (
+                normalized_homoglyph != normalized_normal
+            ), f"Homoglyph not detected: {homoglyph} vs {normal}"
 
     @pytest.mark.asyncio
     async def test_input_validation_integration(self):
@@ -394,26 +441,35 @@ class TestInputValidationSecurity:
         # For now, we'll simulate the behavior
 
         malicious_inputs = {
-            'sql_injection': "' OR '1'='1",
-            'xss': '<script>alert("XSS")</script>',
-            'command_injection': '; rm -rf /',
-            'path_traversal': '../../../etc/passwd',
+            "sql_injection": "' OR '1'='1",
+            "xss": '<script>alert("XSS")</script>',
+            "command_injection": "; rm -rf /",
+            "path_traversal": "../../../etc/passwd",
         }
 
         # Simulate API endpoint validation
         def validate_api_input(input_type: str, input_value: str) -> bool:
-            if input_type == 'sql_injection':
-                return not any(char in input_value for char in ["'", ";", "--"])
-            elif input_type == 'xss':
-                return not any(tag in input_value.lower() for tag in ['<script>', '<img', 'javascript:'])
-            elif input_type == 'command_injection':
-                return not any(char in input_value for char in [';', '|', '`', '$'])
-            elif input_type == 'path_traversal':
-                return not '../' in input_value and not '..\\' in input_value
+            if input_type == "sql_injection":
+                return not any(
+                    char in input_value for char in ["'", ";", "--"]
+                )
+            elif input_type == "xss":
+                return not any(
+                    tag in input_value.lower()
+                    for tag in ["<script>", "<img", "javascript:"]
+                )
+            elif input_type == "command_injection":
+                return not any(
+                    char in input_value for char in [";", "|", "`", "$"]
+                )
+            elif input_type == "path_traversal":
+                return not "../" in input_value and not "..\\" in input_value
             return True
 
         for input_type, malicious_value in malicious_inputs.items():
-            assert not validate_api_input(input_type, malicious_value), f"Malicious {input_type} input not blocked: {malicious_value}"
+            assert not validate_api_input(
+                input_type, malicious_value
+            ), f"Malicious {input_type} input not blocked: {malicious_value}"
 
 
 class TestInputSanitization:
@@ -422,27 +478,36 @@ class TestInputSanitization:
     def test_html_sanitization(self):
         """Test HTML sanitization"""
         html_inputs = [
-            '<b>Bold text</b>',
+            "<b>Bold text</b>",
             '<script>alert("XSS")</script><p>Safe text</p>',
             '<img src="safe.jpg" onerror="alert(\'XSS\')">',
-            '<a href="javascript:alert(\'XSS\')">Click me</a>',
+            "<a href=\"javascript:alert('XSS')\">Click me</a>",
         ]
 
         expected_outputs = [
-            '<b>Bold text</b>',
-            '<p>Safe text</p>',
+            "<b>Bold text</b>",
+            "<p>Safe text</p>",
             '<img src="safe.jpg">',
-            '<a>Click me</a>',
+            "<a>Click me</a>",
         ]
 
         for input_html, expected in zip(html_inputs, expected_outputs):
-            sanitized = bleach.clean(input_html, tags=['b', 'p', 'img', 'a'], attributes={'img': ['src'], 'a': ['href']})
-            assert sanitized == expected, f"HTML sanitization failed for: {input_html}"
+            sanitized = bleach.clean(
+                input_html,
+                tags=["b", "p", "img", "a"],
+                attributes={"img": ["src"], "a": ["href"]},
+            )
+            assert (
+                sanitized == expected
+            ), f"HTML sanitization failed for: {input_html}"
 
     def test_sql_parameterization(self):
         """Test SQL query parameterization"""
+
         # Simulate parameterized query
-        def execute_parameterized_query(query_template: str, params: tuple) -> str:
+        def execute_parameterized_query(
+            query_template: str, params: tuple
+        ) -> str:
             # In real implementation, use proper parameterized queries
             return query_template % params
 
@@ -454,7 +519,9 @@ class TestInputSanitization:
 
         # Malicious params should be treated as literal values
         malicious_params = ("'; DROP TABLE users; --", "hacker")
-        malicious_result = execute_parameterized_query(safe_query, malicious_params)
+        malicious_result = execute_parameterized_query(
+            safe_query, malicious_params
+        )
         # The malicious SQL should be escaped/treated as literal
         assert "DROP TABLE" not in malicious_result.upper()
 
@@ -469,11 +536,17 @@ class TestInputSanitization:
         for encoded in encoded_payloads:
             decoded = unquote(encoded)
             # After decoding, should still be validated
-            assert '<script>' in decoded or '../' in decoded or "' OR '1'='1" in decoded
+            assert (
+                "<script>" in decoded
+                or "../" in decoded
+                or "' OR '1'='1" in decoded
+            )
 
     def test_input_whitelisting(self):
         """Test input whitelisting approach"""
-        allowed_chars = set('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-.')
+        allowed_chars = set(
+            "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-."
+        )
 
         def whitelist_validate(input_str: str) -> bool:
             return all(char in allowed_chars for char in input_str)
@@ -493,7 +566,11 @@ class TestInputSanitization:
         ]
 
         for safe_input in safe_inputs:
-            assert whitelist_validate(safe_input), f"Safe input rejected: {safe_input}"
+            assert whitelist_validate(
+                safe_input
+            ), f"Safe input rejected: {safe_input}"
 
         for malicious_input in malicious_inputs:
-            assert not whitelist_validate(malicious_input), f"Malicious input accepted: {malicious_input}"
+            assert not whitelist_validate(
+                malicious_input
+            ), f"Malicious input accepted: {malicious_input}"

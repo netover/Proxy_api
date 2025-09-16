@@ -49,11 +49,12 @@ class TestAsyncLRUCacheCancellation:
         """Test that shutdown cancels all pending background tasks"""
         # Mock the save method to take some time
         original_save = cache.save
+
         async def slow_save():
             await asyncio.sleep(1.0)  # Simulate slow save
             await original_save()
 
-        with patch.object(cache, 'save', side_effect=slow_save):
+        with patch.object(cache, "save", side_effect=slow_save):
             # Add multiple items to create background tasks
             for i in range(5):
                 cache.set(f"key_{i}", (f"value_{i}", time.time()))
@@ -181,6 +182,7 @@ class TestProviderFactoryCancellation:
         """Test health monitoring task cancellation"""
         # Mock the health check loop to run indefinitely
         original_loop = factory._health_check_loop
+
         async def infinite_loop():
             while not factory._shutdown_event.is_set():
                 await asyncio.sleep(0.1)
@@ -221,18 +223,29 @@ class TestParallelFallbackCancellation:
     async def test_execution_cancellation(self, engine):
         """Test that parallel execution properly cancels tasks"""
         # Mock provider discovery
-        with patch('src.core.parallel_fallback.provider_discovery') as mock_discovery:
-            mock_discovery.get_healthy_providers_for_model.return_value = ['provider1', 'provider2']
+        with patch(
+            "src.core.parallel_fallback.provider_discovery"
+        ) as mock_discovery:
+            mock_discovery.get_healthy_providers_for_model.return_value = [
+                "provider1",
+                "provider2",
+            ]
 
             # Mock provider factory
-            with patch('src.core.parallel_fallback.provider_factory') as mock_factory:
+            with patch(
+                "src.core.parallel_fallback.provider_factory"
+            ) as mock_factory:
                 mock_provider = AsyncMock()
-                mock_provider.create_completion = AsyncMock(side_effect=asyncio.sleep(10))  # Long running
+                mock_provider.create_completion = AsyncMock(
+                    side_effect=asyncio.sleep(10)
+                )  # Long running
                 mock_factory.get_provider.return_value = mock_provider
 
                 # Start execution
                 execution_task = asyncio.create_task(
-                    engine.execute_parallel('test-model', {'messages': []}, timeout=0.1)
+                    engine.execute_parallel(
+                        "test-model", {"messages": []}, timeout=0.1
+                    )
                 )
 
                 # Wait for timeout
@@ -241,7 +254,7 @@ class TestParallelFallbackCancellation:
                 # Execution should complete (with timeout)
                 result = await execution_task
                 assert not result.success
-                assert 'timeout' in result.error.lower()
+                assert "timeout" in result.error.lower()
 
     @pytest.mark.asyncio
     async def test_shutdown_cancels_active_executions(self, engine):
@@ -261,6 +274,7 @@ class TestResourceLeakageDetection:
     @pytest.mark.asyncio
     async def test_task_leakage_detection(self):
         """Test detection of leaked tasks"""
+
         # Create a task that won't be properly tracked
         async def leaked_task():
             await asyncio.sleep(10)

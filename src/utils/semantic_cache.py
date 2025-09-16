@@ -10,19 +10,29 @@ from typing import Dict, Any, Optional, List, Tuple
 try:
     from sentence_transformers import SentenceTransformer
 except ImportError:
-    raise ImportError("SentenceTransformer is not installed. Please run 'pip install sentence-transformers'.")
+    raise ImportError(
+        "SentenceTransformer is not installed. Please run 'pip install sentence-transformers'."
+    )
 
 try:
     import faiss
 except ImportError:
-    raise ImportError("FAISS is not installed. Please run 'pip install faiss-cpu'.")
+    raise ImportError(
+        "FAISS is not installed. Please run 'pip install faiss-cpu'."
+    )
+
 
 class SemanticCache:
     """
     A cache that stores text-based queries and their responses, allowing retrieval
     based on the semantic similarity of the query.
     """
-    def __init__(self, model_name: str = 'all-MiniLM-L6-v2', similarity_threshold: float = 0.95):
+
+    def __init__(
+        self,
+        model_name: str = "all-MiniLM-L6-v2",
+        similarity_threshold: float = 0.95,
+    ):
         """
         Initializes the semantic cache.
 
@@ -76,7 +86,7 @@ class SemanticCache:
             Optional[Any]: The cached response if a similar query is found, otherwise None.
         """
         if self.index.ntotal == 0:
-            return None # Cache is empty
+            return None  # Cache is empty
 
         # Generate embedding for the search query
         query_embedding = self.model.encode([query])

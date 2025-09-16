@@ -125,15 +125,17 @@ class TestTruncationFallback:
         # Mock long content
         req = {
             "messages": [{"content": "x" * 2000}],  # Exceeds threshold
-            "model": "gpt-4"
+            "model": "gpt-4",
         }
 
         background_tasks = BackgroundTasks()
-        result = await handle_context_condensation(mock_request, background_tasks, req, "chat_completion")
+        result = await handle_context_condensation(
+            mock_request, background_tasks, req, "chat_completion"
+        )
 
         # Should return JSONResponse for long context
         assert result is not None
-        assert hasattr(result, 'status_code')
+        assert hasattr(result, "status_code")
         assert result.status_code == 202  # Accepted
 
     @pytest.mark.asyncio
@@ -143,13 +145,12 @@ class TestTruncationFallback:
         from fastapi import BackgroundTasks
 
         # Mock short content
-        req = {
-            "messages": [{"content": "short message"}],
-            "model": "gpt-4"
-        }
+        req = {"messages": [{"content": "short message"}], "model": "gpt-4"}
 
         background_tasks = BackgroundTasks()
-        result = await handle_context_condensation(mock_request, background_tasks, req, "chat_completion")
+        result = await handle_context_condensation(
+            mock_request, background_tasks, req, "chat_completion"
+        )
 
         # Should return None (no truncation needed)
         assert result is None
@@ -167,7 +168,10 @@ class TestBackgroundTasks:
         mock_request.app.state.summary_cache = {}
         chunks = ["test chunk"]
 
-        with patch('src.utils.context_condenser.condense_context', new_callable=AsyncMock) as mock_condense:
+        with patch(
+            "src.utils.context_condenser.condense_context",
+            new_callable=AsyncMock,
+        ) as mock_condense:
             mock_condense.return_value = "test summary"
 
             await background_condense("test-id", mock_request, chunks)
@@ -192,7 +196,9 @@ class TestSummaryEndpoint:
     def test_summary_with_mock_cache(self, client, monkeypatch):
         """Test summary retrieval with mocked cache"""
         # Mock the cache
-        mock_cache = {"test-id": {"summary": "test summary", "timestamp": 1234567890}}
+        mock_cache = {
+            "test-id": {"summary": "test summary", "timestamp": 1234567890}
+        }
 
         # Mock request.app.state.summary_cache
         def mock_getattr(obj, name):
@@ -200,7 +206,9 @@ class TestSummaryEndpoint:
                 return mock_cache
             return object.__getattribute__(obj, name)
 
-        monkeypatch.setattr(type(client.app.state), "__getattr__", mock_getattr)
+        monkeypatch.setattr(
+            type(client.app.state), "__getattr__", mock_getattr
+        )
 
         response = client.get("/summary/test-id")
         assert response.status_code == 200
@@ -233,7 +241,7 @@ class TestErrorHandling:
         response = client.post(
             "/v1/chat/completions",
             json={"model": "", "messages": []},
-            headers={"X-API-Key": "test-key"}
+            headers={"X-API-Key": "test-key"},
         )
         assert response.status_code == 400
         data = response.json()
@@ -244,7 +252,10 @@ class TestErrorHandling:
         """Test error response for missing API key"""
         response = client.post(
             "/v1/chat/completions",
-            json={"model": "gpt-4", "messages": [{"role": "user", "content": "test"}]}
+            json={
+                "model": "gpt-4",
+                "messages": [{"role": "user", "content": "test"}],
+            },
         )
         assert response.status_code == 401
         data = response.json()

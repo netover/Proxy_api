@@ -6,20 +6,21 @@ for troubleshooting PyInstaller dependency issues.
 try:
     import importlib
 except ImportError as e:
-    raise Exception("Cannot import importlib: "+str(e))
+    raise Exception("Cannot import importlib: " + str(e))
 
 # List of packages that should be explicitly imported
 # (add more as needed)
 packages_to_import = [
-    'uvicorn',
-    'fastapi',
-    'pydantic',
-    'httpx',
-    'PyYAML',
-    'slowapi',
-    'python_multipart',
-    'structlog',
+    "uvicorn",
+    "fastapi",
+    "pydantic",
+    "httpx",
+    "PyYAML",
+    "slowapi",
+    "python_multipart",
+    "structlog",
 ]
+
 
 # Create a file containing a list of all actual imports
 def diagnose_a_package(package):
@@ -36,6 +37,7 @@ def diagnose_a_package(package):
         print(f"   Error: {str(e)}")
         return None
 
+
 print("Python Dependency Diagnosis\n" + "=" * 40)
 
 diagnosed_packages = []
@@ -47,17 +49,16 @@ for package in packages_to_import:
 
 with open("dependency_report.txt", "w") as report:
     import_statement = "\n".join(
-        f"from {dp.replace('.', ' import ')}" if '.' in dp
-        else f"import {dp}"
+        f"from {dp.replace('.', ' import ')}" if "." in dp else f"import {dp}"
         for dp in diagnosed_packages
     )
 
     report.write("Successfully diagnosed packages:\n" + import_statement)
-    missing_known_exprs = [i for i in packages_to_import
+    missing_known_exprs = [
+        i
+        for i in packages_to_import
         if i not in import_statement.split("from")[0]
     ]
-    report.write("\n\nKnown missing:\n"
-        + "\n".join(missing_known_exprs)
-    )
+    report.write("\n\nKnown missing:\n" + "\n".join(missing_known_exprs))
 
 print("Diagnostic report saved to dependency_report.txt")

@@ -18,15 +18,21 @@ class DynamicProvider(BaseProvider):
         """Internal health check implementation"""
 
     @abstractmethod
-    async def create_completion(self, request: Dict[str, Any]) -> Dict[str, Any]:
+    async def create_completion(
+        self, request: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Create a chat completion using the provider's API"""
 
     @abstractmethod
-    async def create_text_completion(self, request: Dict[str, Any]) -> Dict[str, Any]:
+    async def create_text_completion(
+        self, request: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Create a text completion using the provider's API"""
 
     @abstractmethod
-    async def create_embeddings(self, request: Dict[str, Any]) -> Dict[str, Any]:
+    async def create_embeddings(
+        self, request: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Create embeddings using the provider's API"""
 
     # Note: make_request_with_retry removed - use the base Provider's make_request method instead

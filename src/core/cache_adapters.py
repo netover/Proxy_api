@@ -30,14 +30,16 @@ class ModelCacheAdapter:
         self._stats.total_requests += 1
 
         try:
-            if hasattr(self.model_cache, 'get_models'):
+            if hasattr(self.model_cache, "get_models"):
                 # This is a ModelCache instance
-                if ':' in key:
+                if ":" in key:
                     # Parse provider:base_url format
-                    parts = key.split(':', 1)
+                    parts = key.split(":", 1)
                     if len(parts) == 2:
                         provider_name, base_url = parts
-                        result = self.model_cache.get_models(provider_name, base_url)
+                        result = self.model_cache.get_models(
+                            provider_name, base_url
+                        )
                         if result is not None:
                             self._stats.hits += 1
                             return result
@@ -55,18 +57,20 @@ class ModelCacheAdapter:
         value: Any,
         ttl: Optional[int] = None,
         category: str = "default",
-        priority: int = 1
+        priority: int = 1,
     ) -> bool:
         """Set value in model cache with unified interface"""
         try:
-            if hasattr(self.model_cache, 'set_models'):
+            if hasattr(self.model_cache, "set_models"):
                 # This is a ModelCache instance
-                if ':' in key:
+                if ":" in key:
                     # Parse provider:base_url format
-                    parts = key.split(':', 1)
+                    parts = key.split(":", 1)
                     if len(parts) == 2:
                         provider_name, base_url = parts
-                        self.model_cache.set_models(provider_name, base_url, value)
+                        self.model_cache.set_models(
+                            provider_name, base_url, value
+                        )
                         self._stats.sets += 1
                         return True
 
@@ -78,12 +82,14 @@ class ModelCacheAdapter:
     async def delete(self, key: str) -> bool:
         """Delete key from model cache"""
         try:
-            if hasattr(self.model_cache, 'invalidate'):
-                if ':' in key:
-                    parts = key.split(':', 1)
+            if hasattr(self.model_cache, "invalidate"):
+                if ":" in key:
+                    parts = key.split(":", 1)
                     if len(parts) == 2:
                         provider_name, base_url = parts
-                        result = self.model_cache.invalidate(provider_name, base_url)
+                        result = self.model_cache.invalidate(
+                            provider_name, base_url
+                        )
                         if result:
                             self._stats.deletes += 1
                         return result
@@ -94,7 +100,7 @@ class ModelCacheAdapter:
     async def clear(self, category: Optional[str] = None) -> int:
         """Clear model cache"""
         try:
-            if hasattr(self.model_cache, 'invalidate_all'):
+            if hasattr(self.model_cache, "invalidate_all"):
                 count = self.model_cache.invalidate_all()
                 return count
             return 0
@@ -104,8 +110,8 @@ class ModelCacheAdapter:
     async def has(self, key: str) -> bool:
         """Check if key exists in model cache"""
         try:
-            if ':' in key:
-                parts = key.split(':', 1)
+            if ":" in key:
+                parts = key.split(":", 1)
                 if len(parts) == 2:
                     provider_name, base_url = parts
                     return self.model_cache.is_valid(provider_name, base_url)
@@ -113,7 +119,9 @@ class ModelCacheAdapter:
         except Exception as e:
             return False
 
-    async def get_many(self, keys: List[str], category: str = "default") -> Dict[str, Any]:
+    async def get_many(
+        self, keys: List[str], category: str = "default"
+    ) -> Dict[str, Any]:
         """Get multiple values from model cache"""
         results = {}
         for key in keys:
@@ -126,7 +134,7 @@ class ModelCacheAdapter:
         self,
         key_value_pairs: Dict[str, Any],
         ttl: Optional[int] = None,
-        category: str = "default"
+        category: str = "default",
     ) -> int:
         """Set multiple values in model cache"""
         success_count = 0
@@ -164,8 +172,8 @@ class ModelCacheAdapter:
                     "sets": self._stats.sets,
                     "deletes": self._stats.deletes,
                     "hit_rate": self._stats.hit_rate,
-                    "total_requests": self._stats.total_requests
-                }
+                    "total_requests": self._stats.total_requests,
+                },
             }
         except Exception as e:
             return {"error": str(e)}
@@ -189,7 +197,7 @@ class ModelCacheAdapter:
     async def cleanup_expired(self) -> int:
         """Cleanup expired entries"""
         try:
-            if hasattr(self.model_cache, 'cleanup_expired'):
+            if hasattr(self.model_cache, "cleanup_expired"):
                 return self.model_cache.cleanup_expired()
             return 0
         except Exception as e:
@@ -238,7 +246,7 @@ class SmartCacheAdapter:
         value: Any,
         ttl: Optional[int] = None,
         category: str = "default",
-        priority: int = 1
+        priority: int = 1,
     ) -> bool:
         """Set value in smart cache with unified interface"""
         return await self.smart_cache.set(key, value, ttl)
@@ -261,7 +269,9 @@ class SmartCacheAdapter:
         except:
             return False
 
-    async def get_many(self, keys: List[str], category: str = "default") -> Dict[str, Any]:
+    async def get_many(
+        self, keys: List[str], category: str = "default"
+    ) -> Dict[str, Any]:
         """Get multiple values from smart cache"""
         results = {}
         for key in keys:
@@ -274,7 +284,7 @@ class SmartCacheAdapter:
         self,
         key_value_pairs: Dict[str, Any],
         ttl: Optional[int] = None,
-        category: str = "default"
+        category: str = "default",
     ) -> int:
         """Set multiple values in smart cache"""
         success_count = 0
@@ -306,7 +316,7 @@ class SmartCacheAdapter:
             smart_stats = self.smart_cache.get_stats()
             return {
                 "type": "smart_cache_adapter",
-                "smart_cache_stats": smart_stats
+                "smart_cache_stats": smart_stats,
             }
         except Exception as e:
             return {"error": str(e)}
@@ -337,13 +347,13 @@ class SmartCacheAdapter:
 
     async def start(self) -> None:
         """Start adapter"""
-        if hasattr(self.smart_cache, 'start'):
+        if hasattr(self.smart_cache, "start"):
             await self.smart_cache.start()
         self._running = True
 
     async def stop(self) -> None:
         """Stop adapter"""
-        if hasattr(self.smart_cache, 'stop'):
+        if hasattr(self.smart_cache, "stop"):
             await self.smart_cache.stop()
         self._running = False
 
@@ -373,10 +383,12 @@ class UnifiedCacheAdapter:
         value: Any,
         ttl: Optional[int] = None,
         category: str = "default",
-        priority: int = 1
+        priority: int = 1,
     ) -> bool:
         """Set value in unified cache"""
-        return await self.unified_cache.set(key, value, ttl, category, priority)
+        return await self.unified_cache.set(
+            key, value, ttl, category, priority
+        )
 
     async def delete(self, key: str) -> bool:
         """Delete key from unified cache"""
@@ -391,7 +403,9 @@ class UnifiedCacheAdapter:
         value = await self.unified_cache.get(key)
         return value is not None
 
-    async def get_many(self, keys: List[str], category: str = "default") -> Dict[str, Any]:
+    async def get_many(
+        self, keys: List[str], category: str = "default"
+    ) -> Dict[str, Any]:
         """Get multiple values from unified cache"""
         results = {}
         for key in keys:
@@ -404,7 +418,7 @@ class UnifiedCacheAdapter:
         self,
         key_value_pairs: Dict[str, Any],
         ttl: Optional[int] = None,
-        category: str = "default"
+        category: str = "default",
     ) -> int:
         """Set multiple values in unified cache"""
         success_count = 0
@@ -435,7 +449,7 @@ class UnifiedCacheAdapter:
             stats = await self.unified_cache.get_stats()
             return {
                 "type": "unified_cache_adapter",
-                "unified_cache_stats": stats
+                "unified_cache_stats": stats,
             }
         except Exception as e:
             return {"error": str(e)}
@@ -471,7 +485,10 @@ class UnifiedCacheAdapter:
 
     def is_running(self) -> bool:
         """Check if adapter is running"""
-        return hasattr(self.unified_cache, '_running') and self.unified_cache._running
+        return (
+            hasattr(self.unified_cache, "_running")
+            and self.unified_cache._running
+        )
 
 
 # Factory functions for creating adapted caches
@@ -492,16 +509,10 @@ def adapt_unified_cache(unified_cache) -> ICache:
 
 # Utility functions for migration
 async def migrate_model_cache_to_unified(
-    model_cache,
-    unified_cache,
-    category: str = "models"
+    model_cache, unified_cache, category: str = "models"
 ) -> Dict[str, Any]:
     """Migrate data from ModelCache to UnifiedCache"""
-    results = {
-        "migrated": 0,
-        "failed": 0,
-        "errors": []
-    }
+    results = {"migrated": 0, "failed": 0, "errors": []}
 
     try:
         # ModelCache doesn't expose internal storage easily
@@ -515,20 +526,14 @@ async def migrate_model_cache_to_unified(
 
 
 async def migrate_smart_cache_to_unified(
-    smart_cache,
-    unified_cache,
-    category: str = "responses"
+    smart_cache, unified_cache, category: str = "responses"
 ) -> Dict[str, Any]:
     """Migrate data from SmartCache to UnifiedCache"""
-    results = {
-        "migrated": 0,
-        "failed": 0,
-        "errors": []
-    }
+    results = {"migrated": 0, "failed": 0, "errors": []}
 
     try:
         # SmartCache uses _cache OrderedDict
-        if hasattr(smart_cache, '_cache'):
+        if hasattr(smart_cache, "_cache"):
             for key, entry in smart_cache._cache.items():
                 try:
                     success = await unified_cache.set(
@@ -536,7 +541,7 @@ async def migrate_smart_cache_to_unified(
                         value=entry.value,
                         ttl=entry.ttl,
                         category=category,
-                        priority=1
+                        priority=1,
                     )
                     if success:
                         results["migrated"] += 1

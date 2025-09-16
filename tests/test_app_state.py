@@ -20,9 +20,13 @@ class TestAppState:
         """Test successful AppState initialization"""
         state = AppState()
 
-        with patch('src.core.app_state.ConfigManager') as mock_config_manager_class, \
-             patch('src.core.app_state.ProviderFactory') as mock_provider_factory_class, \
-             patch('src.core.app_state.rate_limiter') as mock_rate_limiter:
+        with patch(
+            "src.core.app_state.ConfigManager"
+        ) as mock_config_manager_class, patch(
+            "src.core.app_state.ProviderFactory"
+        ) as mock_provider_factory_class, patch(
+            "src.core.app_state.rate_limiter"
+        ) as mock_rate_limiter:
 
             mock_config_manager = Mock()
             mock_provider_factory = Mock()
@@ -42,7 +46,9 @@ class TestAppState:
             assert state.initialized is True
 
             mock_config_manager.load_config.assert_called_once()
-            mock_provider_factory.initialize_providers.assert_called_once_with(mock_config.providers)
+            mock_provider_factory.initialize_providers.assert_called_once_with(
+                mock_config.providers
+            )
             mock_rate_limiter.configure_limits.assert_called_once_with(100)
 
     @pytest.mark.asyncio
@@ -61,7 +67,9 @@ class TestAppState:
         """Test AppState initialization failure"""
         state = AppState()
 
-        with patch('src.core.app_state.ConfigManager') as mock_config_manager_class:
+        with patch(
+            "src.core.app_state.ConfigManager"
+        ) as mock_config_manager_class:
             mock_config_manager_class.side_effect = Exception("Config error")
 
             with pytest.raises(Exception) as exc_info:
@@ -76,9 +84,13 @@ class TestAppState:
         state = AppState()
         config_path = Path("/custom/config.yaml")
 
-        with patch('src.core.app_state.ConfigManager') as mock_config_manager_class, \
-             patch('src.core.app_state.ProviderFactory') as mock_provider_factory_class, \
-             patch('src.core.app_state.rate_limiter') as mock_rate_limiter:
+        with patch(
+            "src.core.app_state.ConfigManager"
+        ) as mock_config_manager_class, patch(
+            "src.core.app_state.ProviderFactory"
+        ) as mock_provider_factory_class, patch(
+            "src.core.app_state.rate_limiter"
+        ) as mock_rate_limiter:
 
             mock_config_manager = Mock()
             mock_provider_factory = Mock()
@@ -136,7 +148,9 @@ class TestAppState:
         state = AppState()
         state.initialized = True
         state.provider_factory = Mock()
-        state.provider_factory.shutdown = AsyncMock(side_effect=Exception("Shutdown error"))
+        state.provider_factory.shutdown = AsyncMock(
+            side_effect=Exception("Shutdown error")
+        )
 
         await state.shutdown()
 
@@ -160,9 +174,13 @@ class TestGlobalAppState:
         app_state.config_manager = None
         app_state.provider_factory = None
 
-        with patch('src.core.app_state.ConfigManager') as mock_config_manager_class, \
-             patch('src.core.app_state.ProviderFactory') as mock_provider_factory_class, \
-             patch('src.core.app_state.rate_limiter') as mock_rate_limiter:
+        with patch(
+            "src.core.app_state.ConfigManager"
+        ) as mock_config_manager_class, patch(
+            "src.core.app_state.ProviderFactory"
+        ) as mock_provider_factory_class, patch(
+            "src.core.app_state.rate_limiter"
+        ) as mock_rate_limiter:
 
             mock_config_manager = Mock()
             mock_provider_factory = Mock()

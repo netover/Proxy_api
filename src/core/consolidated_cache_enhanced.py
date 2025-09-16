@@ -40,7 +40,10 @@ class DistributedLock:
     A distributed lock implementation using Redis for cross-instance synchronization.
     This prevents multiple instances from performing the same work simultaneously (e.g., cache warming).
     """
-    def __init__(self, redis_client: redis.Redis, lock_key: str, timeout: int = 30):
+
+    def __init__(
+        self, redis_client: redis.Redis, lock_key: str, timeout: int = 30
+    ):
         """
         Initializes the distributed lock.
         Args:
@@ -59,7 +62,9 @@ class DistributedLock:
         Yields control once the lock is acquired.
         """
         # Continuously try to acquire the lock
-        while not await self.redis.set(self.lock_key, "locked", nx=True, ex=self.timeout):
+        while not await self.redis.set(
+            self.lock_key, "locked", nx=True, ex=self.timeout
+        ):
             # If lock is not acquired, wait for a short period before retrying
             await asyncio.sleep(0.1)
         try:
@@ -76,9 +81,10 @@ class DistributedLock:
 
 class CacheTier(Enum):
     """Cache tier levels for data organization"""
-    HOT = "hot"       # Frequently accessed, fast storage
-    WARM = "warm"     # Moderately accessed, balanced storage
-    COLD = "cold"     # Rarely accessed, cost-effective storage
+
+    HOT = "hot"  # Frequently accessed, fast storage
+    WARM = "warm"  # Moderately accessed, balanced storage
+    COLD = "cold"  # Rarely accessed, cost-effective storage
 
 
 class CacheCategory:
@@ -104,9 +110,16 @@ class CacheCategory:
     def get_all_categories(cls) -> List[str]:
         """Get all predefined categories"""
         return [
-            cls.MODELS, cls.RESPONSES, cls.SUMMARIES, cls.METRICS,
-            cls.CONFIG, cls.TOKENS, cls.SESSIONS,
-            cls.QUERIES, cls.RESULTS, cls.ANALYTICS
+            cls.MODELS,
+            cls.RESPONSES,
+            cls.SUMMARIES,
+            cls.METRICS,
+            cls.CONFIG,
+            cls.TOKENS,
+            cls.SESSIONS,
+            cls.QUERIES,
+            cls.RESULTS,
+            cls.ANALYTICS,
         ]
 
 
@@ -134,7 +147,7 @@ class ConsolidatedCacheManager:
         default_ttl: int = 1800,
         enable_tiering: bool = True,
         tier_thresholds: Optional[Dict[str, int]] = None,
-        redis_url: Optional[str] = None
+        redis_url: Optional[str] = None,
     ):
         self.cache_dir = cache_dir or Path.cwd() / ".cache" / "consolidated"
         self.enable_warming = enable_warming
@@ -147,10 +160,10 @@ class ConsolidatedCacheManager:
 
         # Tier configuration
         self.tier_thresholds = tier_thresholds or {
-            'hot_access_count': 10,      # Moves to hot tier after 10 accesses
-            'warm_access_count': 3,      # Moves to warm tier after 3 accesses
-            'cold_ttl_multiplier': 0.5,  # Cold tier has 50% shorter TTL
-            'hot_ttl_multiplier': 2.0,   # Hot tier has 2x longer TTL
+            "hot_access_count": 10,  # Moves to hot tier after 10 accesses
+            "warm_access_count": 3,  # Moves to warm tier after 3 accesses
+            "cold_ttl_multiplier": 0.5,  # Cold tier has 50% shorter TTL
+            "hot_ttl_multiplier": 2.0,  # Hot tier has 2x longer TTL
         }
 
         # Core components
@@ -164,7 +177,7 @@ class ConsolidatedCacheManager:
         self._tier_assignments: Dict[str, CacheTier] = {}
         self._category_tiers: Dict[str, CacheTier] = {}
         self._tier_stats: Dict[str, Dict[str, Any]] = {
-            tier.value: {'entries': 0, 'memory_usage': 0, 'hit_rate': 0.0}
+            tier.value: {"entries": 0, "memory_usage": 0, "hit_rate": 0.0}
             for tier in CacheTier
         }
 
@@ -180,7 +193,9 @@ class ConsolidatedCacheManager:
         # Initialize category tiers (default assignments)
         self._initialize_category_tiers()
 
-        logger.info("ConsolidatedCacheManager initialized with tiering support")
+        logger.info(
+            "ConsolidatedCacheManager initialized with tiering support"
+        )
 
     def _initialize_category_tiers(self) -> None:
         """Initialize default tier assignments for categories"""
@@ -216,7 +231,9 @@ class ConsolidatedCacheManager:
 
             try:
                 # Initialize Redis client for distributed features
-                self.redis = redis.from_url(self.redis_url, encoding="utf-8", decode_responses=True)
+                self.redis = redis.from_url(
+                    self.redis_url, encoding="utf-8", decode_responses=True
+                )
                 await self.redis.ping()
                 logger.info("Redis client connected successfully.")
 
@@ -224,12 +241,14 @@ class ConsolidatedCacheManager:
                 self._cache = await get_unified_cache()
 
                 # Configure cache with our settings
-                if hasattr(self._cache, '_unified_cache'):
+                if hasattr(self._cache, "_unified_cache"):
                     unified = self._cache._unified_cache
                     # Apply our configuration to the underlying unified cache
-                    if hasattr(unified, 'max_memory_bytes'):
-                        unified.max_memory_bytes = self.max_memory_mb * 1024 * 1024
-                    if hasattr(unified, 'default_ttl'):
+                    if hasattr(unified, "max_memory_bytes"):
+                        unified.max_memory_bytes = (
+                            self.max_memory_mb * 1024 * 1024
+                        )
+                    if hasattr(unified, "default_ttl"):
                         unified.default_ttl = self.default_ttl
 
                 # Initialize warmer
@@ -237,15 +256,14 @@ class ConsolidatedCacheManager:
                     self._warmer = CacheWarmer(
                         cache=self._cache,
                         enable_pattern_analysis=True,
-                        enable_predictive_warming=True
+                        enable_predictive_warming=True,
                     )
                     await self._warmer.start()
 
                 # Initialize monitor
                 if self.enable_monitoring:
                     self._monitor = CacheMonitor(
-                        target_hit_rate=0.9,
-                        check_interval=60
+                        target_hit_rate=0.9, check_interval=60
                     )
                     await self._monitor.start_monitoring()
 
@@ -257,7 +275,9 @@ class ConsolidatedCacheManager:
                 logger.info("ConsolidatedCacheManager fully initialized")
 
             except Exception as e:
-                logger.error(f"Failed to initialize ConsolidatedCacheManager: {e}")
+                logger.error(
+                    f"Failed to initialize ConsolidatedCacheManager: {e}"
+                )
                 await self._cleanup_on_error()
                 raise
 
@@ -292,26 +312,34 @@ class ConsolidatedCacheManager:
             return base_ttl
 
         if tier == CacheTier.HOT:
-            return int(base_ttl * self.tier_thresholds['hot_ttl_multiplier'])
+            return int(base_ttl * self.tier_thresholds["hot_ttl_multiplier"])
         elif tier == CacheTier.COLD:
-            return int(base_ttl * self.tier_thresholds['cold_ttl_multiplier'])
+            return int(base_ttl * self.tier_thresholds["cold_ttl_multiplier"])
         else:  # WARM
             return base_ttl
 
-    def _update_tier_assignment(self, key: str, category: str, access_count: int) -> None:
+    def _update_tier_assignment(
+        self, key: str, category: str, access_count: int
+    ) -> None:
         """Update tier assignment based on access patterns"""
         if not self.enable_tiering:
             return
 
-        current_tier = self._tier_assignments.get(key, self._get_tier_for_category(category))
+        current_tier = self._tier_assignments.get(
+            key, self._get_tier_for_category(category)
+        )
 
         # Promote to higher tiers based on access count
-        if (access_count >= self.tier_thresholds['hot_access_count'] and
-            current_tier != CacheTier.HOT):
+        if (
+            access_count >= self.tier_thresholds["hot_access_count"]
+            and current_tier != CacheTier.HOT
+        ):
             self._tier_assignments[key] = CacheTier.HOT
             logger.debug(f"Promoted key {key} to HOT tier")
-        elif (access_count >= self.tier_thresholds['warm_access_count'] and
-              current_tier == CacheTier.COLD):
+        elif (
+            access_count >= self.tier_thresholds["warm_access_count"]
+            and current_tier == CacheTier.COLD
+        ):
             self._tier_assignments[key] = CacheTier.WARM
             logger.debug(f"Promoted key {key} to WARM tier")
 
@@ -334,14 +362,16 @@ class ConsolidatedCacheManager:
                 self._stats.hits += 1
 
                 # Update tier assignment based on access
-                self._update_tier_assignment(key, category, getattr(value, 'access_count', 1))
+                self._update_tier_assignment(
+                    key, category, getattr(value, "access_count", 1)
+                )
 
                 # Record access for warming
                 if self._warmer:
                     self._warmer.record_access(key, category)
 
                 # Update tier statistics
-                self._tier_stats[tier.value]['entries'] += 1
+                self._tier_stats[tier.value]["entries"] += 1
 
             else:
                 self._stats.misses += 1
@@ -359,7 +389,7 @@ class ConsolidatedCacheManager:
         value: Any,
         ttl: Optional[int] = None,
         category: str = "default",
-        priority: int = 1
+        priority: int = 1,
     ) -> bool:
         """Set value in cache with tier-aware TTL calculation"""
         if not self._cache:
@@ -368,14 +398,18 @@ class ConsolidatedCacheManager:
         try:
             # Determine tier and calculate tier-specific TTL
             tier = self._get_tier_for_key(key, category)
-            effective_ttl = self._calculate_tier_ttl(ttl or self.default_ttl, tier)
+            effective_ttl = self._calculate_tier_ttl(
+                ttl or self.default_ttl, tier
+            )
 
-            success = await self._cache.set(key, value, effective_ttl, category, priority)
+            success = await self._cache.set(
+                key, value, effective_ttl, category, priority
+            )
 
             if success:
                 self._stats.sets += 1
                 # Update tier statistics
-                self._tier_stats[tier.value]['entries'] += 1
+                self._tier_stats[tier.value]["entries"] += 1
 
             return success
 
@@ -411,8 +445,11 @@ class ConsolidatedCacheManager:
 
             # Clear tier assignments for cleared entries
             if category:
-                keys_to_remove = [k for k, t in self._tier_assignments.items()
-                                if k.startswith(f"{category}:")]
+                keys_to_remove = [
+                    k
+                    for k, t in self._tier_assignments.items()
+                    if k.startswith(f"{category}:")
+                ]
                 for key in keys_to_remove:
                     del self._tier_assignments[key]
 
@@ -431,7 +468,9 @@ class ConsolidatedCacheManager:
         except Exception as e:
             return False
 
-    async def get_many(self, keys: List[str], category: str = "default") -> Dict[str, Any]:
+    async def get_many(
+        self, keys: List[str], category: str = "default"
+    ) -> Dict[str, Any]:
         """Get multiple values"""
         if not self._cache:
             raise RuntimeError("Cache not initialized")
@@ -446,7 +485,7 @@ class ConsolidatedCacheManager:
         self,
         key_value_pairs: Dict[str, Any],
         ttl: Optional[int] = None,
-        category: str = "default"
+        category: str = "default",
     ) -> int:
         """Set multiple values with tier-aware TTL"""
         if not self._cache:
@@ -457,7 +496,9 @@ class ConsolidatedCacheManager:
             tiered_pairs = {}
             for key, value in key_value_pairs.items():
                 tier = self._get_tier_for_key(key, category)
-                effective_ttl = self._calculate_tier_ttl(ttl or self.default_ttl, tier)
+                effective_ttl = self._calculate_tier_ttl(
+                    ttl or self.default_ttl, tier
+                )
                 tiered_pairs[key] = (value, effective_ttl)
 
             # Set with individual TTLs
@@ -465,7 +506,7 @@ class ConsolidatedCacheManager:
             for key, (value, effective_ttl) in tiered_pairs.items():
                 if await self._cache.set(key, value, effective_ttl, category):
                     success_count += 1
-                    self._tier_stats[tier.value]['entries'] += 1
+                    self._tier_stats[tier.value]["entries"] += 1
 
             self._stats.sets += success_count
             return success_count
@@ -526,16 +567,21 @@ class ConsolidatedCacheManager:
                 "manager_type": "consolidated_cache_enhanced",
                 "running": self._running,
                 "migrated": self._migrated,
-                "uptime_seconds": (datetime.now() - self._start_time).total_seconds(),
+                "uptime_seconds": (
+                    datetime.now() - self._start_time
+                ).total_seconds(),
                 "tiering_enabled": self.enable_tiering,
                 "tier_assignments": len(self._tier_assignments),
                 "tier_stats": self._tier_stats,
-                "category_tiers": {cat: tier.value for cat, tier in self._category_tiers.items()},
+                "category_tiers": {
+                    cat: tier.value
+                    for cat, tier in self._category_tiers.items()
+                },
                 "components": {
                     "cache": self._cache is not None,
                     "warmer": self._warmer is not None,
                     "monitor": self._monitor is not None,
-                    "migrator": self._migrator is not None
+                    "migrator": self._migrator is not None,
                 },
                 "manager_stats": {
                     "hits": self._stats.hits,
@@ -543,8 +589,8 @@ class ConsolidatedCacheManager:
                     "sets": self._stats.sets,
                     "deletes": self._stats.deletes,
                     "total_requests": self._stats.total_requests,
-                    "hit_rate": self._stats.hit_rate
-                }
+                    "hit_rate": self._stats.hit_rate,
+                },
             }
 
             # Add warmer stats if available
@@ -587,7 +633,9 @@ class ConsolidatedCacheManager:
         try:
             cache_categories = await self._cache.get_categories()
             # Add our predefined categories
-            all_categories = set(cache_categories + CacheCategory.get_all_categories())
+            all_categories = set(
+                cache_categories + CacheCategory.get_all_categories()
+            )
             return list(all_categories)
         except Exception as e:
             return CacheCategory.get_all_categories()
@@ -601,8 +649,11 @@ class ConsolidatedCacheManager:
             count = await self._cache.clear_category(category)
 
             # Clear tier assignments for this category
-            keys_to_remove = [k for k, t in self._tier_assignments.items()
-                            if k.startswith(f"{category}:")]
+            keys_to_remove = [
+                k
+                for k, t in self._tier_assignments.items()
+                if k.startswith(f"{category}:")
+            ]
             for key in keys_to_remove:
                 del self._tier_assignments[key]
 
@@ -640,7 +691,7 @@ class ConsolidatedCacheManager:
             return {
                 "cache_optimization": cache_result,
                 "tier_optimization": tier_result,
-                "warmer_optimization": warmer_result
+                "warmer_optimization": warmer_result,
             }
 
         except Exception as e:
@@ -658,7 +709,7 @@ class ConsolidatedCacheManager:
                 "reassigned_to_hot": 0,
                 "reassigned_to_warm": 0,
                 "reassigned_to_cold": 0,
-                "total_analyzed": len(self._tier_assignments)
+                "total_analyzed": len(self._tier_assignments),
             }
 
             # This is a simplified optimization - in practice, you'd analyze
@@ -684,18 +735,18 @@ class ConsolidatedCacheManager:
         try:
             # Migrate from SmartCache global instances
             from .smart_cache import get_response_cache, get_summary_cache
+
             response_cache = await get_response_cache()
             summary_cache = await get_summary_cache()
 
-            results = await self._migrator.migrate_to_unified_cache([
-                'response_cache',
-                'summary_cache'
-            ])
+            results = await self._migrator.migrate_to_unified_cache(
+                ["response_cache", "summary_cache"]
+            )
 
             # Assign appropriate tiers to migrated data
-            if 'response_cache' in results.get('migrated_caches', []):
+            if "response_cache" in results.get("migrated_caches", []):
                 self._category_tiers[CacheCategory.RESPONSES] = CacheTier.WARM
-            if 'summary_cache' in results.get('migrated_caches', []):
+            if "summary_cache" in results.get("migrated_caches", []):
                 self._category_tiers[CacheCategory.SUMMARIES] = CacheTier.WARM
 
             # Mark as migrated
@@ -715,7 +766,7 @@ class ConsolidatedCacheManager:
         provider_name: str,
         base_url: str,
         getter_func: Callable,
-        priority: int = 2
+        priority: int = 2,
     ) -> bool:
         """Warm cache with provider models using tier-aware warming"""
         if not self._warmer:
@@ -732,7 +783,9 @@ class ConsolidatedCacheManager:
 
         return await self._warmer.warm_key(key, getter_func, priority)
 
-    async def warm_category(self, category: str, priority: int = 1) -> Dict[str, Any]:
+    async def warm_category(
+        self, category: str, priority: int = 1
+    ) -> Dict[str, Any]:
         """Warm all keys in a category with tier awareness"""
         if not self._warmer:
             return {"error": "Warming not enabled"}
@@ -752,7 +805,9 @@ class ConsolidatedCacheManager:
             logger.error(f"Category warming error for {category}: {e}")
             return {"error": str(e)}
 
-    async def warm_cache_batch(self, keys: List[str], getter_func: Callable, category: str, ttl: int) -> Dict[str, Any]:
+    async def warm_cache_batch(
+        self, keys: List[str], getter_func: Callable, category: str, ttl: int
+    ) -> Dict[str, Any]:
         """
         Warms a batch of keys in parallel, protected by a distributed lock to prevent race conditions.
         Args:
@@ -770,20 +825,29 @@ class ConsolidatedCacheManager:
         batch_id = hash(tuple(sorted(keys)))
         lock_key = f"warm_batch:{category}:{batch_id}"
 
-        results = {"acquired_lock": False, "warmed_keys": 0, "failed_keys": 0, "errors": []}
+        results = {
+            "acquired_lock": False,
+            "warmed_keys": 0,
+            "failed_keys": 0,
+            "errors": [],
+        }
 
         try:
             lock = DistributedLock(self.redis, lock_key, timeout=60)
             async with lock:
                 results["acquired_lock"] = True
-                logger.info(f"Acquired distributed lock for warming batch {lock_key}")
+                logger.info(
+                    f"Acquired distributed lock for warming batch {lock_key}"
+                )
 
                 # Check which keys are not already in the cache
                 existing_keys = await self.get_many(keys, category)
                 keys_to_warm = [k for k in keys if k not in existing_keys]
 
                 if not keys_to_warm:
-                    logger.info(f"All keys in batch {lock_key} are already cached.")
+                    logger.info(
+                        f"All keys in batch {lock_key} are already cached."
+                    )
                     return results
 
                 async def _populate_cache(key: str):
@@ -792,11 +856,15 @@ class ConsolidatedCacheManager:
                         await self.set(key, value, ttl, category)
                         return key, True
                     except Exception as e:
-                        logger.error(f"Failed to warm key {key} in batch {lock_key}: {e}")
+                        logger.error(
+                            f"Failed to warm key {key} in batch {lock_key}: {e}"
+                        )
                         return key, False
 
                 tasks = [_populate_cache(key) for key in keys_to_warm]
-                task_results = await asyncio.gather(*tasks, return_exceptions=True)
+                task_results = await asyncio.gather(
+                    *tasks, return_exceptions=True
+                )
 
                 for result in task_results:
                     if isinstance(result, Exception):
@@ -808,7 +876,10 @@ class ConsolidatedCacheManager:
                         results["failed_keys"] += 1
 
         except Exception as e:
-            logger.error(f"Error during batch cache warming for {lock_key}: {e}", exc_info=True)
+            logger.error(
+                f"Error during batch cache warming for {lock_key}: {e}",
+                exc_info=True,
+            )
             results["errors"].append(str(e))
 
         return results
@@ -830,7 +901,11 @@ class ConsolidatedCacheManager:
                     "entries": stats["entries"],
                     "memory_usage": stats["memory_usage"],
                     "hit_rate": stats["hit_rate"],
-                    "status": "healthy" if stats["hit_rate"] > 0.5 else "needs_attention"
+                    "status": (
+                        "healthy"
+                        if stats["hit_rate"] > 0.5
+                        else "needs_attention"
+                    ),
                 }
                 health["tier_health"][tier_name] = tier_health
 
@@ -850,13 +925,20 @@ class ConsolidatedCacheManager:
             # Add tier analytics
             report["tier_analytics"] = {
                 "tier_distribution": {
-                    tier: len([k for k, t in self._tier_assignments.items() if t.value == tier])
+                    tier: len(
+                        [
+                            k
+                            for k, t in self._tier_assignments.items()
+                            if t.value == tier
+                        ]
+                    )
                     for tier in [t.value for t in CacheTier]
                 },
                 "tier_performance": self._tier_stats,
                 "category_tier_mapping": {
-                    cat: tier.value for cat, tier in self._category_tiers.items()
-                }
+                    cat: tier.value
+                    for cat, tier in self._category_tiers.items()
+                },
             }
 
             return report
@@ -900,17 +982,23 @@ class ConsolidatedCacheManager:
 
     # Backward compatibility methods (enhanced)
 
-    async def get_models(self, provider_name: str, base_url: str) -> Optional[List[Dict[str, Any]]]:
+    async def get_models(
+        self, provider_name: str, base_url: str
+    ) -> Optional[List[Dict[str, Any]]]:
         """Get cached models for a provider (backward compatibility)"""
         key = f"models:{provider_name}:{base_url}"
         return await self.get(key, category=CacheCategory.MODELS)
 
-    async def set_models(self, provider_name: str, base_url: str, models: List[Dict[str, Any]]) -> bool:
+    async def set_models(
+        self, provider_name: str, base_url: str, models: List[Dict[str, Any]]
+    ) -> bool:
         """Cache models for a provider (backward compatibility)"""
         key = f"models:{provider_name}:{base_url}"
         return await self.set(key, models, category=CacheCategory.MODELS)
 
-    async def invalidate_models(self, provider_name: str, base_url: str) -> bool:
+    async def invalidate_models(
+        self, provider_name: str, base_url: str
+    ) -> bool:
         """Invalidate cached models (backward compatibility)"""
         key = f"models:{provider_name}:{base_url}"
         return await self.delete(key)
@@ -919,17 +1007,25 @@ class ConsolidatedCacheManager:
         """Get cached response (SmartCache compatibility)"""
         return await self.get(key, category=CacheCategory.RESPONSES)
 
-    async def set_response(self, key: str, response: Any, ttl: Optional[int] = None) -> bool:
+    async def set_response(
+        self, key: str, response: Any, ttl: Optional[int] = None
+    ) -> bool:
         """Cache response (SmartCache compatibility)"""
-        return await self.set(key, response, ttl, category=CacheCategory.RESPONSES)
+        return await self.set(
+            key, response, ttl, category=CacheCategory.RESPONSES
+        )
 
     async def get_summary(self, key: str) -> Optional[Any]:
         """Get cached summary (SmartCache compatibility)"""
         return await self.get(key, category=CacheCategory.SUMMARIES)
 
-    async def set_summary(self, key: str, summary: Any, ttl: Optional[int] = None) -> bool:
+    async def set_summary(
+        self, key: str, summary: Any, ttl: Optional[int] = None
+    ) -> bool:
         """Cache summary (SmartCache compatibility)"""
-        return await self.set(key, summary, ttl, category=CacheCategory.SUMMARIES)
+        return await self.set(
+            key, summary, ttl, category=CacheCategory.SUMMARIES
+        )
 
     # Enhanced utility methods
 
@@ -940,13 +1036,11 @@ class ConsolidatedCacheManager:
             "category": category,
             "tier": tier.value,
             "ttl_multiplier": self.tier_thresholds.get(
-                f"{tier.value}_ttl_multiplier",
-                1.0
+                f"{tier.value}_ttl_multiplier", 1.0
             ),
             "access_threshold": self.tier_thresholds.get(
-                f"{tier.value}_access_count",
-                0
-            )
+                f"{tier.value}_access_count", 0
+            ),
         }
 
     async def rebalance_tiers(self) -> Dict[str, Any]:
@@ -957,13 +1051,28 @@ class ConsolidatedCacheManager:
         try:
             # Analyze current tier distribution and rebalance
             rebalance_stats = {
-                "hot_tier_entries": len([k for k, t in self._tier_assignments.items()
-                                       if t == CacheTier.HOT]),
-                "warm_tier_entries": len([k for k, t in self._tier_assignments.items()
-                                        if t == CacheTier.WARM]),
-                "cold_tier_entries": len([k for k, t in self._tier_assignments.items()
-                                        if t == CacheTier.COLD]),
-                "reassignments": 0
+                "hot_tier_entries": len(
+                    [
+                        k
+                        for k, t in self._tier_assignments.items()
+                        if t == CacheTier.HOT
+                    ]
+                ),
+                "warm_tier_entries": len(
+                    [
+                        k
+                        for k, t in self._tier_assignments.items()
+                        if t == CacheTier.WARM
+                    ]
+                ),
+                "cold_tier_entries": len(
+                    [
+                        k
+                        for k, t in self._tier_assignments.items()
+                        if t == CacheTier.COLD
+                    ]
+                ),
+                "reassignments": 0,
             }
 
             # Simple rebalancing logic - could be enhanced
@@ -1017,6 +1126,7 @@ async def shutdown_consolidated_cache() -> None:
 
 # Enhanced migration utilities
 
+
 async def migrate_cache_to_enhanced() -> Dict[str, Any]:
     """Migrate from basic ConsolidatedCacheManager to enhanced version"""
     try:
@@ -1032,10 +1142,12 @@ async def migrate_cache_to_enhanced() -> Dict[str, Any]:
             "target_manager": "EnhancedConsolidatedCacheManager",
             "status": "migration_simulated",
             "tiering_enabled": True,
-            "categories_initialized": len(CacheCategory.get_all_categories())
+            "categories_initialized": len(CacheCategory.get_all_categories()),
         }
 
-        logger.info("Cache migration to enhanced version completed", migration_stats)
+        logger.info(
+            "Cache migration to enhanced version completed", migration_stats
+        )
         return migration_stats
 
     except Exception as e:
@@ -1045,19 +1157,26 @@ async def migrate_cache_to_enhanced() -> Dict[str, Any]:
 
 # Convenience functions for common operations
 
-async def cache_model(provider_name: str, base_url: str, models: List[Dict[str, Any]]) -> bool:
+
+async def cache_model(
+    provider_name: str, base_url: str, models: List[Dict[str, Any]]
+) -> bool:
     """Convenience function to cache models"""
     manager = await get_consolidated_cache_manager()
     return await manager.set_models(provider_name, base_url, models)
 
 
-async def get_cached_model(provider_name: str, base_url: str) -> Optional[List[Dict[str, Any]]]:
+async def get_cached_model(
+    provider_name: str, base_url: str
+) -> Optional[List[Dict[str, Any]]]:
     """Convenience function to get cached models"""
     manager = await get_consolidated_cache_manager()
     return await manager.get_models(provider_name, base_url)
 
 
-async def cache_response(key: str, response: Any, ttl: Optional[int] = None) -> bool:
+async def cache_response(
+    key: str, response: Any, ttl: Optional[int] = None
+) -> bool:
     """Convenience function to cache responses"""
     manager = await get_consolidated_cache_manager()
     return await manager.set_response(key, response, ttl)

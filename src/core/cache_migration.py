@@ -58,7 +58,9 @@ class MigrationStats:
     @property
     def is_complete(self) -> bool:
         """Check if migration is complete"""
-        return (self.migrated_entries + self.failed_entries + self.skipped_entries) >= self.total_entries
+        return (
+            self.migrated_entries + self.failed_entries + self.skipped_entries
+        ) >= self.total_entries
 
 
 @dataclass
@@ -67,7 +69,9 @@ class MigrationConfig:
 
     batch_size: int = 100
     max_workers: int = 4
-    conflict_strategy: str = "newer_wins"  # newer_wins, older_wins, skip, merge
+    conflict_strategy: str = (
+        "newer_wins"  # newer_wins, older_wins, skip, merge
+    )
     enable_validation: bool = True
     enable_backup: bool = True
     backup_retention_days: int = 7
@@ -91,7 +95,9 @@ class CacheMigrationService:
         self.stats = MigrationStats()
         self._lock = threading.RLock()
         self._migration_in_progress = False
-        self._executor = ThreadPoolExecutor(max_workers=self.config.max_workers)
+        self._executor = ThreadPoolExecutor(
+            max_workers=self.config.max_workers
+        )
         self._backup_created = False
         self._backup_path: Optional[Path] = None
 
@@ -103,8 +109,7 @@ class CacheMigrationService:
         logger.info("CacheMigrationService initialized")
 
     async def migrate_to_unified_cache(
-        self,
-        source_cache_types: List[str] = None
+        self, source_cache_types: List[str] = None
     ) -> Dict[str, Any]:
         """
         Perform migration to unified cache.
@@ -117,7 +122,7 @@ class CacheMigrationService:
             Migration results and statistics
         """
         if source_cache_types is None:
-            source_cache_types = ['model_cache', 'smart_cache']
+            source_cache_types = ["model_cache", "smart_cache"]
 
         with self._lock:
             if self._migration_in_progress:
@@ -181,7 +186,7 @@ class CacheMigrationService:
             # Try to find existing ModelCache instances
             # This would need to be adapted based on how they're currently instantiated
             model_cache = ModelCache()
-            self._source_caches['model_cache'] = model_cache
+            self._source_caches["model_cache"] = model_cache
             logger.info("ModelCache initialized for migration")
         except Exception as e:
             logger.warning(f"Could not initialize ModelCache: {e}")
@@ -190,8 +195,8 @@ class CacheMigrationService:
         try:
             response_cache = await get_response_cache()
             summary_cache = await get_summary_cache()
-            self._source_caches['response_cache'] = response_cache
-            self._source_caches['summary_cache'] = summary_cache
+            self._source_caches["response_cache"] = response_cache
+            self._source_caches["summary_cache"] = summary_cache
             logger.info("SmartCache instances initialized for migration")
         except Exception as e:
             logger.warning(f"Could not initialize SmartCache instances: {e}")
@@ -199,18 +204,31 @@ class CacheMigrationService:
     async def _create_backup(self) -> None:
         """Create backup of existing cache data"""
         try:
-            backup_dir = Path.cwd() / ".cache" / "backup" / datetime.now().strftime("%Y%m%d_%H%M%S")
+            backup_dir = (
+                Path.cwd()
+                / ".cache"
+                / "backup"
+                / datetime.now().strftime("%Y%m%d_%H%M%S")
+            )
             backup_dir.mkdir(parents=True, exist_ok=True)
 
             # Backup ModelCache data
             model_cache_dir = Path.cwd() / ".cache" / "model_discovery"
             if model_cache_dir.exists():
-                shutil.copytree(model_cache_dir, backup_dir / "model_cache", dirs_exist_ok=True)
+                shutil.copytree(
+                    model_cache_dir,
+                    backup_dir / "model_cache",
+                    dirs_exist_ok=True,
+                )
 
             # Backup SmartCache data (if persisted)
             smart_cache_dir = Path.cwd() / ".cache" / "smart_cache"
             if smart_cache_dir.exists():
-                shutil.copytree(smart_cache_dir, backup_dir / "smart_cache", dirs_exist_ok=True)
+                shutil.copytree(
+                    smart_cache_dir,
+                    backup_dir / "smart_cache",
+                    dirs_exist_ok=True,
+                )
 
             self._backup_path = backup_dir
             self._backup_created = True
@@ -224,7 +242,9 @@ class CacheMigrationService:
             logger.error(f"Failed to create backup: {e}")
             self.stats.warnings.append(f"Backup creation failed: {e}")
 
-    async def _perform_migration(self, source_cache_types: List[str]) -> Dict[str, Any]:
+    async def _perform_migration(
+        self, source_cache_types: List[str]
+    ) -> Dict[str, Any]:
         """Perform the actual migration process"""
         migration_tasks = []
 
@@ -235,16 +255,22 @@ class CacheMigrationService:
 
         # Execute migration tasks
         if migration_tasks:
-            results = await asyncio.gather(*migration_tasks, return_exceptions=True)
+            results = await asyncio.gather(
+                *migration_tasks, return_exceptions=True
+            )
 
             # Process results
             for i, result in enumerate(results):
                 cache_type = source_cache_types[i]
                 if isinstance(result, Exception):
-                    logger.error(f"Migration failed for {cache_type}: {result}")
+                    logger.error(
+                        f"Migration failed for {cache_type}: {result}"
+                    )
                     self.stats.errors.append(f"{cache_type}: {result}")
                 else:
-                    logger.info(f"Migration completed for {cache_type}: {result}")
+                    logger.info(
+                        f"Migration completed for {cache_type}: {result}"
+                    )
 
         return {"status": "migration_tasks_completed"}
 
@@ -257,7 +283,9 @@ class CacheMigrationService:
         logger.info(f"Starting migration for {cache_type}")
 
         # Get entries from source cache
-        entries = await self._extract_entries_from_cache(source_cache, cache_type)
+        entries = await self._extract_entries_from_cache(
+            source_cache, cache_type
+        )
 
         if not entries:
             logger.info(f"No entries found in {cache_type}")
@@ -270,12 +298,12 @@ class CacheMigrationService:
         failed = 0
 
         for i in range(0, len(entries), self.config.batch_size):
-            batch = entries[i:i + self.config.batch_size]
+            batch = entries[i : i + self.config.batch_size]
 
             try:
                 batch_results = await self._migrate_batch(batch, cache_type)
-                migrated += batch_results.get('migrated', 0)
-                failed += batch_results.get('failed', 0)
+                migrated += batch_results.get("migrated", 0)
+                failed += batch_results.get("failed", 0)
 
                 # Log progress
                 if self.config.enable_progress_logging:
@@ -292,46 +320,56 @@ class CacheMigrationService:
         return {
             "entries_found": len(entries),
             "migrated": migrated,
-            "failed": failed
+            "failed": failed,
         }
 
-    async def _extract_entries_from_cache(self, cache: Any, cache_type: str) -> List[Dict[str, Any]]:
+    async def _extract_entries_from_cache(
+        self, cache: Any, cache_type: str
+    ) -> List[Dict[str, Any]]:
         """Extract entries from source cache"""
         entries = []
 
         try:
-            if cache_type == 'model_cache' and hasattr(cache, '_cache'):
+            if cache_type == "model_cache" and hasattr(cache, "_cache"):
                 # Extract from ModelCache
                 for key, models in cache._cache.items():
                     if isinstance(models, list) and models:
-                        entries.append({
-                            'key': key,
-                            'value': models,
-                            'category': 'model_discovery',
-                            'source_cache': cache_type,
-                            'timestamp': getattr(cache, '_timestamps', {}).get(key, time.time())
-                        })
+                        entries.append(
+                            {
+                                "key": key,
+                                "value": models,
+                                "category": "model_discovery",
+                                "source_cache": cache_type,
+                                "timestamp": getattr(
+                                    cache, "_timestamps", {}
+                                ).get(key, time.time()),
+                            }
+                        )
 
-            elif cache_type in ['response_cache', 'summary_cache']:
+            elif cache_type in ["response_cache", "summary_cache"]:
                 # Extract from SmartCache (this is more complex due to async nature)
                 # For now, we'll use a simplified approach
-                if hasattr(cache, '_cache'):
+                if hasattr(cache, "_cache"):
                     for key, entry in cache._cache.items():
-                        entries.append({
-                            'key': key,
-                            'value': entry.value,
-                            'category': cache_type.replace('_cache', ''),
-                            'source_cache': cache_type,
-                            'timestamp': entry.timestamp,
-                            'ttl': entry.ttl
-                        })
+                        entries.append(
+                            {
+                                "key": key,
+                                "value": entry.value,
+                                "category": cache_type.replace("_cache", ""),
+                                "source_cache": cache_type,
+                                "timestamp": entry.timestamp,
+                                "ttl": entry.ttl,
+                            }
+                        )
 
         except Exception as e:
             logger.error(f"Error extracting entries from {cache_type}: {e}")
 
         return entries
 
-    async def _migrate_batch(self, batch: List[Dict[str, Any]], cache_type: str) -> Dict[str, int]:
+    async def _migrate_batch(
+        self, batch: List[Dict[str, Any]], cache_type: str
+    ) -> Dict[str, int]:
         """Migrate a batch of entries"""
         migrated = 0
         failed = 0
@@ -339,7 +377,7 @@ class CacheMigrationService:
         for entry in batch:
             try:
                 # Check for conflicts
-                existing_entry = await self._target_cache.get(entry['key'])
+                existing_entry = await self._target_cache.get(entry["key"])
 
                 if existing_entry is not None:
                     # Handle conflict based on strategy
@@ -348,26 +386,28 @@ class CacheMigrationService:
                         continue
 
                 # Determine TTL
-                ttl = entry.get('ttl', self._target_cache.default_ttl)
+                ttl = entry.get("ttl", self._target_cache.default_ttl)
 
                 # Determine category
                 category = self.config.category_mapping.get(
-                    entry.get('category', 'default'),
-                    entry.get('category', 'default')
+                    entry.get("category", "default"),
+                    entry.get("category", "default"),
                 )
 
                 # Skip expired entries if configured
-                if (self.config.skip_expired_entries and
-                    entry.get('timestamp', 0) + ttl < time.time()):
+                if (
+                    self.config.skip_expired_entries
+                    and entry.get("timestamp", 0) + ttl < time.time()
+                ):
                     self.stats.skipped_entries += 1
                     continue
 
                 # Set in unified cache
                 success = await self._target_cache.set(
-                    key=entry['key'],
-                    value=entry['value'],
+                    key=entry["key"],
+                    value=entry["value"],
                     ttl=ttl,
-                    category=category
+                    category=category,
                 )
 
                 if success:
@@ -378,13 +418,17 @@ class CacheMigrationService:
                     self.stats.failed_entries += 1
 
             except Exception as e:
-                logger.error(f"Failed to migrate entry {entry.get('key', 'unknown')}: {e}")
+                logger.error(
+                    f"Failed to migrate entry {entry.get('key', 'unknown')}: {e}"
+                )
                 failed += 1
                 self.stats.failed_entries += 1
 
-        return {'migrated': migrated, 'failed': failed}
+        return {"migrated": migrated, "failed": failed}
 
-    async def _resolve_conflict(self, new_entry: Dict[str, Any], existing_entry: Any) -> bool:
+    async def _resolve_conflict(
+        self, new_entry: Dict[str, Any], existing_entry: Any
+    ) -> bool:
         """Resolve conflicts between existing and new entries"""
         strategy = self.config.conflict_strategy
 
@@ -392,7 +436,7 @@ class CacheMigrationService:
             return False
         elif strategy == "newer_wins":
             # Compare timestamps
-            new_timestamp = new_entry.get('timestamp', 0)
+            new_timestamp = new_entry.get("timestamp", 0)
             # For unified cache, we can't easily get the existing timestamp
             # So we'll assume new entry wins
             return True
@@ -401,14 +445,15 @@ class CacheMigrationService:
             return False
         elif strategy == "merge":
             # For model info lists, merge them
-            if (isinstance(new_entry.get('value'), list) and
-                isinstance(existing_entry, list)):
+            if isinstance(new_entry.get("value"), list) and isinstance(
+                existing_entry, list
+            ):
                 # Merge lists (remove duplicates)
                 merged = existing_entry.copy()
-                for item in new_entry['value']:
+                for item in new_entry["value"]:
                     if item not in merged:
                         merged.append(item)
-                new_entry['value'] = merged
+                new_entry["value"] = merged
                 return True
             else:
                 # Default to newer wins for non-mergeable types
@@ -425,7 +470,7 @@ class CacheMigrationService:
             cache_stats = await self._target_cache.get_stats()
 
             # Basic validation checks
-            if cache_stats['entries'] != self.stats.migrated_entries:
+            if cache_stats["entries"] != self.stats.migrated_entries:
                 warning = (
                     f"Entry count mismatch: cache has {cache_stats['entries']} "
                     f"but migration reported {self.stats.migrated_entries}"
@@ -434,7 +479,10 @@ class CacheMigrationService:
                 logger.warning(warning)
 
             # Check memory usage
-            if cache_stats['memory_usage_bytes'] > self._target_cache.max_memory_bytes:
+            if (
+                cache_stats["memory_usage_bytes"]
+                > self._target_cache.max_memory_bytes
+            ):
                 warning = (
                     f"Memory usage {cache_stats['memory_usage_mb']}MB exceeds "
                     f"limit of {self._target_cache.max_memory_bytes / (1024 * 1024)}MB"
@@ -506,7 +554,9 @@ class CacheMigrationService:
                     shutil.rmtree(target_dir)
                 shutil.copytree(smart_backup, target_dir)
 
-            logger.info(f"Cache data restored from backup: {self._backup_path}")
+            logger.info(
+                f"Cache data restored from backup: {self._backup_path}"
+            )
 
         except Exception as e:
             logger.error(f"Error restoring from backup: {e}")
@@ -519,7 +569,9 @@ class CacheMigrationService:
             if not backup_root.exists():
                 return
 
-            cutoff_date = datetime.now() - timedelta(days=self.config.backup_retention_days)
+            cutoff_date = datetime.now() - timedelta(
+                days=self.config.backup_retention_days
+            )
 
             for backup_dir in backup_root.iterdir():
                 if backup_dir.is_dir():
@@ -532,9 +584,13 @@ class CacheMigrationService:
 
                             if dir_date < cutoff_date:
                                 shutil.rmtree(backup_dir)
-                                logger.info(f"Removed old backup: {backup_dir}")
+                                logger.info(
+                                    f"Removed old backup: {backup_dir}"
+                                )
                     except (ValueError, OSError) as e:
-                        logger.warning(f"Error processing backup directory {backup_dir}: {e}")
+                        logger.warning(
+                            f"Error processing backup directory {backup_dir}: {e}"
+                        )
 
         except Exception as e:
             logger.error(f"Error cleaning old backups: {e}")
@@ -542,7 +598,11 @@ class CacheMigrationService:
     def _get_migration_results(self) -> Dict[str, Any]:
         """Get comprehensive migration results"""
         return {
-            "status": "completed" if self.stats.success_rate >= 0.95 else "completed_with_errors",
+            "status": (
+                "completed"
+                if self.stats.success_rate >= 0.95
+                else "completed_with_errors"
+            ),
             "success_rate": self.stats.success_rate,
             "stats": {
                 "total_entries": self.stats.total_entries,
@@ -550,17 +610,27 @@ class CacheMigrationService:
                 "failed_entries": self.stats.failed_entries,
                 "skipped_entries": self.stats.skipped_entries,
                 "conflicts_resolved": self.stats.conflicts_resolved,
-                "duplicates_found": self.stats.duplicates_found
+                "duplicates_found": self.stats.duplicates_found,
             },
             "timing": {
-                "start_time": self.stats.start_time.isoformat() if self.stats.start_time else None,
-                "end_time": self.stats.end_time.isoformat() if self.stats.end_time else None,
-                "duration_seconds": self.stats.duration_seconds
+                "start_time": (
+                    self.stats.start_time.isoformat()
+                    if self.stats.start_time
+                    else None
+                ),
+                "end_time": (
+                    self.stats.end_time.isoformat()
+                    if self.stats.end_time
+                    else None
+                ),
+                "duration_seconds": self.stats.duration_seconds,
             },
             "errors": self.stats.errors,
             "warnings": self.stats.warnings,
             "backup_created": self._backup_created,
-            "backup_path": str(self._backup_path) if self._backup_path else None
+            "backup_path": (
+                str(self._backup_path) if self._backup_path else None
+            ),
         }
 
     async def get_migration_status(self) -> Dict[str, Any]:
@@ -573,21 +643,33 @@ class CacheMigrationService:
                 "status": "in_progress",
                 "progress": {
                     "total": self.stats.total_entries,
-                    "completed": self.stats.migrated_entries + self.stats.failed_entries + self.stats.skipped_entries,
+                    "completed": self.stats.migrated_entries
+                    + self.stats.failed_entries
+                    + self.stats.skipped_entries,
                     "percentage": (
-                        (self.stats.migrated_entries + self.stats.failed_entries + self.stats.skipped_entries) /
-                        self.stats.total_entries * 100
-                        if self.stats.total_entries > 0 else 0
-                    )
+                        (
+                            self.stats.migrated_entries
+                            + self.stats.failed_entries
+                            + self.stats.skipped_entries
+                        )
+                        / self.stats.total_entries
+                        * 100
+                        if self.stats.total_entries > 0
+                        else 0
+                    ),
                 },
                 "stats": {
                     "migrated": self.stats.migrated_entries,
                     "failed": self.stats.failed_entries,
-                    "skipped": self.stats.skipped_entries
+                    "skipped": self.stats.skipped_entries,
                 },
-                "start_time": self.stats.start_time.isoformat() if self.stats.start_time else None,
+                "start_time": (
+                    self.stats.start_time.isoformat()
+                    if self.stats.start_time
+                    else None
+                ),
                 "errors": len(self.stats.errors),
-                "warnings": len(self.stats.warnings)
+                "warnings": len(self.stats.warnings),
             }
 
     async def cancel_migration(self) -> bool:
@@ -625,7 +707,7 @@ def get_migration_service() -> CacheMigrationService:
 
 async def migrate_to_unified_cache(
     config: Optional[MigrationConfig] = None,
-    source_cache_types: List[str] = None
+    source_cache_types: List[str] = None,
 ) -> Dict[str, Any]:
     """
     Convenience function to perform cache migration.

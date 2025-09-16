@@ -9,10 +9,10 @@ from typing import Any, Dict, List, Optional
 class ModelInfo:
     """
     Model information structure matching OpenAI API format.
-    
+
     This class represents a model's metadata as returned by OpenAI-compatible APIs.
     It includes all standard fields plus optional extensions for compatibility.
-    
+
     Attributes:
         id: Unique identifier for the model (e.g., "gpt-4", "claude-3-opus-20240229")
         object: Always "model" for model objects
@@ -21,7 +21,7 @@ class ModelInfo:
         permissions: List of permission objects for the model
         root: Optional root model identifier for model variants
         parent: Optional parent model identifier for model derivatives
-    
+
     Example:
         >>> model = ModelInfo(
         ...     id="gpt-4",
@@ -33,7 +33,7 @@ class ModelInfo:
         ...     parent=None
         ... )
     """
-    
+
     id: str
     created: int
     owned_by: str
@@ -41,46 +41,46 @@ class ModelInfo:
     permissions: List[Dict[str, Any]] = field(default_factory=list)
     root: Optional[str] = None
     parent: Optional[str] = None
-    
+
     def __post_init__(self) -> None:
         """Validate the model info after initialization."""
         if self.object != "model":
             raise ValueError(f"object must be 'model', got '{self.object}'")
-        
+
         if not self.id:
             raise ValueError("id cannot be empty")
-        
+
         if not self.owned_by:
             raise ValueError("owned_by cannot be empty")
-        
+
         if self.created <= 0:
             raise ValueError("created must be a positive Unix timestamp")
-    
+
     def __post_init__(self) -> None:
         """Validate the model info after initialization."""
         if self.object != "model":
             raise ValueError(f"object must be 'model', got '{self.object}'")
-        
+
         if not self.id:
             raise ValueError("id cannot be empty")
-        
+
         if not self.owned_by:
             raise ValueError("owned_by cannot be empty")
-        
+
         if self.created <= 0:
             raise ValueError("created must be a positive Unix timestamp")
-    
+
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "ModelInfo":
         """
         Create ModelInfo instance from dictionary.
-        
+
         Args:
             data: Dictionary containing model information
-            
+
         Returns:
             ModelInfo instance
-            
+
         Raises:
             ValueError: If required fields are missing or invalid
         """
@@ -92,15 +92,15 @@ class ModelInfo:
                 owned_by=data["owned_by"],
                 permissions=data.get("permissions", []),
                 root=data.get("root"),
-                parent=data.get("parent")
+                parent=data.get("parent"),
             )
         except KeyError as e:
             raise ValueError(f"Missing required field: {e}")
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """
         Convert ModelInfo instance to dictionary.
-        
+
         Returns:
             Dictionary representation of the model info
         """
@@ -111,23 +111,23 @@ class ModelInfo:
             "owned_by": self.owned_by,
             "permissions": self.permissions,
             "root": self.root,
-            "parent": self.parent
+            "parent": self.parent,
         }
-    
+
     @property
     def created_datetime(self) -> datetime:
         """
         Get creation time as datetime object.
-        
+
         Returns:
             Datetime object representing the creation time
         """
         return datetime.fromtimestamp(self.created)
-    
+
     def __str__(self) -> str:
         """String representation of the model."""
         return f"ModelInfo(id='{self.id}', owned_by='{self.owned_by}')"
-    
+
     def __repr__(self) -> str:
         """Detailed string representation for debugging."""
         return (

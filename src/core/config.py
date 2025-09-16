@@ -2,11 +2,12 @@ from pathlib import Path
 from typing import List, Optional
 
 import yaml
-from pydantic import field_validator
+from pydantic import field_validator, ConfigDict
 from pydantic_settings import BaseSettings
 
 # Define the project's base directory (the parent of the 'src' directory)
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
+
 
 class Settings(BaseSettings):
     """Application settings with validation and environment support"""
@@ -22,10 +23,13 @@ class Settings(BaseSettings):
 
     # Security
     api_key_header: str = "X-API-Key"
-    allowed_origins: List[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
+    allowed_origins: List[str] = [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ]
     keys: List[str] = []
 
-    @field_validator('keys', mode='before')
+    @field_validator("keys", mode="before")
     @classmethod
     def parse_proxy_keys(cls, v):
         """Parse keys from string to list if necessary.
@@ -40,21 +44,26 @@ class Settings(BaseSettings):
             v = v.strip()
             if not v:  # Empty string
                 return []
-            if v.startswith('[') and v.endswith(']'):
+            if v.startswith("[") and v.endswith("]"):
                 # JSON array format
                 import json
+
                 try:
                     parsed = json.loads(v)
                     if isinstance(parsed, list):
-                        return [str(k).strip() for k in parsed if k and str(k).strip()]
+                        return [
+                            str(k).strip()
+                            for k in parsed
+                            if k and str(k).strip()
+                        ]
                     else:
                         return [str(parsed).strip()] if parsed else []
                 except json.JSONDecodeError:
                     # Fallback to comma-separated if JSON parsing fails
-                    return [k.strip() for k in v.split(',') if k.strip()]
+                    return [k.strip() for k in v.split(",") if k.strip()]
             else:
                 # Comma-separated format
-                return [k.strip() for k in v.split(',') if k.strip()]
+                return [k.strip() for k in v.split(",") if k.strip()]
         elif isinstance(v, list):
             # Already a list, clean it up
             return [str(k).strip() for k in v if k and str(k).strip()]
@@ -91,11 +100,13 @@ class Settings(BaseSettings):
     export_model_filter: Optional[str] = None
     export_log_level: str = "INFO"
 
-    class Config:
-        env_prefix = "PROXY_API_"
-        case_sensitive = False
-        env_file = ".env"
-        extra = "allow"
+    model_config = ConfigDict(
+        env_prefix="PROXY_API_",
+        case_sensitive=False,
+        env_file=".env",
+        extra="allow",
+    )
+
 
 from src.core.app_config import ProviderConfig
 
@@ -104,10 +115,13 @@ settings = Settings()
 
 # Validate that proxy API keys are configured
 if not settings.keys:
-    raise ValueError("Proxy API keys must be configured. At least one key is required for security.")
+    raise ValueError(
+        "Proxy API keys must be configured. At least one key is required for security."
+    )
+
 
 def load_providers_cfg(path: str) -> List[ProviderConfig]:
-    with open(path, 'r') as f:
+    with open(path, "r") as f:
         raw = yaml.safe_load(f)
     providers_data = raw.get("providers", []) if raw else []
     return [ProviderConfig.model_validate(p) for p in providers_data]

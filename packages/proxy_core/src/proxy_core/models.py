@@ -7,6 +7,7 @@ from enum import Enum
 
 class ProviderType(str, Enum):
     """Supported provider types."""
+
     OPENAI = "openai"
     ANTHROPIC = "anthropic"
     PERPLEXITY = "perplexity"
@@ -19,6 +20,7 @@ class ProviderType(str, Enum):
 
 class ModelInfo(BaseModel):
     """Information about a model."""
+
     id: str
     name: str
     provider: str
@@ -33,6 +35,7 @@ class ModelInfo(BaseModel):
 
 class ProviderConfig(BaseModel):
     """Configuration for a provider."""
+
     name: str
     type: ProviderType
     api_key_env: str

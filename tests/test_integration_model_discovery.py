@@ -47,30 +47,31 @@ class TestModelDiscoveryIntegration:
         # Setup test configuration
         test_config = {
             "providers": {
-                "openai": {
-                    "api_key": "test-key",
-                    "enabled": True
-                },
-                "anthropic": {
-                    "api_key": "test-key",
-                    "enabled": True
-                }
+                "openai": {"api_key": "test-key", "enabled": True},
+                "anthropic": {"api_key": "test-key", "enabled": True},
             }
         }
 
         # Mock provider responses
         mock_openai_models = [
             {"id": "gpt-4", "object": "model", "created": 1234567890},
-            {"id": "gpt-3.5-turbo", "object": "model", "created": 1234567890}
-        ]
-        
-        mock_anthropic_models = [
-            {"id": "claude-3-opus-20240229", "display_name": "Claude 3 Opus"},
-            {"id": "claude-3-sonnet-20240229", "display_name": "Claude 3 Sonnet"}
+            {"id": "gpt-3.5-turbo", "object": "model", "created": 1234567890},
         ]
 
-        with patch('src.providers.openai.OpenAIDiscovery.get_models') as mock_openai:
-            with patch('src.providers.anthropic.AnthropicDiscovery.get_models') as mock_anthropic:
+        mock_anthropic_models = [
+            {"id": "claude-3-opus-20240229", "display_name": "Claude 3 Opus"},
+            {
+                "id": "claude-3-sonnet-20240229",
+                "display_name": "Claude 3 Sonnet",
+            },
+        ]
+
+        with patch(
+            "src.providers.openai.OpenAIDiscovery.get_models"
+        ) as mock_openai:
+            with patch(
+                "src.providers.anthropic.AnthropicDiscovery.get_models"
+            ) as mock_anthropic:
                 mock_openai.return_value = [
                     ModelInfo(
                         id="gpt-4",
@@ -81,7 +82,7 @@ class TestModelDiscoveryIntegration:
                         supports_chat=True,
                         supports_completion=True,
                         input_cost=0.03,
-                        output_cost=0.06
+                        output_cost=0.06,
                     ),
                     ModelInfo(
                         id="gpt-3.5-turbo",
@@ -92,10 +93,10 @@ class TestModelDiscoveryIntegration:
                         supports_chat=True,
                         supports_completion=True,
                         input_cost=0.0015,
-                        output_cost=0.002
-                    )
+                        output_cost=0.002,
+                    ),
                 ]
-                
+
                 mock_anthropic.return_value = [
                     ModelInfo(
                         id="claude-3-opus-20240229",
@@ -106,7 +107,7 @@ class TestModelDiscoveryIntegration:
                         supports_chat=True,
                         supports_completion=False,
                         input_cost=0.015,
-                        output_cost=0.075
+                        output_cost=0.075,
                     ),
                     ModelInfo(
                         id="claude-3-sonnet-20240229",
@@ -117,8 +118,8 @@ class TestModelDiscoveryIntegration:
                         supports_chat=True,
                         supports_completion=False,
                         input_cost=0.003,
-                        output_cost=0.015
-                    )
+                        output_cost=0.015,
+                    ),
                 ]
 
                 # Execute discovery
@@ -129,9 +130,11 @@ class TestModelDiscoveryIntegration:
                 # Verify results
                 assert len(result) == 4
                 assert all(isinstance(model, ModelInfo) for model in result)
-                
+
                 # Verify cache was populated
-                cached_models = discovery_service.cache_manager.get("all_models")
+                cached_models = discovery_service.cache_manager.get(
+                    "all_models"
+                )
                 assert cached_models is not None
                 assert len(cached_models) == 4
 
@@ -140,7 +143,7 @@ class TestModelDiscoveryIntegration:
         # Test GET /v1/models endpoint
         response = api_client.get("/v1/models")
         assert response.status_code == 200
-        
+
         data = response.json()
         assert "data" in data
         assert isinstance(data["data"], list)
@@ -165,9 +168,11 @@ class TestModelDiscoveryIntegration:
         """Test provider discovery with real API calls (mocked)."""
         # Test individual provider discovery
         providers = ["openai", "anthropic", "cohere"]
-        
+
         for provider_name in providers:
-            with patch(f'src.providers.{provider_name}.{provider_name.capitalize()}Discovery.get_models') as mock_provider:
+            with patch(
+                f"src.providers.{provider_name}.{provider_name.capitalize()}Discovery.get_models"
+            ) as mock_provider:
                 mock_provider.return_value = [
                     ModelInfo(
                         id=f"{provider_name}-model-1",
@@ -178,14 +183,16 @@ class TestModelDiscoveryIntegration:
                         supports_chat=True,
                         supports_completion=True,
                         input_cost=0.01,
-                        output_cost=0.02
+                        output_cost=0.02,
                     )
                 ]
-                
+
                 models = asyncio.run(
-                    discovery_service.discover_provider_models(provider_name, {})
+                    discovery_service.discover_provider_models(
+                        provider_name, {}
+                    )
                 )
-                
+
                 assert len(models) == 1
                 assert models[0].provider == provider_name
 
@@ -202,32 +209,38 @@ class TestModelDiscoveryIntegration:
                 supports_chat=True,
                 supports_completion=True,
                 input_cost=0.01,
-                output_cost=0.02
+                output_cost=0.02,
             )
         ]
-        
+
         # Mock provider to return test models
-        with patch('src.providers.openai.OpenAIDiscovery.get_models') as mock_openai:
+        with patch(
+            "src.providers.openai.OpenAIDiscovery.get_models"
+        ) as mock_openai:
             mock_openai.return_value = test_models
-            
+
             # First call - should hit provider and cache results
             result1 = asyncio.run(
-                discovery_service.discover_provider_models("openai", {"api_key": "test"})
+                discovery_service.discover_provider_models(
+                    "openai", {"api_key": "test"}
+                )
             )
-            
+
             # Verify cache was populated
             cached = discovery_service.cache_manager.get("openai_models")
             assert cached is not None
             assert len(cached) == 1
-            
+
             # Second call - should use cache
             result2 = asyncio.run(
-                discovery_service.discover_provider_models("openai", {"api_key": "test"})
+                discovery_service.discover_provider_models(
+                    "openai", {"api_key": "test"}
+                )
             )
-            
+
             # Results should be identical
             assert result1 == result2
-            
+
             # Verify cache hit by checking call count
             assert mock_openai.call_count == 1
 
@@ -243,46 +256,56 @@ class TestModelDiscoveryIntegration:
                 supports_chat=True,
                 supports_completion=True,
                 input_cost=0.01,
-                output_cost=0.02
+                output_cost=0.02,
             )
         ]
-        
-        with patch('src.providers.openai.OpenAIDiscovery.get_models') as mock_openai:
+
+        with patch(
+            "src.providers.openai.OpenAIDiscovery.get_models"
+        ) as mock_openai:
             mock_openai.return_value = test_models
-            
+
             # Set short TTL for testing
             discovery_service.cache_manager.ttl = 1  # 1 second
-            
+
             # First discovery
             asyncio.run(
-                discovery_service.discover_provider_models("openai", {"api_key": "test"})
+                discovery_service.discover_provider_models(
+                    "openai", {"api_key": "test"}
+                )
             )
-            
+
             # Wait for cache to expire
             time.sleep(2)
-            
+
             # Second discovery - should hit provider again
             asyncio.run(
-                discovery_service.discover_provider_models("openai", {"api_key": "test"})
+                discovery_service.discover_provider_models(
+                    "openai", {"api_key": "test"}
+                )
             )
-            
+
             # Should have made two API calls
             assert mock_openai.call_count == 2
 
     def test_error_handling_integration(self, discovery_service):
         """Test error handling across the entire system."""
         # Test provider failure handling
-        with patch('src.providers.openai.OpenAIDiscovery.get_models') as mock_openai:
+        with patch(
+            "src.providers.openai.OpenAIDiscovery.get_models"
+        ) as mock_openai:
             mock_openai.side_effect = Exception("API Error")
-            
+
             # Should handle error gracefully
             result = asyncio.run(
-                discovery_service.discover_provider_models("openai", {"api_key": "test"})
+                discovery_service.discover_provider_models(
+                    "openai", {"api_key": "test"}
+                )
             )
-            
+
             # Should return empty list on error
             assert result == []
-            
+
             # Should not cache error
             cached = discovery_service.cache_manager.get("openai_models")
             assert cached is None
@@ -299,28 +322,32 @@ class TestModelDiscoveryIntegration:
                 supports_chat=True,
                 supports_completion=True,
                 input_cost=0.01,
-                output_cost=0.02
+                output_cost=0.02,
             )
         ]
-        
-        with patch('src.providers.openai.OpenAIDiscovery.get_models') as mock_openai:
+
+        with patch(
+            "src.providers.openai.OpenAIDiscovery.get_models"
+        ) as mock_openai:
             mock_openai.return_value = test_models
-            
+
             # Run multiple concurrent discoveries
             async def run_concurrent():
                 tasks = [
-                    discovery_service.discover_provider_models("openai", {"api_key": "test"})
+                    discovery_service.discover_provider_models(
+                        "openai", {"api_key": "test"}
+                    )
                     for _ in range(5)
                 ]
                 results = await asyncio.gather(*tasks)
                 return results
-            
+
             results = asyncio.run(run_concurrent())
-            
+
             # All results should be identical
             assert all(len(r) == 1 for r in results)
             assert all(r[0].id == "test-model-1" for r in results)
-            
+
             # Should only make one API call due to caching
             assert mock_openai.call_count == 1
 
@@ -336,7 +363,7 @@ class TestModelDiscoveryIntegration:
                 supports_chat=True,
                 supports_completion=True,
                 input_cost=0.03,
-                output_cost=0.06
+                output_cost=0.06,
             ),
             ModelInfo(
                 id="gpt-3.5-turbo",
@@ -347,32 +374,38 @@ class TestModelDiscoveryIntegration:
                 supports_chat=True,
                 supports_completion=True,
                 input_cost=0.0015,
-                output_cost=0.002
-            )
+                output_cost=0.002,
+            ),
         ]
-        
-        with patch('src.providers.openai.OpenAIDiscovery.get_models') as mock_openai:
+
+        with patch(
+            "src.providers.openai.OpenAIDiscovery.get_models"
+        ) as mock_openai:
             mock_openai.return_value = test_models
-            
+
             # Test filtering by provider
             result = asyncio.run(
-                discovery_service.discover_all_models({
-                    "providers": {"openai": {"enabled": True}},
-                    "filters": {"provider": "openai"}
-                })
+                discovery_service.discover_all_models(
+                    {
+                        "providers": {"openai": {"enabled": True}},
+                        "filters": {"provider": "openai"},
+                    }
+                )
             )
-            
+
             assert len(result) == 2
             assert all(m.provider == "openai" for m in result)
-            
+
             # Test filtering by capability
             result = asyncio.run(
-                discovery_service.discover_all_models({
-                    "providers": {"openai": {"enabled": True}},
-                    "filters": {"supports_chat": True}
-                })
+                discovery_service.discover_all_models(
+                    {
+                        "providers": {"openai": {"enabled": True}},
+                        "filters": {"supports_chat": True},
+                    }
+                )
             )
-            
+
             assert len(result) == 2
             assert all(m.supports_chat for m in result)
 
@@ -438,9 +471,7 @@ class TestAPIIntegration:
 
         if data["data"]:
             model = data["data"][0]
-            required_model_fields = [
-                "id", "object", "created", "owned_by"
-            ]
+            required_model_fields = ["id", "object", "created", "owned_by"]
             for field in required_model_fields:
                 assert field in model
 

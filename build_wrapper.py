@@ -4,6 +4,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+
 def run_build():
     # Configure paths
     project_root = Path(__file__).parent.resolve()
@@ -38,6 +39,7 @@ def run_build():
     except subprocess.CalledProcessError as e:
         print(f"\nBuild failed with error: {e}")
         return False
+
 
 if __name__ == "__main__":
     if not run_build():

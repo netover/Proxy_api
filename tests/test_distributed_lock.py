@@ -9,10 +9,14 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 import pytest_asyncio
 
-from src.core.consolidated_cache_enhanced import ConsolidatedCacheManager, DistributedLock
+from src.core.consolidated_cache_enhanced import (
+    ConsolidatedCacheManager,
+    DistributedLock,
+)
 
 # Mark all tests in this file as asyncio
 pytestmark = pytest.mark.asyncio
+
 
 @pytest_asyncio.fixture
 async def mock_redis_client():
@@ -40,6 +44,7 @@ async def mock_redis_client():
 
     return mock_redis, locks
 
+
 @pytest_asyncio.fixture
 async def cache_manager(mock_redis_client):
     """Fixture to create a ConsolidatedCacheManager with a mocked Redis client."""
@@ -59,16 +64,17 @@ async def cache_manager(mock_redis_client):
     manager.redis = mock_redis
     manager._cache = mock_unified_cache
     manager._warmer = mock_warmer
-    manager._running = True # Mark as running
+    manager._running = True  # Mark as running
 
     return manager
+
 
 async def test_distributed_lock_acquires_and_releases(mock_redis_client):
     """Test that the lock can be acquired and is released properly."""
     mock_redis, locks = mock_redis_client
     lock_key = "test_lock"
 
-    assert not locks # Ensure no locks at the start
+    assert not locks  # Ensure no locks at the start
 
     lock = DistributedLock(mock_redis, lock_key, timeout=10)
     async with lock:
@@ -77,6 +83,7 @@ async def test_distributed_lock_acquires_and_releases(mock_redis_client):
 
     # Check that the lock was released upon exiting the context
     assert not locks
+
 
 async def test_distributed_lock_blocks_concurrent_access(mock_redis_client):
     """Test that a second process must wait for the first to release the lock."""
@@ -95,16 +102,19 @@ async def test_distributed_lock_blocks_concurrent_access(mock_redis_client):
 
         # Give the task a moment to run and block
         await asyncio.sleep(0.2)
-        assert not acquire_task.done() # It should be waiting for the lock
+        assert not acquire_task.done()  # It should be waiting for the lock
 
     # After lock1 is released, lock2 should be able to acquire it
     await acquire_task
-    assert lock_key in locks # Now lock2 holds it
+    assert lock_key in locks  # Now lock2 holds it
 
     await lock2.__aexit__(None, None, None)
-    assert not locks # And now it's released
+    assert not locks  # And now it's released
 
-async def test_warm_cache_batch_uses_distributed_lock(cache_manager, mock_redis_client):
+
+async def test_warm_cache_batch_uses_distributed_lock(
+    cache_manager, mock_redis_client
+):
     """Verify that warm_cache_batch uses the distributed lock."""
     mock_redis, locks = mock_redis_client
 
@@ -117,13 +127,20 @@ async def test_warm_cache_batch_uses_distributed_lock(cache_manager, mock_redis_
     getter_func = AsyncMock(return_value="warmed_value")
 
     # Run the batch warming
-    await cache_manager.warm_cache_batch(keys_to_warm, getter_func, category, ttl=3600)
+    await cache_manager.warm_cache_batch(
+        keys_to_warm, getter_func, category, ttl=3600
+    )
 
     # Assert that the lock was set and then deleted
-    mock_redis.set.assert_called_once_with(expected_lock_key, "locked", nx=True, ex=60)
+    mock_redis.set.assert_called_once_with(
+        expected_lock_key, "locked", nx=True, ex=60
+    )
     mock_redis.delete.assert_called_once_with(expected_lock_key)
 
-async def test_warm_cache_batch_concurrent_calls(cache_manager, mock_redis_client):
+
+async def test_warm_cache_batch_concurrent_calls(
+    cache_manager, mock_redis_client
+):
     """Simulate two instances calling warm_cache_batch for the same batch concurrently."""
     mock_redis, _ = mock_redis_client
 
@@ -150,10 +167,13 @@ async def test_warm_cache_batch_concurrent_calls(cache_manager, mock_redis_clien
                 return {}
             # On subsequent calls, everything is cached
             return {k: "cached" for k in keys}
+
         get_many_side_effect.call_count = 1
         cache_manager._cache.get_many.side_effect = get_many_side_effect
 
-        await cache_manager.warm_cache_batch(keys, getter_func, category, ttl=60)
+        await cache_manager.warm_cache_batch(
+            keys, getter_func, category, ttl=60
+        )
 
     # Simulate two concurrent calls
     task1 = asyncio.create_task(run_warming())

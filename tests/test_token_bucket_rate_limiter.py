@@ -3,7 +3,12 @@ import time
 import pytest
 from unittest.mock import MagicMock
 
-from src.core.rate_limiter import TokenBucket, TokenBucketRateLimiter, token_bucket_rate_limit, rate_limiter
+from src.core.rate_limiter import (
+    TokenBucket,
+    TokenBucketRateLimiter,
+    token_bucket_rate_limit,
+    rate_limiter,
+)
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 

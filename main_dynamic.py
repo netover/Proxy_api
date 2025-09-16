@@ -31,8 +31,12 @@ async def lifespan(app: FastAPI):
         app.state.app_state = app_state
         logger.info("AppState initialized successfully")
     except ModuleNotFoundError as e:
-        logger.error(f"A required dependency is missing: {e}. Please install it.")
-        logger.error("The application cannot start without all configured dependencies.")
+        logger.error(
+            f"A required dependency is missing: {e}. Please install it."
+        )
+        logger.error(
+            "The application cannot start without all configured dependencies."
+        )
         raise
     except asyncio.TimeoutError:
         logger.error("AppState initialization timed out after 30 seconds")
@@ -53,12 +57,14 @@ async def lifespan(app: FastAPI):
     # Setup logging after config load
     setup_logging(
         log_level="DEBUG" if config.settings.debug else "INFO",
-        log_file=config.settings.log_file
+        log_file=config.settings.log_file,
     )
 
     # Initialize authentication
     if not config.settings.api_keys:
-        logger.warning("No API keys configured. All authenticated requests will be rejected.")
+        logger.warning(
+            "No API keys configured. All authenticated requests will be rejected."
+        )
     app.state.api_key_auth = APIKeyAuth(config.settings.api_keys)
 
     yield
@@ -68,13 +74,12 @@ async def lifespan(app: FastAPI):
     await app_state.shutdown()
 
 
-
 # FastAPI app setup
 app = FastAPI(
     title="LLM Proxy API",
     version="2.0.0",
     description="High-performance LLM proxy with intelligent routing and fallback",
-    lifespan=lifespan
+    lifespan=lifespan,
 )
 
 # Middleware setup
@@ -89,8 +94,10 @@ app.add_middleware(
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 from src.api.endpoints import create_router
+
 router = create_router()
 app.include_router(router, prefix="/v1")
+
 
 @app.get("/")
 async def root():
@@ -107,17 +114,28 @@ async def root():
             "models": "/v1/models",
             "health": "/health",
             "metrics": "/metrics",
-            "providers": "/providers"
-        }
+            "providers": "/providers",
+        },
     }
 
+
 # Error handlers
-from src.core.exceptions import ProviderError, InvalidRequestError, RateLimitError, AuthenticationError, ServiceUnavailableError, NotImplementedError
+from src.core.exceptions import (
+    ProviderError,
+    InvalidRequestError,
+    RateLimitError,
+    AuthenticationError,
+    ServiceUnavailableError,
+    NotImplementedError,
+)
+
 
 @app.exception_handler(ProviderError)
 async def provider_exception_handler(request: Request, exc: ProviderError):
-    logger.error(f"Provider error: {exc}", path=request.url.path, exc_info=True)
-    
+    logger.error(
+        f"Provider error: {exc}", path=request.url.path, exc_info=True
+    )
+
     status_code = 500
     if isinstance(exc, InvalidRequestError):
         status_code = 400
@@ -129,22 +147,23 @@ async def provider_exception_handler(request: Request, exc: ProviderError):
         status_code = 503
     elif isinstance(exc, NotImplementedError):
         status_code = 501
-    
+
     error_dict = exc.to_dict()
     if isinstance(exc, InvalidRequestError):
         error_dict["param"] = exc.param
-    
+
     return JSONResponse(
         status_code=status_code,
-        content={
-            "error": error_dict
-        },
+        content={"error": error_dict},
     )
+
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    logger.error(f"Unhandled exception: {exc}", path=request.url.path, exc_info=True)
-    
+    logger.error(
+        f"Unhandled exception: {exc}", path=request.url.path, exc_info=True
+    )
+
     return JSONResponse(
         status_code=500,
         content={
@@ -152,10 +171,11 @@ async def global_exception_handler(request: Request, exc: Exception):
                 "message": "Internal server error",
                 "type": "server_error",
                 "code": "internal_error",
-                "detail": "An unexpected error occurred. Please check the logs for more information."
+                "detail": "An unexpected error occurred. Please check the logs for more information.",
             }
         },
     )
+
 
 if __name__ == "__main__":
     # Setup logging with default
@@ -163,16 +183,13 @@ if __name__ == "__main__":
 
     # Check if running as bundled executable
     import sys
-    is_bundled = getattr(sys, 'frozen', False)
+
+    is_bundled = getattr(sys, "frozen", False)
 
     if is_bundled:
         # When bundled, use the app object directly
         uvicorn.run(
-            app,
-            host="127.0.0.1",
-            port=8000,
-            reload=False,
-            log_level="info"
+            app, host="127.0.0.1", port=8000, reload=False, log_level="info"
         )
     else:
         # When running from source, use string import
@@ -181,5 +198,5 @@ if __name__ == "__main__":
             host="127.0.0.1",
             port=8000,
             reload=False,
-            log_level="info"
+            log_level="info",
         )

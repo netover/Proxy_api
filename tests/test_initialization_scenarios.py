@@ -31,28 +31,30 @@ class TestInitializationScenarios:
         with tempfile.TemporaryDirectory() as temp_dir:
             yield Path(temp_dir)
 
-    def create_config_file(self, temp_dir, config_data, filename="config.yaml"):
+    def create_config_file(
+        self, temp_dir, config_data, filename="config.yaml"
+    ):
         """Create a temporary config file."""
         config_path = temp_dir / filename
-        with open(config_path, 'w') as f:
+        with open(config_path, "w") as f:
             yaml.safe_dump(config_data, f)
         return config_path
 
     def get_minimal_config(self):
         """Get minimal configuration with only required fields."""
         return {
-            "auth": {
-                "api_keys": ["test-key-123"]
-            },
-            "providers": [{
-                "name": "test-provider",
-                "type": "openai",
-                "api_key_env": "TEST_API_KEY",
-                "base_url": "https://api.openai.com/v1",
-                "models": ["gpt-3.5-turbo"],
-                "enabled": True,
-                "priority": 1
-            }]
+            "auth": {"api_keys": ["test-key-123"]},
+            "providers": [
+                {
+                    "name": "test-provider",
+                    "type": "openai",
+                    "api_key_env": "TEST_API_KEY",
+                    "base_url": "https://api.openai.com/v1",
+                    "models": ["gpt-3.5-turbo"],
+                    "enabled": True,
+                    "priority": 1,
+                }
+            ],
         }
 
     def get_full_config(self):
@@ -61,67 +63,58 @@ class TestInitializationScenarios:
             "app": {
                 "name": "LLM Proxy API",
                 "version": "2.0.0",
-                "environment": "test"
+                "environment": "test",
             },
-            "server": {
-                "host": "127.0.0.1",
-                "port": 8000,
-                "debug": False
-            },
-            "auth": {
-                "api_keys": ["test-key-123", "prod-key-456"]
-            },
-            "providers": [{
-                "name": "openai",
-                "type": "openai",
-                "api_key_env": "OPENAI_API_KEY",
-                "base_url": "https://api.openai.com/v1",
-                "models": ["gpt-3.5-turbo", "gpt-4"],
-                "enabled": True,
-                "priority": 1,
-                "timeout": 30,
-                "max_retries": 3
-            }, {
-                "name": "anthropic",
-                "type": "anthropic",
-                "api_key_env": "ANTHROPIC_API_KEY",
-                "base_url": "https://api.anthropic.com",
-                "models": ["claude-3-haiku"],
-                "enabled": True,
-                "priority": 2
-            }],
+            "server": {"host": "127.0.0.1", "port": 8000, "debug": False},
+            "auth": {"api_keys": ["test-key-123", "prod-key-456"]},
+            "providers": [
+                {
+                    "name": "openai",
+                    "type": "openai",
+                    "api_key_env": "OPENAI_API_KEY",
+                    "base_url": "https://api.openai.com/v1",
+                    "models": ["gpt-3.5-turbo", "gpt-4"],
+                    "enabled": True,
+                    "priority": 1,
+                    "timeout": 30,
+                    "max_retries": 3,
+                },
+                {
+                    "name": "anthropic",
+                    "type": "anthropic",
+                    "api_key_env": "ANTHROPIC_API_KEY",
+                    "base_url": "https://api.anthropic.com",
+                    "models": ["claude-3-haiku"],
+                    "enabled": True,
+                    "priority": 2,
+                },
+            ],
             "circuit_breaker": {
                 "failure_threshold": 5,
-                "recovery_timeout": 60
+                "recovery_timeout": 60,
             },
             "caching": {
                 "enabled": True,
-                "response_cache": {
-                    "max_size_mb": 100,
-                    "ttl": 1800
-                }
+                "response_cache": {"max_size_mb": 100, "ttl": 1800},
             },
-            "logging": {
-                "level": "INFO",
-                "format": "json"
-            }
+            "logging": {"level": "INFO", "format": "json"},
         }
 
     def get_partial_config(self):
         """Get partial configuration missing some optional sections."""
         return {
-            "auth": {
-                "api_keys": ["test-key-123"]
-            },
-            "providers": [{
-                "name": "openai",
-                "type": "openai",
-                "api_key_env": "OPENAI_API_KEY",
-                "base_url": "https://api.openai.com/v1",
-                "models": ["gpt-3.5-turbo"],
-                "enabled": True,
-                "priority": 1
-            }]
+            "auth": {"api_keys": ["test-key-123"]},
+            "providers": [
+                {
+                    "name": "openai",
+                    "type": "openai",
+                    "api_key_env": "OPENAI_API_KEY",
+                    "base_url": "https://api.openai.com/v1",
+                    "models": ["gpt-3.5-turbo"],
+                    "enabled": True,
+                    "priority": 1,
+                }
+            ],
             # Missing: circuit_breaker, caching, logging sections
         }
 
@@ -136,15 +129,18 @@ class TestInitializationScenarios:
 
         initializer = ApplicationInitializer(str(config_path))
 
-        with patch('src.core.app_init.settings') as mock_settings, \
-             patch('src.core.app_init.setup_logging') as mock_setup_logging, \
-             patch('signal.signal') as mock_signal, \
-             patch.object(initializer, '_initialize_parallel_execution_components') as mock_init_parallel:
+        with patch("src.core.app_init.settings") as mock_settings, patch(
+            "src.core.app_init.setup_logging"
+        ) as mock_setup_logging, patch(
+            "signal.signal"
+        ) as mock_signal, patch.object(
+            initializer, "_initialize_parallel_execution_components"
+        ) as mock_init_parallel:
 
             # Mock settings to return our config
             mock_config = Mock()
             mock_settings.__class__ = Mock()
-            mock_settings.__class__.__name__ = 'Settings'
+            mock_settings.__class__.__name__ = "Settings"
             mock_logger = Mock()
             mock_setup_logging.return_value = mock_logger
 
@@ -158,8 +154,12 @@ class TestInitializationScenarios:
 
             # Verify logging calls
             mock_setup_logging.assert_called_once()
-            mock_logger.info.assert_any_call("🚀 Starting application initialization...")
-            mock_logger.info.assert_any_call("✅ Application initialization completed successfully")
+            mock_logger.info.assert_any_call(
+                "🚀 Starting application initialization..."
+            )
+            mock_logger.info.assert_any_call(
+                "✅ Application initialization completed successfully"
+            )
             mock_init_parallel.assert_called_once()
 
     @pytest.mark.asyncio
@@ -174,14 +174,17 @@ class TestInitializationScenarios:
 
         initializer = ApplicationInitializer(str(config_path))
 
-        with patch('src.core.app_init.settings') as mock_settings, \
-             patch('src.core.app_init.setup_logging') as mock_setup_logging, \
-             patch('signal.signal') as mock_signal, \
-             patch.object(initializer, '_initialize_parallel_execution_components') as mock_init_parallel:
+        with patch("src.core.app_init.settings") as mock_settings, patch(
+            "src.core.app_init.setup_logging"
+        ) as mock_setup_logging, patch(
+            "signal.signal"
+        ) as mock_signal, patch.object(
+            initializer, "_initialize_parallel_execution_components"
+        ) as mock_init_parallel:
 
             mock_config = Mock()
             mock_settings.__class__ = Mock()
-            mock_settings.__class__.__name__ = 'Settings'
+            mock_settings.__class__.__name__ = "Settings"
             mock_logger = Mock()
             mock_setup_logging.return_value = mock_logger
 
@@ -204,14 +207,17 @@ class TestInitializationScenarios:
 
         initializer = ApplicationInitializer(str(config_path))
 
-        with patch('src.core.app_init.settings') as mock_settings, \
-             patch('src.core.app_init.setup_logging') as mock_setup_logging, \
-             patch('signal.signal') as mock_signal, \
-             patch.object(initializer, '_initialize_parallel_execution_components') as mock_init_parallel:
+        with patch("src.core.app_init.settings") as mock_settings, patch(
+            "src.core.app_init.setup_logging"
+        ) as mock_setup_logging, patch(
+            "signal.signal"
+        ) as mock_signal, patch.object(
+            initializer, "_initialize_parallel_execution_components"
+        ) as mock_init_parallel:
 
             mock_config = Mock()
             mock_settings.__class__ = Mock()
-            mock_settings.__class__.__name__ = 'Settings'
+            mock_settings.__class__.__name__ = "Settings"
             mock_logger = Mock()
             mock_setup_logging.return_value = mock_logger
 
@@ -235,14 +241,19 @@ class TestInitializationScenarios:
         # Test missing dependencies by making parallel init fail
         initializer = ApplicationInitializer(str(config_path))
 
-        with patch('src.core.app_init.settings') as mock_settings, \
-             patch('src.core.app_init.setup_logging') as mock_setup_logging, \
-             patch('signal.signal') as mock_signal, \
-             patch.object(initializer, '_initialize_parallel_execution_components', side_effect=ImportError("No module named 'circuit_breaker_pool'")) as mock_init_parallel:
+        with patch("src.core.app_init.settings") as mock_settings, patch(
+            "src.core.app_init.setup_logging"
+        ) as mock_setup_logging, patch(
+            "signal.signal"
+        ) as mock_signal, patch.object(
+            initializer,
+            "_initialize_parallel_execution_components",
+            side_effect=ImportError("No module named 'circuit_breaker_pool'"),
+        ) as mock_init_parallel:
 
             mock_config = Mock()
             mock_settings.__class__ = Mock()
-            mock_settings.__class__.__name__ = 'Settings'
+            mock_settings.__class__.__name__ = "Settings"
             mock_logger = Mock()
             mock_setup_logging.return_value = mock_logger
 
@@ -251,7 +262,9 @@ class TestInitializationScenarios:
                 await initializer.initialize()
 
             assert "Failed to initialize application" in str(exc_info.value)
-            assert "No module named 'circuit_breaker_pool'" in str(exc_info.value)
+            assert "No module named 'circuit_breaker_pool'" in str(
+                exc_info.value
+            )
 
     @pytest.mark.asyncio
     async def test_network_failure_simulation(self, temp_config_dir):
@@ -263,14 +276,19 @@ class TestInitializationScenarios:
 
         initializer = ApplicationInitializer(str(config_path))
 
-        with patch('src.core.app_init.settings') as mock_settings, \
-             patch('src.core.app_init.setup_logging') as mock_setup_logging, \
-             patch('signal.signal') as mock_signal, \
-             patch.object(initializer, '_initialize_parallel_execution_components', side_effect=asyncio.TimeoutError("Network timeout")) as mock_init_parallel:
+        with patch("src.core.app_init.settings") as mock_settings, patch(
+            "src.core.app_init.setup_logging"
+        ) as mock_setup_logging, patch(
+            "signal.signal"
+        ) as mock_signal, patch.object(
+            initializer,
+            "_initialize_parallel_execution_components",
+            side_effect=asyncio.TimeoutError("Network timeout"),
+        ) as mock_init_parallel:
 
             mock_config = Mock()
             mock_settings.__class__ = Mock()
-            mock_settings.__class__.__name__ = 'Settings'
+            mock_settings.__class__.__name__ = "Settings"
             mock_logger = Mock()
             mock_setup_logging.return_value = mock_logger
 
@@ -286,17 +304,22 @@ class TestInitializationScenarios:
         """Test initialization with invalid configuration."""
         # Create invalid config (missing required api_keys)
         invalid_config = {
-            "providers": [{
-                "name": "test",
-                "type": "openai",
-                "models": ["gpt-3.5-turbo"],
-                "enabled": True
-            }]
+            "providers": [
+                {
+                    "name": "test",
+                    "type": "openai",
+                    "models": ["gpt-3.5-turbo"],
+                    "enabled": True,
+                }
+            ]
             # Missing auth.api_keys
         }
         config_path = self.create_config_file(temp_config_dir, invalid_config)
 
-        with patch('src.core.config.settings', side_effect=ValueError("Proxy API keys must be configured")):
+        with patch(
+            "src.core.config.settings",
+            side_effect=ValueError("Proxy API keys must be configured"),
+        ):
             initializer = ApplicationInitializer(str(config_path))
 
             with pytest.raises(InitializationError) as exc_info:
@@ -312,13 +335,14 @@ class TestInitializationScenarios:
 
         os.environ["TEST_API_KEY"] = "test-key"
 
-        with patch('src.core.app_init.settings') as mock_settings, \
-             patch('src.core.app_init.setup_logging', side_effect=Exception("Logging setup failed")), \
-             patch('signal.signal') as mock_signal:
+        with patch("src.core.app_init.settings") as mock_settings, patch(
+            "src.core.app_init.setup_logging",
+            side_effect=Exception("Logging setup failed"),
+        ), patch("signal.signal") as mock_signal:
 
             mock_config = Mock()
             mock_settings.__class__ = Mock()
-            mock_settings.__class__.__name__ = 'Settings'
+            mock_settings.__class__.__name__ = "Settings"
 
             initializer = ApplicationInitializer(str(config_path))
 
@@ -336,13 +360,15 @@ class TestInitializationScenarios:
 
         os.environ["TEST_API_KEY"] = "test-key"
 
-        with patch('src.core.app_init.settings') as mock_settings, \
-             patch('src.core.app_init.setup_logging') as mock_setup_logging, \
-             patch('signal.signal', side_effect=OSError("Signal setup failed")):
+        with patch("src.core.app_init.settings") as mock_settings, patch(
+            "src.core.app_init.setup_logging"
+        ) as mock_setup_logging, patch(
+            "signal.signal", side_effect=OSError("Signal setup failed")
+        ):
 
             mock_config = Mock()
             mock_settings.__class__ = Mock()
-            mock_settings.__class__.__name__ = 'Settings'
+            mock_settings.__class__.__name__ = "Settings"
             mock_logger = Mock()
             mock_setup_logging.return_value = mock_logger
 
@@ -352,7 +378,9 @@ class TestInitializationScenarios:
             result = await initializer.initialize()
 
             assert "config" in result
-            mock_logger.warning.assert_called_once_with("Failed to setup signal handlers: Signal setup failed")
+            mock_logger.warning.assert_called_once_with(
+                "Failed to setup signal handlers: Signal setup failed"
+            )
 
     @pytest.mark.asyncio
     async def test_multiple_provider_initialization(self, temp_config_dir):
@@ -365,14 +393,17 @@ class TestInitializationScenarios:
 
         initializer = ApplicationInitializer(str(config_path))
 
-        with patch('src.core.app_init.settings') as mock_settings, \
-             patch('src.core.app_init.setup_logging') as mock_setup_logging, \
-             patch('signal.signal') as mock_signal, \
-             patch.object(initializer, '_initialize_parallel_execution_components') as mock_init_parallel:
+        with patch("src.core.app_init.settings") as mock_settings, patch(
+            "src.core.app_init.setup_logging"
+        ) as mock_setup_logging, patch(
+            "signal.signal"
+        ) as mock_signal, patch.object(
+            initializer, "_initialize_parallel_execution_components"
+        ) as mock_init_parallel:
 
             mock_config = Mock()
             mock_settings.__class__ = Mock()
-            mock_settings.__class__.__name__ = 'Settings'
+            mock_settings.__class__.__name__ = "Settings"
             mock_logger = Mock()
             mock_setup_logging.return_value = mock_logger
 
@@ -394,14 +425,19 @@ class TestInitializationScenarios:
 
         initializer = ApplicationInitializer(str(config_path))
 
-        with patch('src.core.app_init.settings') as mock_settings, \
-             patch('src.core.app_init.setup_logging') as mock_setup_logging, \
-             patch('signal.signal') as mock_signal, \
-             patch.object(initializer, '_initialize_parallel_execution_components', side_effect=asyncio.TimeoutError("Load balancer timeout")) as mock_init_parallel:
+        with patch("src.core.app_init.settings") as mock_settings, patch(
+            "src.core.app_init.setup_logging"
+        ) as mock_setup_logging, patch(
+            "signal.signal"
+        ) as mock_signal, patch.object(
+            initializer,
+            "_initialize_parallel_execution_components",
+            side_effect=asyncio.TimeoutError("Load balancer timeout"),
+        ) as mock_init_parallel:
 
             mock_config = Mock()
             mock_settings.__class__ = Mock()
-            mock_settings.__class__.__name__ = 'Settings'
+            mock_settings.__class__.__name__ = "Settings"
             mock_logger = Mock()
             mock_setup_logging.return_value = mock_logger
 
@@ -421,13 +457,21 @@ class TestInitializationReport:
         report = {
             "test_summary": {
                 "total_scenarios": len(test_results),
-                "passed": sum(1 for r in test_results if r["status"] == "passed"),
-                "failed": sum(1 for r in test_results if r["status"] == "failed"),
-                "warnings": sum(1 for r in test_results if r["status"] == "warning")
+                "passed": sum(
+                    1 for r in test_results if r["status"] == "passed"
+                ),
+                "failed": sum(
+                    1 for r in test_results if r["status"] == "failed"
+                ),
+                "warnings": sum(
+                    1 for r in test_results if r["status"] == "warning"
+                ),
             },
             "scenarios": test_results,
-            "failure_modes": [r for r in test_results if r["status"] in ["failed", "warning"]],
-            "recommendations": self.generate_recommendations(test_results)
+            "failure_modes": [
+                r for r in test_results if r["status"] in ["failed", "warning"]
+            ],
+            "recommendations": self.generate_recommendations(test_results),
         }
         return report
 
@@ -436,45 +480,53 @@ class TestInitializationReport:
         recommendations = []
 
         failed_scenarios = [r for r in test_results if r["status"] == "failed"]
-        warning_scenarios = [r for r in test_results if r["status"] == "warning"]
+        warning_scenarios = [
+            r for r in test_results if r["status"] == "warning"
+        ]
 
         if failed_scenarios:
-            recommendations.append({
-                "priority": "high",
-                "category": "critical_failures",
-                "description": f"Address {len(failed_scenarios)} critical initialization failures",
-                "details": [f["scenario"] for f in failed_scenarios]
-            })
+            recommendations.append(
+                {
+                    "priority": "high",
+                    "category": "critical_failures",
+                    "description": f"Address {len(failed_scenarios)} critical initialization failures",
+                    "details": [f["scenario"] for f in failed_scenarios],
+                }
+            )
 
         if warning_scenarios:
-            recommendations.append({
-                "priority": "medium",
-                "category": "resilience_improvements",
-                "description": f"Improve error handling for {len(warning_scenarios)} scenarios",
-                "details": [w["scenario"] for w in warning_scenarios]
-            })
+            recommendations.append(
+                {
+                    "priority": "medium",
+                    "category": "resilience_improvements",
+                    "description": f"Improve error handling for {len(warning_scenarios)} scenarios",
+                    "details": [w["scenario"] for w in warning_scenarios],
+                }
+            )
 
         # General recommendations
-        recommendations.extend([
-            {
-                "priority": "medium",
-                "category": "dependency_management",
-                "description": "Implement dependency health checks before initialization",
-                "rationale": "Prevents initialization failures due to missing optional components"
-            },
-            {
-                "priority": "low",
-                "category": "configuration_validation",
-                "description": "Add comprehensive configuration validation with detailed error messages",
-                "rationale": "Improves debugging experience for configuration issues"
-            },
-            {
-                "priority": "medium",
-                "category": "graceful_degradation",
-                "description": "Enhance graceful degradation when optional components fail",
-                "rationale": "Ensures core functionality remains available during partial failures"
-            }
-        ])
+        recommendations.extend(
+            [
+                {
+                    "priority": "medium",
+                    "category": "dependency_management",
+                    "description": "Implement dependency health checks before initialization",
+                    "rationale": "Prevents initialization failures due to missing optional components",
+                },
+                {
+                    "priority": "low",
+                    "category": "configuration_validation",
+                    "description": "Add comprehensive configuration validation with detailed error messages",
+                    "rationale": "Improves debugging experience for configuration issues",
+                },
+                {
+                    "priority": "medium",
+                    "category": "graceful_degradation",
+                    "description": "Enhance graceful degradation when optional components fail",
+                    "rationale": "Ensures core functionality remains available during partial failures",
+                },
+            ]
+        )
 
         return recommendations
 
@@ -492,13 +544,25 @@ async def run_initialization_tests():
         ("minimal_config", test_instance.test_minimal_configuration_startup),
         ("full_config", test_instance.test_full_configuration_startup),
         ("partial_config", test_instance.test_partial_configuration_startup),
-        ("missing_dependencies", test_instance.test_missing_dependencies_scenario),
+        (
+            "missing_dependencies",
+            test_instance.test_missing_dependencies_scenario,
+        ),
         ("network_failure", test_instance.test_network_failure_simulation),
         ("invalid_config", test_instance.test_invalid_configuration_error),
         ("logging_failure", test_instance.test_logging_setup_failure),
-        ("signal_handler_failure", test_instance.test_signal_handler_setup_failure),
-        ("multiple_providers", test_instance.test_multiple_provider_initialization),
-        ("timeout_simulation", test_instance.test_initialization_timeout_simulation)
+        (
+            "signal_handler_failure",
+            test_instance.test_signal_handler_setup_failure,
+        ),
+        (
+            "multiple_providers",
+            test_instance.test_multiple_provider_initialization,
+        ),
+        (
+            "timeout_simulation",
+            test_instance.test_initialization_timeout_simulation,
+        ),
     ]
 
     with tempfile.TemporaryDirectory() as temp_dir:
@@ -509,22 +573,28 @@ async def run_initialization_tests():
                 print(f"Running scenario: {scenario_name}")
                 await test_method(temp_path)
 
-                test_results.append({
-                    "scenario": scenario_name,
-                    "status": "passed",
-                    "error": None,
-                    "duration": None  # Could add timing if needed
-                })
+                test_results.append(
+                    {
+                        "scenario": scenario_name,
+                        "status": "passed",
+                        "error": None,
+                        "duration": None,  # Could add timing if needed
+                    }
+                )
                 print(f"[PASS] {scenario_name}: PASSED")
 
             except Exception as e:
-                status = "failed" if "critical" in str(e).lower() else "warning"
-                test_results.append({
-                    "scenario": scenario_name,
-                    "status": status,
-                    "error": str(e),
-                    "duration": None
-                })
+                status = (
+                    "failed" if "critical" in str(e).lower() else "warning"
+                )
+                test_results.append(
+                    {
+                        "scenario": scenario_name,
+                        "status": status,
+                        "error": str(e),
+                        "duration": None,
+                    }
+                )
                 print(f"[FAIL] {scenario_name}: {status.upper()} - {e}")
 
     # Generate report
@@ -537,9 +607,9 @@ if __name__ == "__main__":
     # Run tests and print report
     report = asyncio.run(run_initialization_tests())
 
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("INITIALIZATION STABILITY TEST REPORT")
-    print("="*60)
+    print("=" * 60)
 
     summary = report["test_summary"]
     print(f"Total Scenarios: {summary['total_scenarios']}")
@@ -555,8 +625,8 @@ if __name__ == "__main__":
     print("\nRecommendations:")
     for rec in report["recommendations"]:
         print(f"  [{rec['priority'].upper()}] {rec['description']}")
-        if 'details' in rec:
-            for detail in rec['details']:
+        if "details" in rec:
+            for detail in rec["details"]:
                 print(f"    - {detail}")
 
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)

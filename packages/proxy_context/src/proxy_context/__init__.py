@@ -22,7 +22,7 @@ from .feature_flags import (
     is_feature_enabled,
     enable_feature_flag,
     disable_feature_flag,
-    CACHE_FEATURE_FLAGS
+    CACHE_FEATURE_FLAGS,
 )
 
 __all__ = [

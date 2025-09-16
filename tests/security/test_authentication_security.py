@@ -36,7 +36,10 @@ class TestAuthenticationSecurity:
 
     def test_timing_attack_resistance_comprehensive(self):
         """Comprehensive test for timing attack resistance"""
-        api_keys = ["short_key", "a_very_long_key_that_should_take_similar_time_to_verify"]
+        api_keys = [
+            "short_key",
+            "a_very_long_key_that_should_take_similar_time_to_verify",
+        ]
         auth = APIKeyAuth(api_keys)
 
         # Test various key lengths
@@ -46,7 +49,7 @@ class TestAuthenticationSecurity:
             "a_very_long_key_that_should_have_similar_timing_characteristics",
             "",  # Empty
             "special_chars_!@#$%^&*()",
-            "unicode_key_🚀_test"
+            "unicode_key_🚀_test",
         ]
 
         times = []
@@ -61,9 +64,13 @@ class TestAuthenticationSecurity:
         if times:
             avg_time = sum(times) / len(times)
             max_deviation = max(abs(t - avg_time) for t in times)
-            relative_deviation = max_deviation / avg_time if avg_time > 0 else 0
+            relative_deviation = (
+                max_deviation / avg_time if avg_time > 0 else 0
+            )
 
-            assert relative_deviation < 0.1, f"Timing attack vulnerability detected: {relative_deviation:.3f} relative deviation"
+            assert (
+                relative_deviation < 0.1
+            ), f"Timing attack vulnerability detected: {relative_deviation:.3f} relative deviation"
 
     def test_api_key_entropy(self):
         """Test API key entropy and randomness"""
@@ -72,15 +79,17 @@ class TestAuthenticationSecurity:
 
         # Test that weak keys are handled but flagged
         weak_patterns = [
-            r'^\d+$',  # Only numbers
-            r'^[a-zA-Z]+$',  # Only letters
-            r'^(.)\1*$',  # Repeated characters
-            r'^.{0,7}$',  # Too short
+            r"^\d+$",  # Only numbers
+            r"^[a-zA-Z]+$",  # Only letters
+            r"^(.)\1*$",  # Repeated characters
+            r"^.{0,7}$",  # Too short
         ]
 
         # This is more of a warning test - weak keys should still work but be flagged
         for key in api_keys:
-            assert auth.verify_api_key(key) is True, f"Valid key rejected: {key}"
+            assert (
+                auth.verify_api_key(key) is True
+            ), f"Valid key rejected: {key}"
 
     def test_jwt_token_security(self):
         """Test JWT token security if used"""
@@ -88,7 +97,7 @@ class TestAuthenticationSecurity:
         secret_key = "test_secret_key_for_jwt"
         test_payload = {
             "user_id": "test_user",
-            "exp": datetime.utcnow() + timedelta(hours=1)
+            "exp": datetime.utcnow() + timedelta(hours=1),
         }
 
         # Generate token
@@ -111,11 +120,13 @@ class TestAuthenticationSecurity:
         sessions = {}
 
         def create_session(user_id: str) -> str:
-            session_id = hashlib.sha256(f"{user_id}{time.time()}".encode()).hexdigest()
+            session_id = hashlib.sha256(
+                f"{user_id}{time.time()}".encode()
+            ).hexdigest()
             sessions[session_id] = {
                 "user_id": user_id,
                 "created": time.time(),
-                "expires": time.time() + 3600  # 1 hour
+                "expires": time.time() + 3600,  # 1 hour
             }
             return session_id
 
@@ -154,7 +165,8 @@ class TestAuthenticationSecurity:
 
             # Clean old attempts
             auth_attempts[identifier] = [
-                attempt for attempt in auth_attempts[identifier]
+                attempt
+                for attempt in auth_attempts[identifier]
                 if now - attempt < rate_limit_window
             ]
 
@@ -176,7 +188,10 @@ class TestAuthenticationSecurity:
 
     def test_api_key_leakage_prevention(self):
         """Test prevention of API key leakage in logs and responses"""
-        api_keys = ["sk-1234567890abcdef", "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9"]
+        api_keys = [
+            "sk-1234567890abcdef",
+            "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9",
+        ]
         auth = APIKeyAuth(api_keys)
 
         # Mock logging to capture potential leaks
@@ -186,18 +201,23 @@ class TestAuthenticationSecurity:
             logged_messages.append(message)
 
         # Simulate authentication with logging
-        with patch('src.core.logging.logger.info', side_effect=mock_log):
+        with patch("src.core.logging.logger.info", side_effect=mock_log):
             result = auth.verify_api_key("sk-1234567890abcdef")
             assert result is True
 
         # Check that sensitive data is not logged
         for message in logged_messages:
-            assert "sk-1234567890abcdef" not in message, "API key leaked in logs"
-            assert "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9" not in message, "JWT token leaked in logs"
+            assert (
+                "sk-1234567890abcdef" not in message
+            ), "API key leaked in logs"
+            assert (
+                "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9" not in message
+            ), "JWT token leaked in logs"
 
     def test_concurrent_authentication_handling(self):
         """Test authentication handling under concurrent requests"""
         import threading
+
         api_keys = ["concurrent_test_key"]
         auth = APIKeyAuth(api_keys)
 
@@ -214,7 +234,9 @@ class TestAuthenticationSecurity:
         # Simulate concurrent authentication attempts
         threads = []
         for i in range(10):
-            thread = threading.Thread(target=auth_worker, args=("concurrent_test_key",))
+            thread = threading.Thread(
+                target=auth_worker, args=("concurrent_test_key",)
+            )
             threads.append(thread)
             thread.start()
 
@@ -251,9 +273,13 @@ class TestAuthenticationSecurity:
         for attempt in bypass_attempts:
             result = auth.verify_api_key(attempt)
             if attempt and attempt.strip() == "valid_key_123":
-                assert result is True, f"Valid key with whitespace should work: {attempt}"
+                assert (
+                    result is True
+                ), f"Valid key with whitespace should work: {attempt}"
             else:
-                assert result is False, f"Bypass attempt should fail: {attempt}"
+                assert (
+                    result is False
+                ), f"Bypass attempt should fail: {attempt}"
 
     def test_token_replay_attack_prevention(self):
         """Test prevention of token replay attacks"""
@@ -283,14 +309,18 @@ class TestAuthenticationSecurity:
         hashed_passwords = {}
         for pwd in passwords:
             # Use proper hashing (in real implementation)
-            hashed = hashlib.pbkdf2_hmac('sha256', pwd.encode(), b'salt', 100000)
+            hashed = hashlib.pbkdf2_hmac(
+                "sha256", pwd.encode(), b"salt", 100000
+            )
             hashed_passwords[pwd] = hashed.hex()
 
         # Verify hashes are different
         assert hashed_passwords["password123"] != hashed_passwords["admin"]
 
         # Verify hash consistency
-        hashed_again = hashlib.pbkdf2_hmac('sha256', "password123".encode(), b'salt', 100000).hex()
+        hashed_again = hashlib.pbkdf2_hmac(
+            "sha256", "password123".encode(), b"salt", 100000
+        ).hex()
         assert hashed_passwords["password123"] == hashed_again
 
     @pytest.mark.asyncio
@@ -311,7 +341,7 @@ class TestAuthenticationSecurity:
             mock_request.headers = {header_name: header_value}
             mock_request.app.state.api_key_auth = auth
 
-            with patch('src.core.auth.config_manager') as mock_config_manager:
+            with patch("src.core.auth.config_manager") as mock_config_manager:
                 mock_config = Mock()
                 mock_config.settings.api_key_header = header_name
                 mock_config_manager.load_config.return_value = mock_config
@@ -355,7 +385,7 @@ class TestAuthorizationSecurity:
         roles = {
             "admin": ["read", "write", "delete", "admin"],
             "user": ["read", "write"],
-            "guest": ["read"]
+            "guest": ["read"],
         }
 
         def check_permission(user_role: str, required_permission: str) -> bool:
@@ -375,18 +405,20 @@ class TestAuthorizationSecurity:
         privileged_actions = [
             "read_all_profiles",
             "delete_user",
-            "update_system_settings"
+            "update_system_settings",
         ]
 
         # User should not have privileged permissions
         for action in privileged_actions:
-            assert action not in user_permissions, f"User has privileged permission: {action}"
+            assert (
+                action not in user_permissions
+            ), f"User has privileged permission: {action}"
 
     def test_horizontal_privilege_escalation_prevention(self):
         """Test prevention of horizontal privilege escalation"""
         users = {
             "user1": {"id": "user1", "data": "user1_data"},
-            "user2": {"id": "user2", "data": "user2_data"}
+            "user2": {"id": "user2", "data": "user2_data"},
         }
 
         def access_user_data(current_user: str, target_user: str) -> str:
@@ -404,14 +436,13 @@ class TestAuthorizationSecurity:
 
     def test_vertical_privilege_escalation_prevention(self):
         """Test prevention of vertical privilege escalation"""
-        user_roles = {
-            "user1": "user",
-            "admin1": "admin"
-        }
+        user_roles = {"user1": "user", "admin1": "admin"}
 
         def perform_admin_action(user: str):
             if user_roles.get(user) != "admin":
-                raise HTTPException(status_code=403, detail="Admin access required")
+                raise HTTPException(
+                    status_code=403, detail="Admin access required"
+                )
             return "admin_action_performed"
 
         # Admin can perform admin actions

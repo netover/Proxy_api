@@ -14,11 +14,12 @@ import yaml
 import time
 from typing import Dict, Any
 
+
 def load_build_config() -> Dict[str, Any]:
     """Load build configuration"""
     config_path = Path("build_config.yaml")
     if config_path.exists():
-        with open(config_path, 'r') as f:
+        with open(config_path, "r") as f:
             return yaml.safe_load(f)
     else:
         # Default configuration
@@ -32,9 +33,10 @@ def load_build_config() -> Dict[str, Any]:
             "onefile": True,
             "include_files": [
                 ("config.yaml", "config.yaml"),
-                ("logs", "logs")
-            ]
+                ("logs", "logs"),
+            ],
         }
+
 
 def create_version_info(config: Dict[str, Any]) -> str:
     """Create version info file for Windows executable"""
@@ -42,7 +44,7 @@ def create_version_info(config: Dict[str, Any]) -> str:
     while len(version_parts) < 4:
         version_parts.append("0")
 
-    version_info = f'''# UTF-8
+    version_info = f"""# UTF-8
 #
 # For more details about fixed file info 'ffi' see:
 # http://msdn.microsoft.com/en-us/library/ms646997.aspx
@@ -85,12 +87,15 @@ VSVersionInfo(
     VarFileInfo([VarStruct(u'Translation', [1033, 1200])])
   ]
 )
-'''
+"""
     return version_info
+
 
 def copy_config_with_permissions():
     """Copy config.yaml to dist directory with proper permissions"""
-    print("📋 Copying config.yaml to dist directory with proper permissions...")
+    print(
+        "📋 Copying config.yaml to dist directory with proper permissions..."
+    )
 
     source_config = Path("config.yaml")
     dist_dir = Path("dist")
@@ -110,7 +115,9 @@ def copy_config_with_permissions():
         # Set proper permissions (readable by all users)
         current_permissions = target_config.stat().st_mode
         # Add read permissions for user, group, and others
-        new_permissions = current_permissions | stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH
+        new_permissions = (
+            current_permissions | stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH
+        )
         target_config.chmod(new_permissions)
 
         print(f"✅ Config file copied to: {target_config.absolute()}")
@@ -121,13 +128,16 @@ def copy_config_with_permissions():
         print(f"❌ Failed to copy config file: {e}")
         return False
 
+
 def build_executable():
     """Build Windows executable using PyInstaller"""
     print("🚀 Building LLM Proxy API Windows executable...")
 
     # Load build configuration
     config = load_build_config()
-    print(f"📋 Build configuration loaded: {config['app_name']} v{config['version']}")
+    print(
+        f"📋 Build configuration loaded: {config['app_name']} v{config['version']}"
+    )
 
     # Create build directory
     build_dir = Path("build")
@@ -138,13 +148,15 @@ def build_executable():
     # Create version info file
     version_info_content = create_version_info(config)
     version_file = build_dir / "version_info.py"
-    with open(version_file, 'w', encoding='utf-8') as f:
+    with open(version_file, "w", encoding="utf-8") as f:
         f.write(version_info_content)
     print(f"📝 Version info file created: {version_file}")
 
     # Prepare PyInstaller command
     cmd = [
-        sys.executable, "-m", "PyInstaller",
+        sys.executable,
+        "-m",
+        "PyInstaller",
         "--clean",
         "--noconfirm",
         f"--name={config['app_name'].replace(' ', '_')}",
@@ -164,14 +176,12 @@ def build_executable():
         "--hidden-import=fastapi.middleware",
         "--hidden-import=fastapi.middleware.cors",
         "--hidden-import=fastapi.middleware.gzip",
-
         # Data validation
         "--hidden-import=pydantic",
         "--hidden-import=pydantic.fields",
         "--hidden-import=pydantic.main",
         "--hidden-import=pydantic.types",
         "--hidden-import=pydantic_settings",
-
         # HTTP client
         "--hidden-import=httpx",
         "--hidden-import=httpx._main",
@@ -179,17 +189,14 @@ def build_executable():
         "--hidden-import=httpx._client",
         "--hidden-import=httpx._transports",
         "--hidden-import=httpx._utils",
-
         # Performance optimizations
         # uvloop not supported on Windows
         "--hidden-import=orjson",
-
         # Configuration and utilities
         "--hidden-import=pyyaml",
         "--hidden-import=slowapi",
         "--hidden-import=jwt",
         "--hidden-import=pyasn1",
-
         # Project modules
         "--hidden-import=src.core.config",
         "--hidden-import=src.core.logging",
@@ -208,14 +215,13 @@ def build_executable():
         "--hidden-import=src.providers.dynamic_blackbox",
         "--hidden-import=src.services.provider_loader",
         "--hidden-import=src.models.requests",
-
         # Collect all for complex packages
         "--collect-all=fastapi",
         "--collect-all=pydantic",
         "--collect-all=httpx",
         "--collect-all=uvicorn",
         "--collect-all=uvloop",
-        "--collect-all=orjson"
+        "--collect-all=orjson",
     ]
 
     # Add console mode
@@ -252,7 +258,9 @@ def build_executable():
         print("🏗️  Running PyInstaller...")
         start_time = time.time()
 
-        result = subprocess.run(cmd, capture_output=True, text=True, cwd=Path.cwd())
+        result = subprocess.run(
+            cmd, capture_output=True, text=True, cwd=Path.cwd()
+        )
 
         if result.returncode != 0:
             print("❌ PyInstaller failed!")
@@ -285,16 +293,21 @@ def build_executable():
         print(f"❌ Build failed with exception: {e}")
         return False
 
+
 def create_installer():
     """Create Windows installer using NSIS (optional)"""
     print("📦 Creating Windows installer...")
 
     # Check if makensis is available
     try:
-        result = subprocess.run(["makensis", "/VERSION"], capture_output=True, text=True)
+        result = subprocess.run(
+            ["makensis", "/VERSION"], capture_output=True, text=True
+        )
         if result.returncode != 0:
             print("⚠️  NSIS not found. Skipping installer creation.")
-            print("   Install NSIS from https://nsis.sourceforge.io/ to create installers.")
+            print(
+                "   Install NSIS from https://nsis.sourceforge.io/ to create installers."
+            )
             return False
     except FileNotFoundError:
         print("⚠️  NSIS not found. Skipping installer creation.")
@@ -304,7 +317,7 @@ def create_installer():
     nsis_script = create_nsis_script()
     nsis_file = Path("installer.nsi")
 
-    with open(nsis_file, 'w', encoding='utf-8') as f:
+    with open(nsis_file, "w", encoding="utf-8") as f:
         f.write(nsis_script)
 
     # Run NSIS
@@ -324,11 +337,12 @@ def create_installer():
         print(f"❌ Installer creation failed with exception: {e}")
         return False
 
+
 def create_nsis_script() -> str:
     """Create NSIS installer script"""
     config = load_build_config()
 
-    script = f'''!include "MUI2.nsh"
+    script = f"""!include "MUI2.nsh"
 
 Name "{config['app_name']}"
 OutFile "{config['app_name'].replace(' ', '_')}_installer.exe"
@@ -376,8 +390,9 @@ Section "Uninstall"
 
     DeleteRegKey HKCU "Software\\{config['company']}\\{config['app_name']}"
 SectionEnd
-'''
+"""
     return script
+
 
 def main():
     """Main build function"""
@@ -397,6 +412,7 @@ def main():
     print("1. Test the executable: .\\dist\\llm-proxy-api.exe")
     print("2. Configure your API keys in the embedded config.yaml")
     print("3. Run the executable to start the proxy server")
+
 
 if __name__ == "__main__":
     main()

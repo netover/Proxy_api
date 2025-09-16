@@ -36,7 +36,7 @@ class OptimizedHTTPClient:
         connect_timeout: float = 10.0,
         retry_attempts: int = 3,
         retry_backoff_factor: float = 0.5,
-        circuit_breaker=None
+        circuit_breaker=None,
     ):
         self.max_keepalive_connections = max_keepalive_connections
         self.max_connections = max_connections
@@ -71,28 +71,25 @@ class OptimizedHTTPClient:
         limits = httpx.Limits(
             max_keepalive_connections=self.max_keepalive_connections,
             max_connections=self.max_connections,
-            keepalive_expiry=self.keepalive_expiry
+            keepalive_expiry=self.keepalive_expiry,
         )
 
-        timeout = httpx.Timeout(
-            self.timeout,
-            connect=self.connect_timeout
-        )
+        timeout = httpx.Timeout(self.timeout, connect=self.connect_timeout)
 
         self._client = httpx.AsyncClient(
             limits=limits,
             timeout=timeout,
             follow_redirects=True,
-            http2=True  # Enable HTTP/2 for better performance
+            http2=True,  # Enable HTTP/2 for better performance
         )
 
         logger.info(
             "HTTP client initialized",
             extra={
-                'max_keepalive': self.max_keepalive_connections,
-                'max_connections': self.max_connections,
-                'timeout': self.timeout
-            }
+                "max_keepalive": self.max_keepalive_connections,
+                "max_connections": self.max_connections,
+                "timeout": self.timeout,
+            },
         )
 
     async def close(self):
@@ -125,16 +122,30 @@ class OptimizedHTTPClient:
 
         # Circuit breaker check
         if self.circuit_breaker:
+
             async def make_request():
                 return await self._make_request(
-                    method, url, headers=headers, json=json,
-                    data=data, params=params, stream=stream, **kwargs
+                    method,
+                    url,
+                    headers=headers,
+                    json=json,
+                    data=data,
+                    params=params,
+                    stream=stream,
+                    **kwargs
                 )
+
             return await self.circuit_breaker.execute(make_request)
 
         return await self._make_request(
-            method, url, headers=headers, json=json,
-            data=data, params=params, stream=stream, **kwargs
+            method,
+            url,
+            headers=headers,
+            json=json,
+            data=data,
+            params=params,
+            stream=stream,
+            **kwargs
         )
 
     async def _make_request(
@@ -177,12 +188,12 @@ class OptimizedHTTPClient:
                 logger.info(
                     "HTTP request successful",
                     extra={
-                        'method': method,
-                        'url': url,
-                        'status_code': response.status_code,
-                        'response_time': round(response_time * 1000, 2),  # ms
-                        'attempt': attempt + 1
-                    }
+                        "method": method,
+                        "url": url,
+                        "status_code": response.status_code,
+                        "response_time": round(response_time * 1000, 2),  # ms
+                        "attempt": attempt + 1,
+                    },
                 )
 
                 return response
@@ -193,28 +204,28 @@ class OptimizedHTTPClient:
 
                 if attempt < self.retry_attempts:
                     # Exponential backoff
-                    delay = self.retry_backoff_factor * (2 ** attempt)
+                    delay = self.retry_backoff_factor * (2**attempt)
                     logger.warning(
                         "HTTP request failed, retrying",
                         extra={
-                            'method': method,
-                            'url': url,
-                            'attempt': attempt + 1,
-                            'max_attempts': self.retry_attempts + 1,
-                            'delay': delay,
-                            'error': str(e)
-                        }
+                            "method": method,
+                            "url": url,
+                            "attempt": attempt + 1,
+                            "max_attempts": self.retry_attempts + 1,
+                            "delay": delay,
+                            "error": str(e),
+                        },
                     )
                     await asyncio.sleep(delay)
                 else:
                     logger.error(
                         "HTTP request failed after all retries",
                         extra={
-                            'method': method,
-                            'url': url,
-                            'attempts': attempt + 1,
-                            'error': str(e)
-                        }
+                            "method": method,
+                            "url": url,
+                            "attempts": attempt + 1,
+                            "error": str(e),
+                        },
                     )
 
             except Exception as e:
@@ -223,11 +234,11 @@ class OptimizedHTTPClient:
                 logger.error(
                     "HTTP request failed with non-retryable error",
                     extra={
-                        'method': method,
-                        'url': url,
-                        'error': str(e),
-                        'error_type': type(e).__name__
-                    }
+                        "method": method,
+                        "url": url,
+                        "error": str(e),
+                        "error_type": type(e).__name__,
+                    },
                 )
                 raise
 
@@ -238,31 +249,47 @@ class OptimizedHTTPClient:
         """Get client performance metrics"""
         avg_response_time = (
             self.total_response_time / self.request_count
-            if self.request_count > 0 else 0
+            if self.request_count > 0
+            else 0
         )
 
         metrics = {
-            'requests_total': self.request_count,
-            'errors_total': self.error_count,
-            'avg_response_time_ms': round(avg_response_time * 1000, 2),
-            'error_rate': (
+            "requests_total": self.request_count,
+            "errors_total": self.error_count,
+            "avg_response_time_ms": round(avg_response_time * 1000, 2),
+            "error_rate": (
                 self.error_count / self.request_count
-                if self.request_count > 0 else 0
+                if self.request_count > 0
+                else 0
             ),
-            'max_connections': self.max_connections,
-            'active_connections': getattr(self._client, '_pool', {}).get('connections', 0) if self._client else 0
+            "max_connections": self.max_connections,
+            "active_connections": (
+                getattr(self._client, "_pool", {}).get("connections", 0)
+                if self._client
+                else 0
+            ),
         }
 
         # Update main metrics collector with connection pool data
         pool_metrics = {
-            'max_keepalive_connections': self.max_keepalive_connections,
-            'max_connections': self.max_connections,
-            'active_connections': metrics['active_connections'],
-            'available_connections': getattr(self._client, '_pool', {}).get('available_connections', 0) if self._client else 0,
-            'pending_requests': getattr(self._client, '_pool', {}).get('pending_requests', 0) if self._client else 0,
-            'total_requests': self.request_count,
-            'error_count': self.error_count,
-            'avg_response_time_ms': metrics['avg_response_time_ms']
+            "max_keepalive_connections": self.max_keepalive_connections,
+            "max_connections": self.max_connections,
+            "active_connections": metrics["active_connections"],
+            "available_connections": (
+                getattr(self._client, "_pool", {}).get(
+                    "available_connections", 0
+                )
+                if self._client
+                else 0
+            ),
+            "pending_requests": (
+                getattr(self._client, "_pool", {}).get("pending_requests", 0)
+                if self._client
+                else 0
+            ),
+            "total_requests": self.request_count,
+            "error_count": self.error_count,
+            "avg_response_time_ms": metrics["avg_response_time_ms"],
         }
         metrics_collector.update_connection_pool_metrics(pool_metrics)
 

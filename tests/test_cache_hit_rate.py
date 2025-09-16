@@ -32,7 +32,7 @@ class TestCacheHitRate:
         return ProviderConfig(
             name="test_provider",
             base_url="https://api.test.com",
-            api_key="test_key"
+            api_key="test_key",
         )
 
     @pytest.fixture
@@ -43,28 +43,44 @@ class TestCacheHitRate:
                 id="gpt-4",
                 object="model",
                 created=time.time(),
-                owned_by="test_provider"
+                owned_by="test_provider",
             ),
             ModelInfo(
                 id="gpt-3.5-turbo",
                 object="model",
                 created=time.time(),
-                owned_by="test_provider"
-            )
+                owned_by="test_provider",
+            ),
         ]
 
-    async def test_model_discovery_cache_hit_rate(self, setup_cache, mock_provider_config, mock_models):
+    async def test_model_discovery_cache_hit_rate(
+        self, setup_cache, mock_provider_config, mock_models
+    ):
         """Test that model discovery achieves >90% cache hit rate"""
         service = ModelDiscoveryService()
 
         # Mock the HTTP request to avoid actual API calls
-        with patch('aiohttp.ClientSession') as mock_session:
+        with patch("aiohttp.ClientSession") as mock_session:
             mock_response = AsyncMock()
             mock_response.status = 200
-            mock_response.json = AsyncMock(return_value={"data": [
-                {"id": "gpt-4", "object": "model", "created": int(time.time()), "owned_by": "test_provider"},
-                {"id": "gpt-3.5-turbo", "object": "model", "created": int(time.time()), "owned_by": "test_provider"}
-            ]})
+            mock_response.json = AsyncMock(
+                return_value={
+                    "data": [
+                        {
+                            "id": "gpt-4",
+                            "object": "model",
+                            "created": int(time.time()),
+                            "owned_by": "test_provider",
+                        },
+                        {
+                            "id": "gpt-3.5-turbo",
+                            "object": "model",
+                            "created": int(time.time()),
+                            "owned_by": "test_provider",
+                        },
+                    ]
+                }
+            )
 
             mock_context = AsyncMock()
             mock_context.__aenter__ = AsyncMock(return_value=mock_response)
@@ -78,7 +94,7 @@ class TestCacheHitRate:
 
             # Get cache stats after first call
             cache_stats = await service.get_cache_stats()
-            assert cache_stats['model_cache_entries'] == 1
+            assert cache_stats["model_cache_entries"] == 1
 
             # Multiple subsequent calls - should be cache hits
             hit_count = 0
@@ -94,20 +110,28 @@ class TestCacheHitRate:
                     hit_count += 1
 
             # Verify we got cache hits
-            assert hit_count == total_calls - 1, f"Expected {total_calls - 1} cache hits, got {hit_count}"
+            assert (
+                hit_count == total_calls - 1
+            ), f"Expected {total_calls - 1} cache hits, got {hit_count}"
 
             # Check final cache stats
             final_stats = await service.get_cache_stats()
-            cache_hit_rate = final_stats['cache_hit_rate']
+            cache_hit_rate = final_stats["cache_hit_rate"]
 
             print(f"Model discovery cache hit rate: {cache_hit_rate:.2%}")
-            assert cache_hit_rate >= 0.9, f"Cache hit rate {cache_hit_rate:.2%} is below 90% target"
+            assert (
+                cache_hit_rate >= 0.9
+            ), f"Cache hit rate {cache_hit_rate:.2%} is below 90% target"
 
     async def test_provider_discovery_cache_hit_rate(self, setup_cache):
         """Test that provider discovery achieves >90% cache hit rate"""
         # Mock provider metrics
-        provider_discovery._provider_metrics["test_provider"] = provider_discovery._get_or_create_metrics("test_provider")
-        provider_discovery._provider_metrics["test_provider"].record_request(True, 100)
+        provider_discovery._provider_metrics["test_provider"] = (
+            provider_discovery._get_or_create_metrics("test_provider")
+        )
+        provider_discovery._provider_metrics["test_provider"].record_request(
+            True, 100
+        )
 
         # First call - should be cache miss
         report1 = await provider_discovery.get_provider_performance_report()
@@ -126,10 +150,12 @@ class TestCacheHitRate:
 
         # Check cache stats
         cache_stats = await provider_discovery.get_cache_stats()
-        cache_hit_rate = cache_stats['cache_hit_rate']
+        cache_hit_rate = cache_stats["cache_hit_rate"]
 
         print(f"Provider discovery cache hit rate: {cache_hit_rate:.2%}")
-        assert cache_hit_rate >= 0.9, f"Cache hit rate {cache_hit_rate:.2%} is below 90% target"
+        assert (
+            cache_hit_rate >= 0.9
+        ), f"Cache hit rate {cache_hit_rate:.2%} is below 90% target"
 
     async def test_unified_cache_performance(self, setup_cache):
         """Test unified cache performance under load"""
@@ -151,7 +177,12 @@ class TestCacheHitRate:
         for i in range(operations):
             key = test_keys[i % len(test_keys)]
             if i % 3 == 0:  # Write operation
-                await cache.set(key, test_data[i % len(test_data)], ttl=300, category="test")
+                await cache.set(
+                    key,
+                    test_data[i % len(test_data)],
+                    ttl=300,
+                    category="test",
+                )
             else:  # Read operation
                 result = await cache.get(key, category="test")
                 if result is not None:
@@ -163,12 +194,14 @@ class TestCacheHitRate:
         hit_rate = hits / total_reads if total_reads > 0 else 0
 
         print(f"Unified cache hit rate under load: {hit_rate:.2%}")
-        assert hit_rate >= 0.9, f"Cache hit rate {hit_rate:.2%} is below 90% target"
+        assert (
+            hit_rate >= 0.9
+        ), f"Cache hit rate {hit_rate:.2%} is below 90% target"
 
         # Verify cache stats
         stats = await cache.get_stats()
-        assert stats['entries'] > 0
-        assert stats['hit_rate'] >= 0.9
+        assert stats["entries"] > 0
+        assert stats["hit_rate"] >= 0.9
 
     async def test_cache_monitoring(self, setup_cache):
         """Test cache monitoring functionality"""
@@ -188,15 +221,26 @@ class TestCacheHitRate:
         # Stop monitoring
         await cache_monitor.stop_monitoring()
 
-    async def test_cache_warming(self, setup_cache, mock_provider_config, mock_models):
+    async def test_cache_warming(
+        self, setup_cache, mock_provider_config, mock_models
+    ):
         """Test cache warming functionality"""
         # Mock the model discovery
-        with patch('aiohttp.ClientSession') as mock_session:
+        with patch("aiohttp.ClientSession") as mock_session:
             mock_response = AsyncMock()
             mock_response.status = 200
-            mock_response.json = AsyncMock(return_value={"data": [
-                {"id": "gpt-4", "object": "model", "created": int(time.time()), "owned_by": "test_provider"}
-            ]})
+            mock_response.json = AsyncMock(
+                return_value={
+                    "data": [
+                        {
+                            "id": "gpt-4",
+                            "object": "model",
+                            "created": int(time.time()),
+                            "owned_by": "test_provider",
+                        }
+                    ]
+                }
+            )
 
             mock_context = AsyncMock()
             mock_context.__aenter__ = AsyncMock(return_value=mock_response)
@@ -211,17 +255,28 @@ class TestCacheHitRate:
             assert "providers_warmed" in warming_results
             assert "errors" in warming_results
 
-    async def test_cache_invalidation(self, setup_cache, mock_provider_config, mock_models):
+    async def test_cache_invalidation(
+        self, setup_cache, mock_provider_config, mock_models
+    ):
         """Test cache invalidation functionality"""
         service = ModelDiscoveryService()
 
         # Mock HTTP response
-        with patch('aiohttp.ClientSession') as mock_session:
+        with patch("aiohttp.ClientSession") as mock_session:
             mock_response = AsyncMock()
             mock_response.status = 200
-            mock_response.json = AsyncMock(return_value={"data": [
-                {"id": "gpt-4", "object": "model", "created": int(time.time()), "owned_by": "test_provider"}
-            ]})
+            mock_response.json = AsyncMock(
+                return_value={
+                    "data": [
+                        {
+                            "id": "gpt-4",
+                            "object": "model",
+                            "created": int(time.time()),
+                            "owned_by": "test_provider",
+                        }
+                    ]
+                }
+            )
 
             mock_context = AsyncMock()
             mock_context.__aenter__ = AsyncMock(return_value=mock_response)
@@ -238,7 +293,9 @@ class TestCacheHitRate:
             assert len(cached_models) == 1
 
             # Invalidate cache
-            invalidated = await service.invalidate_model_cache(mock_provider_config)
+            invalidated = await service.invalidate_model_cache(
+                mock_provider_config
+            )
             assert invalidated
 
             # Next call should be a cache miss (would make HTTP call if not mocked)
@@ -251,15 +308,20 @@ class TestCacheHitRate:
 
         # Fill cache with many entries
         for i in range(150):  # More than default max_size of 100
-            await cache.set(f"memory_test_{i}", {"data": f"value_{i}"}, ttl=300, category="test")
+            await cache.set(
+                f"memory_test_{i}",
+                {"data": f"value_{i}"},
+                ttl=300,
+                category="test",
+            )
 
         # Check that cache size is managed
         stats = await cache.get_stats()
-        assert stats['entries'] <= stats['max_size'] + 10  # Allow some buffer
+        assert stats["entries"] <= stats["max_size"] + 10  # Allow some buffer
 
         # Test memory usage is reasonable
-        memory_mb = stats.get('memory_usage_mb', 0)
-        max_memory_mb = stats.get('max_memory_mb', 0)
+        memory_mb = stats.get("memory_usage_mb", 0)
+        max_memory_mb = stats.get("max_memory_mb", 0)
         assert memory_mb <= max_memory_mb
 
         print(f"Cache memory usage: {memory_mb}MB / {max_memory_mb}MB")

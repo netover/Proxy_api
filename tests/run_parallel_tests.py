@@ -35,7 +35,9 @@ async def run_test_suite():
         print("=" * 50)
 
         # Check if targets were achieved
-        targets = benchmark_report.get('summary', {}).get('targets_achieved', [])
+        targets = benchmark_report.get("summary", {}).get(
+            "targets_achieved", []
+        )
         if targets:
             print(f"✅ TARGETS ACHIEVED: {len(targets)}")
             for target in targets:
@@ -45,14 +47,18 @@ async def run_test_suite():
             print("   Optimization needed before production deployment")
 
         # Performance summary
-        summary = benchmark_report.get('summary', {})
+        summary = benchmark_report.get("summary", {})
         print("\n📈 PERFORMANCE SUMMARY:")
-        print(f"Overall Success Rate: {summary.get('overall_success_rate', 0):.1f}%")
+        print(
+            f"Overall Success Rate: {summary.get('overall_success_rate', 0):.1f}%"
+        )
         print(f"Best P95 Latency: {summary.get('best_p95_latency', 0):.1f}ms")
-        print(f"Best Throughput: {summary.get('best_throughput', 0):.1f} req/s")
+        print(
+            f"Best Throughput: {summary.get('best_throughput', 0):.1f} req/s"
+        )
 
         # Recommendations
-        recommendations = benchmark_report.get('recommendations', [])
+        recommendations = benchmark_report.get("recommendations", [])
         if recommendations:
             print("\n💡 RECOMMENDATIONS:")
             for rec in recommendations:
@@ -63,6 +69,7 @@ async def run_test_suite():
     except Exception as e:
         print(f"❌ Test suite failed: {e}")
         import traceback
+
         traceback.print_exc()
         return None
 
@@ -71,14 +78,23 @@ def run_unit_tests():
     """Run unit tests using pytest if available"""
     try:
         import subprocess
+
         print("\n🧪 Running Unit Tests...")
 
-        result = subprocess.run([
-            sys.executable, "-m", "pytest",
-            "tests/test_parallel_execution.py",
-            "tests/test_chaos_parallel_execution.py",
-            "-v", "--tb=short"
-        ], capture_output=True, text=True, cwd=Path(__file__).parent.parent)
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "pytest",
+                "tests/test_parallel_execution.py",
+                "tests/test_chaos_parallel_execution.py",
+                "-v",
+                "--tb=short",
+            ],
+            capture_output=True,
+            text=True,
+            cwd=Path(__file__).parent.parent,
+        )
 
         print(result.stdout)
         if result.stderr:
@@ -107,7 +123,9 @@ async def main():
     # Final status
     print("\n" + "=" * 50)
     if unit_tests_passed and benchmark_report:
-        targets_achieved = benchmark_report.get('summary', {}).get('targets_achieved', [])
+        targets_achieved = benchmark_report.get("summary", {}).get(
+            "targets_achieved", []
+        )
         if targets_achieved:
             print("🎉 ALL TESTS PASSED - READY FOR PRODUCTION!")
             sys.exit(0)

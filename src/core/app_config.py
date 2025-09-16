@@ -13,9 +13,10 @@ from .optimized_config import config_loader, load_full_config
 
 logger = ContextualLogger(__name__)
 
+
 def get_config_paths() -> Tuple[Path, Path, Path, Path]:
     """Returns paths for bundled and external config files (YAML and JSON)"""
-    if getattr(sys, 'frozen', False):
+    if getattr(sys, "frozen", False):
         # Executable: config bundled (read-only) + config external (writable)
         bundle_yaml = Path(sys._MEIPASS) / "config.yaml"
         bundle_json = Path(sys._MEIPASS) / "config.json"
@@ -28,6 +29,7 @@ def get_config_paths() -> Tuple[Path, Path, Path, Path]:
         bundle_json = external_json = base_path / "config.json"
 
     return bundle_yaml, bundle_json, external_yaml, external_json
+
 
 def create_default_config(config_path: Path) -> Dict[str, Any]:
     """Create and return default configuration in appropriate format"""
@@ -44,15 +46,18 @@ def create_default_config(config_path: Path) -> Dict[str, Any]:
                 "timeout": 30,
                 "rate_limit": 1000,
                 "retry_attempts": 3,
-                "retry_delay": 1.0
+                "retry_delay": 1.0,
             }
         ],
         "condensation": {
             "max_tokens_default": 512,
-            "error_keywords": ["context_length_exceeded", "maximum context length"],
+            "error_keywords": [
+                "context_length_exceeded",
+                "maximum context length",
+            ],
             "adaptive_factor": 0.5,
-            "cache_ttl": 300
-        }
+            "cache_ttl": 300,
+        },
     }
 
     try:
@@ -60,107 +65,196 @@ def create_default_config(config_path: Path) -> Dict[str, Any]:
         config_path.parent.mkdir(parents=True, exist_ok=True)
 
         # Write the config file in appropriate format
-        with open(config_path, 'w', encoding='utf-8') as f:
-            if config_path.suffix.lower() == '.json':
+        with open(config_path, "w", encoding="utf-8") as f:
+            if config_path.suffix.lower() == ".json":
                 json.dump(default_config, f, indent=2, ensure_ascii=False)
             else:
-                yaml.safe_dump(default_config, f, default_flow_style=False, sort_keys=False)
+                yaml.safe_dump(
+                    default_config,
+                    f,
+                    default_flow_style=False,
+                    sort_keys=False,
+                )
 
-        logger.info("Created default config file", config_path=str(config_path))
+        logger.info(
+            "Created default config file", config_path=str(config_path)
+        )
     except Exception as e:
-        logger.error("Failed to create default config file", error=str(e), config_path=str(config_path))
+        logger.error(
+            "Failed to create default config file",
+            error=str(e),
+            config_path=str(config_path),
+        )
 
     return default_config
 
+
 class ProviderConfig(BaseModel):
     """Configuration for a single provider"""
+
     name: str = Field(..., description="Unique name for the provider")
-    type: str = Field(..., description="Provider type (openai, anthropic, etc.)")
+    type: str = Field(
+        ..., description="Provider type (openai, anthropic, etc.)"
+    )
     base_url: HttpUrl = Field(..., description="Base URL for the provider API")
-    api_key_env: str = Field(..., description="Environment variable name for API key")
-    models: List[str] = Field(..., min_length=1, description="List of supported models")
+    api_key_env: str = Field(
+        ..., description="Environment variable name for API key"
+    )
+    models: List[str] = Field(
+        ..., min_length=1, description="List of supported models"
+    )
     enabled: bool = Field(True, description="Whether this provider is enabled")
-    priority: int = Field(100, ge=1, le=1000, description="Provider priority (lower = higher priority)")
-    timeout: int = Field(30, ge=1, le=300, description="Request timeout in seconds")
-    rate_limit: int = Field(1000, ge=1, description="Rate limit requests per hour")
-    retry_attempts: int = Field(3, ge=0, le=10, description="Number of retry attempts")
-    retry_delay: float = Field(1.0, ge=0.1, le=60.0, description="Delay between retries in seconds")
-    headers: Optional[Dict[str, str]] = Field(None, description="Additional headers to send")
+    priority: int = Field(
+        100,
+        ge=1,
+        le=1000,
+        description="Provider priority (lower = higher priority)",
+    )
+    timeout: int = Field(
+        30, ge=1, le=300, description="Request timeout in seconds"
+    )
+    rate_limit: int = Field(
+        1000, ge=1, description="Rate limit requests per hour"
+    )
+    retry_attempts: int = Field(
+        3, ge=0, le=10, description="Number of retry attempts"
+    )
+    retry_delay: float = Field(
+        1.0, ge=0.1, le=60.0, description="Delay between retries in seconds"
+    )
+    headers: Optional[Dict[str, str]] = Field(
+        None, description="Additional headers to send"
+    )
 
     # HTTP Connection Pool Configuration
-    max_keepalive_connections: int = Field(100, ge=1, le=1000, description="Maximum keepalive connections")
-    max_connections: int = Field(1000, ge=1, le=10000, description="Maximum total connections")
-    keepalive_expiry: float = Field(30.0, ge=1.0, le=300.0, description="Keepalive expiry in seconds")
+    max_keepalive_connections: int = Field(
+        100, ge=1, le=1000, description="Maximum keepalive connections"
+    )
+    max_connections: int = Field(
+        1000, ge=1, le=10000, description="Maximum total connections"
+    )
+    keepalive_expiry: float = Field(
+        30.0, ge=1.0, le=300.0, description="Keepalive expiry in seconds"
+    )
 
-    @field_validator('type')
+    @field_validator("type")
     @classmethod
     def validate_provider_type(cls, v):
-        supported_types = ['openai', 'anthropic', 'azure_openai', 'cohere', 'perplexity', 'grok', 'blackbox', 'openrouter']
+        supported_types = [
+            "openai",
+            "anthropic",
+            "azure_openai",
+            "cohere",
+            "perplexity",
+            "grok",
+            "blackbox",
+            "openrouter",
+        ]
         if v.lower() not in supported_types:
-            raise ValueError(f'Provider type must be one of: {supported_types}')
+            raise ValueError(
+                f"Provider type must be one of: {supported_types}"
+            )
         return v.lower()
 
-    @field_validator('models')
+    @field_validator("models")
     @classmethod
     def validate_models(cls, v):
         if not v:
-            raise ValueError('At least one model must be specified')
+            raise ValueError("At least one model must be specified")
         return list(set(v))  # Remove duplicates
 
 
 class CondensationConfig(BaseModel):
     """Configuration for context condensation feature"""
-    max_tokens_default: int = Field(512, ge=1, le=4096, description="Default max tokens for condensation")
-    error_keywords: List[str] = Field(default_factory=lambda: ["context_length_exceeded", "maximum context length"], description="Keywords to detect context length errors")
-    adaptive_enabled: bool = Field(True, description="Enable adaptive max_tokens calculation")
-    adaptive_factor: float = Field(0.5, ge=0.1, le=1.0, description="Factor for adaptive max_tokens calculation")
-    cache_ttl: int = Field(300, ge=60, le=3600, description="Cache TTL in seconds for summaries")
+
+    max_tokens_default: int = Field(
+        512, ge=1, le=4096, description="Default max tokens for condensation"
+    )
+    error_keywords: List[str] = Field(
+        default_factory=lambda: [
+            "context_length_exceeded",
+            "maximum context length",
+        ],
+        description="Keywords to detect context length errors",
+    )
+    adaptive_enabled: bool = Field(
+        True, description="Enable adaptive max_tokens calculation"
+    )
+    adaptive_factor: float = Field(
+        0.5,
+        ge=0.1,
+        le=1.0,
+        description="Factor for adaptive max_tokens calculation",
+    )
+    cache_ttl: int = Field(
+        300, ge=60, le=3600, description="Cache TTL in seconds for summaries"
+    )
 
 
 class AppConfig(BaseModel):
     """Main application configuration"""
-    providers: List[ProviderConfig] = Field(..., min_length=1)
-    condensation: CondensationConfig = Field(default_factory=CondensationConfig)
 
-    @field_validator('providers')
+    providers: List[ProviderConfig] = Field(..., min_length=1)
+    condensation: CondensationConfig = Field(
+        default_factory=CondensationConfig
+    )
+
+    @field_validator("providers")
     @classmethod
     def validate_providers(cls, v):
         if not v:
-            raise ValueError('At least one provider must be configured')
+            raise ValueError("At least one provider must be configured")
 
         # Check for duplicate names
         names = [p.name for p in v]
         if len(names) != len(set(names)):
-            raise ValueError('Provider names must be unique')
+            raise ValueError("Provider names must be unique")
 
         # Check for duplicate priorities
         priorities = [p.priority for p in v]
         if len(priorities) != len(set(priorities)):
-            raise ValueError('Provider priorities must be unique')
+            raise ValueError("Provider priorities must be unique")
 
         return v
 
-def _try_load_config(yaml_path: Path, json_path: Path, description: str) -> Optional[AppConfig]:
+
+def _try_load_config(
+    yaml_path: Path, json_path: Path, description: str
+) -> Optional[AppConfig]:
     """Helper function to try loading a config file with both YAML and JSON"""
     # Try YAML first
     if yaml_path.exists():
         try:
-            with open(yaml_path, 'r', encoding='utf-8') as f:
+            with open(yaml_path, "r", encoding="utf-8") as f:
                 config_data = yaml.safe_load(f)
-            logger.info(f"Loaded {description} config (YAML)", config_path=str(yaml_path))
+            logger.info(
+                f"Loaded {description} config (YAML)",
+                config_path=str(yaml_path),
+            )
             return AppConfig(**config_data)
         except Exception as e:
-            logger.warning(f"Error reading {description} YAML config", error=str(e), config_path=str(yaml_path))
+            logger.warning(
+                f"Error reading {description} YAML config",
+                error=str(e),
+                config_path=str(yaml_path),
+            )
 
     # Try JSON as fallback
     if json_path.exists():
         try:
-            with open(json_path, 'r', encoding='utf-8') as f:
+            with open(json_path, "r", encoding="utf-8") as f:
                 config_data = json.load(f)
-            logger.info(f"Loaded {description} config (JSON)", config_path=str(json_path))
+            logger.info(
+                f"Loaded {description} config (JSON)",
+                config_path=str(json_path),
+            )
             return AppConfig(**config_data)
         except Exception as e:
-            logger.warning(f"Error reading {description} JSON config", error=str(e), config_path=str(json_path))
+            logger.warning(
+                f"Error reading {description} JSON config",
+                error=str(e),
+                config_path=str(json_path),
+            )
 
     return None
 
@@ -176,15 +270,23 @@ def load_config() -> AppConfig:
             if external_yaml.exists():
                 config_loader.config_path = external_yaml
                 config_data = await load_full_config()
-                logger.info("Loaded external config (optimized)", config_path=str(external_yaml))
+                logger.info(
+                    "Loaded external config (optimized)",
+                    config_path=str(external_yaml),
+                )
                 return AppConfig(**config_data)
             elif external_json.exists():
                 config_loader.config_path = external_json
                 config_data = await load_full_config()
-                logger.info("Loaded external config (optimized)", config_path=str(external_json))
+                logger.info(
+                    "Loaded external config (optimized)",
+                    config_path=str(external_json),
+                )
                 return AppConfig(**config_data)
         except Exception as e:
-            logger.warning("Optimized loader failed for external config", error=str(e))
+            logger.warning(
+                "Optimized loader failed for external config", error=str(e)
+            )
 
         return None
 
@@ -209,7 +311,9 @@ def load_config() -> AppConfig:
 
     # Fallback to original synchronous loading
     # 1st: Try external config (editable by user) - YAML preferred, JSON fallback
-    external_config = _try_load_config(external_yaml, external_json, "external")
+    external_config = _try_load_config(
+        external_yaml, external_json, "external"
+    )
     if external_config:
         return external_config
 
@@ -220,16 +324,31 @@ def load_config() -> AppConfig:
         try:
             if bundle_yaml.exists():
                 shutil.copy2(bundle_yaml, external_yaml)
-                logger.info("Copied bundled config to external location", source=str(bundle_yaml), destination=str(external_yaml))
+                logger.info(
+                    "Copied bundled config to external location",
+                    source=str(bundle_yaml),
+                    destination=str(external_yaml),
+                )
             elif bundle_json.exists():
                 # Convert JSON to YAML for external editing
-                with open(bundle_json, 'r', encoding='utf-8') as f:
+                with open(bundle_json, "r", encoding="utf-8") as f:
                     config_data = json.load(f)
-                with open(external_yaml, 'w', encoding='utf-8') as f:
-                    yaml.safe_dump(config_data, f, default_flow_style=False, sort_keys=False)
-                logger.info("Converted and copied bundled config to external location", source=str(bundle_json), destination=str(external_yaml))
+                with open(external_yaml, "w", encoding="utf-8") as f:
+                    yaml.safe_dump(
+                        config_data,
+                        f,
+                        default_flow_style=False,
+                        sort_keys=False,
+                    )
+                logger.info(
+                    "Converted and copied bundled config to external location",
+                    source=str(bundle_json),
+                    destination=str(external_yaml),
+                )
         except Exception as e:
-            logger.warning("Failed to copy config to external location", error=str(e))
+            logger.warning(
+                "Failed to copy config to external location", error=str(e)
+            )
 
         return bundled_config
 
@@ -237,6 +356,7 @@ def load_config() -> AppConfig:
     logger.info("Creating default config", config_path=str(external_yaml))
     config_data = create_default_config(external_yaml)
     return AppConfig(**config_data)
+
 
 def init_config():
     """Initialize config"""

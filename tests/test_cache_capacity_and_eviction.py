@@ -35,14 +35,32 @@ class TestCacheCapacityLimits:
 
         # Fill cache to maximum capacity
         for i in range(5):
-            models = [ModelInfo(id=f"model-{i}", object="model", created=time.time(), owned_by="test")]
-            cache.set_models(f"provider-{i}", f"https://provider-{i}.com", models)
+            models = [
+                ModelInfo(
+                    id=f"model-{i}",
+                    object="model",
+                    created=time.time(),
+                    owned_by="test",
+                )
+            ]
+            cache.set_models(
+                f"provider-{i}", f"https://provider-{i}.com", models
+            )
 
         assert cache.get_stats()["size"] == 5
 
         # Add one more entry - should trigger eviction
-        models = [ModelInfo(id="model-overflow", object="model", created=time.time(), owned_by="test")]
-        cache.set_models("provider-overflow", "https://provider-overflow.com", models)
+        models = [
+            ModelInfo(
+                id="model-overflow",
+                object="model",
+                created=time.time(),
+                owned_by="test",
+            )
+        ]
+        cache.set_models(
+            "provider-overflow", "https://provider-overflow.com", models
+        )
 
         # Cache should still be at max_size (oldest entry evicted)
         stats = cache.get_stats()
@@ -61,9 +79,15 @@ class TestCacheCapacityLimits:
         from src.core.smart_cache import CacheEntry
 
         # Create cache entries manually for testing
-        entry1 = CacheEntry(key="key1", value="value1", timestamp=time.time(), ttl=300)
-        entry2 = CacheEntry(key="key2", value="value2", timestamp=time.time(), ttl=300)
-        entry3 = CacheEntry(key="key3", value="value3", timestamp=time.time(), ttl=300)
+        entry1 = CacheEntry(
+            key="key1", value="value1", timestamp=time.time(), ttl=300
+        )
+        entry2 = CacheEntry(
+            key="key2", value="value2", timestamp=time.time(), ttl=300
+        )
+        entry3 = CacheEntry(
+            key="key3", value="value3", timestamp=time.time(), ttl=300
+        )
 
         cache._cache["key1"] = entry1
         cache._cache["key2"] = entry2
@@ -73,7 +97,9 @@ class TestCacheCapacityLimits:
         cache._cache.move_to_end("key1")
 
         # Add new entry - should evict least recently used (key2)
-        entry4 = CacheEntry(key="key4", value="value4", timestamp=time.time(), ttl=300)
+        entry4 = CacheEntry(
+            key="key4", value="value4", timestamp=time.time(), ttl=300
+        )
         cache._cache["key4"] = entry4
         cache._cache.move_to_end("key4")
 
@@ -101,7 +127,7 @@ class TestCacheCapacityLimits:
                 key=f"key-{i}",
                 value=f"value-{i}",
                 timestamp=time.time(),
-                ttl=300
+                ttl=300,
             )
             cache._memory_cache[f"key-{i}"] = entry
             cache._memory_cache.move_to_end(f"key-{i}")
@@ -135,7 +161,14 @@ class TestLRUEvictionUnderCompetition:
                 url = f"https://{provider}.com"
 
                 # Write operation
-                models = [ModelInfo(id=f"model-{key}", object="model", created=time.time(), owned_by=provider)]
+                models = [
+                    ModelInfo(
+                        id=f"model-{key}",
+                        object="model",
+                        created=time.time(),
+                        owned_by=provider,
+                    )
+                ]
                 cache.set_models(provider, url, models)
 
                 # Read operation
@@ -171,7 +204,14 @@ class TestLRUEvictionUnderCompetition:
 
         # Fill cache with mixed hot and cold entries
         for key in hot_keys + cold_keys[:3]:  # Fill to capacity
-            models = [ModelInfo(id=f"model-{key}", object="model", created=time.time(), owned_by="test")]
+            models = [
+                ModelInfo(
+                    id=f"model-{key}",
+                    object="model",
+                    created=time.time(),
+                    owned_by="test",
+                )
+            ]
             cache.set_models(key, f"https://{key}.com", models)
 
         # Frequently access hot keys (but ModelCache doesn't implement true LRU)
@@ -181,7 +221,14 @@ class TestLRUEvictionUnderCompetition:
 
         # Add more cold entries to trigger eviction
         for i, key in enumerate(cold_keys[3:], 3):
-            models = [ModelInfo(id=f"model-{key}", object="model", created=time.time(), owned_by="test")]
+            models = [
+                ModelInfo(
+                    id=f"model-{key}",
+                    object="model",
+                    created=time.time(),
+                    owned_by="test",
+                )
+            ]
             cache.set_models(key, f"https://{key}.com", models)
 
         # With ModelCache (simple FIFO), we can't guarantee which entries stay
@@ -190,13 +237,20 @@ class TestLRUEvictionUnderCompetition:
         assert stats["size"] == stats["max_size"]
 
         # Verify at least some entries exist (FIFO eviction means oldest are removed first)
-        total_entries = sum(1 for key in hot_keys + cold_keys[:8]
-                          if cache.get_models(key, f"https://{key}.com") is not None)
+        total_entries = sum(
+            1
+            for key in hot_keys + cold_keys[:8]
+            if cache.get_models(key, f"https://{key}.com") is not None
+        )
         assert total_entries > 0  # At least some entries should exist
         assert total_entries <= stats["max_size"]  # But not more than max_size
 
         # Some cold keys should be evicted
-        evicted_count = sum(1 for key in cold_keys if cache.get_models(key, f"https://{key}.com") is None)
+        evicted_count = sum(
+            1
+            for key in cold_keys
+            if cache.get_models(key, f"https://{key}.com") is None
+        )
         assert evicted_count > 0
 
     def test_eviction_under_burst_traffic(self):
@@ -221,7 +275,14 @@ class TestLRUEvictionUnderCompetition:
                 else:
                     results["misses"] += 1
                     # Cache the entry
-                    models = [ModelInfo(id=f"model-{key}", object="model", created=time.time(), owned_by=provider)]
+                    models = [
+                        ModelInfo(
+                            id=f"model-{key}",
+                            object="model",
+                            created=time.time(),
+                            owned_by=provider,
+                        )
+                    ]
                     cache.set_models(provider, url, models)
 
         # Run burst workers
@@ -236,14 +297,18 @@ class TestLRUEvictionUnderCompetition:
 
         # Verify cache performance under burst
         total_requests = results["hits"] + results["misses"]
-        hit_rate = results["hits"] / total_requests if total_requests > 0 else 0
+        hit_rate = (
+            results["hits"] / total_requests if total_requests > 0 else 0
+        )
 
         print(f"Burst traffic hit rate: {hit_rate:.2%}")
         # With burst traffic and many unique keys, hit rate will be lower
         # Just verify we have some hits and cache is working
         assert results["hits"] > 0
         assert results["misses"] > 0
-        assert total_requests == 3 * burst_size  # 3 threads * burst_size requests each
+        assert (
+            total_requests == 3 * burst_size
+        )  # 3 threads * burst_size requests each
 
 
 class TestMemoryPressureScenarios:
@@ -251,10 +316,13 @@ class TestMemoryPressureScenarios:
 
     def test_memory_pressure_detection(self):
         """Test detection of memory pressure conditions."""
-        cache = SmartCache(max_size=100, max_memory_mb=1)  # Very low memory limit
+        cache = SmartCache(
+            max_size=100, max_memory_mb=1
+        )  # Very low memory limit
 
         # Fill cache with large entries using proper CacheEntry objects
         from src.core.smart_cache import CacheEntry
+
         large_data = {"data": "x" * 10000}  # 10KB per entry
 
         for i in range(20):
@@ -263,12 +331,14 @@ class TestMemoryPressureScenarios:
                 value=large_data,
                 timestamp=time.time(),
                 ttl=300,
-                size_bytes=len(str(large_data))
+                size_bytes=len(str(large_data)),
             )
             cache._cache[f"large-{i}"] = entry
 
         # Check memory usage by calculating manually
-        total_memory_bytes = sum(entry.size_bytes for entry in cache._cache.values())
+        total_memory_bytes = sum(
+            entry.size_bytes for entry in cache._cache.values()
+        )
         memory_mb = total_memory_bytes / (1024 * 1024)
 
         # Should have significant memory usage
@@ -286,8 +356,17 @@ class TestMemoryPressureScenarios:
 
         # Fill cache
         for i, obj in enumerate(large_objects):
-            models = [ModelInfo(id=f"model-{i}", object="model", created=time.time(), owned_by="test")]
-            cache.set_models(f"provider-{i}", f"https://provider-{i}.com", models)
+            models = [
+                ModelInfo(
+                    id=f"model-{i}",
+                    object="model",
+                    created=time.time(),
+                    owned_by="test",
+                )
+            ]
+            cache.set_models(
+                f"provider-{i}", f"https://provider-{i}.com", models
+            )
 
         # Measure access time under memory pressure
         start_time = time.time()
@@ -302,7 +381,9 @@ class TestMemoryPressureScenarios:
         access_time = time.time() - start_time
         avg_access_time = access_time / 100
 
-        print(f"Average access time under memory pressure: {avg_access_time:.4f}s")
+        print(
+            f"Average access time under memory pressure: {avg_access_time:.4f}s"
+        )
         assert avg_access_time < 0.01  # Should still be reasonably fast
 
     def test_memory_pressure_recovery(self):
@@ -311,8 +392,17 @@ class TestMemoryPressureScenarios:
 
         # Create memory pressure
         for i in range(30):  # Exceed max_size
-            models = [ModelInfo(id=f"model-{i}", object="model", created=time.time(), owned_by="test")]
-            cache.set_models(f"provider-{i}", f"https://provider-{i}.com", models)
+            models = [
+                ModelInfo(
+                    id=f"model-{i}",
+                    object="model",
+                    created=time.time(),
+                    owned_by="test",
+                )
+            ]
+            cache.set_models(
+                f"provider-{i}", f"https://provider-{i}.com", models
+            )
 
         initial_size = cache.get_stats()["size"]
         assert initial_size == 20  # Should be at max_size
@@ -323,8 +413,17 @@ class TestMemoryPressureScenarios:
 
         # Cache should accept new entries again
         for i in range(30, 40):
-            models = [ModelInfo(id=f"model-{i}", object="model", created=time.time(), owned_by="test")]
-            cache.set_models(f"provider-{i}", f"https://provider-{i}.com", models)
+            models = [
+                ModelInfo(
+                    id=f"model-{i}",
+                    object="model",
+                    created=time.time(),
+                    owned_by="test",
+                )
+            ]
+            cache.set_models(
+                f"provider-{i}", f"https://provider-{i}.com", models
+            )
 
         final_size = cache.get_stats()["size"]
         assert final_size == 20  # Should maintain max_size
@@ -346,7 +445,7 @@ class TestMemoryPressureScenarios:
                 timestamp=time.time(),
                 ttl=300,
                 priority=priority,
-                category=category
+                category=category,
             )
             cache._memory_cache[f"key-{i}"] = entry
             cache._memory_cache.move_to_end(f"key-{i}")
@@ -368,10 +467,16 @@ class TestMemoryPressureScenarios:
             cache.metrics.evictions += 1
 
         # Count remaining entries by priority
-        high_priority_remaining = sum(1 for key in cache._memory_cache.keys()
-                                    if key.startswith("key-") and int(key.split("-")[1]) >= 5)
-        low_priority_remaining = sum(1 for key in cache._memory_cache.keys()
-                                   if key.startswith("key-") and int(key.split("-")[1]) < 5)
+        high_priority_remaining = sum(
+            1
+            for key in cache._memory_cache.keys()
+            if key.startswith("key-") and int(key.split("-")[1]) >= 5
+        )
+        low_priority_remaining = sum(
+            1
+            for key in cache._memory_cache.keys()
+            if key.startswith("key-") and int(key.split("-")[1]) < 5
+        )
 
         # High priority items should be preferred (more should remain)
         assert high_priority_remaining >= low_priority_remaining
@@ -395,7 +500,14 @@ class TestCachePerformanceBenchmarks:
             url = f"https://{provider}.com"
 
             if i % 3 == 0:  # Write operation
-                models = [ModelInfo(id=f"model-{key}", object="model", created=time.time(), owned_by=provider)]
+                models = [
+                    ModelInfo(
+                        id=f"model-{key}",
+                        object="model",
+                        created=time.time(),
+                        owned_by=provider,
+                    )
+                ]
                 cache.set_models(provider, url, models)
             else:  # Read operation
                 cache.get_models(provider, url)
@@ -416,8 +528,17 @@ class TestCachePerformanceBenchmarks:
 
         # Fill cache with data
         for i in range(50):
-            models = [ModelInfo(id=f"model-{i}", object="model", created=time.time(), owned_by="test")]
-            cache.set_models(f"provider-{i}", f"https://provider-{i}.com", models)
+            models = [
+                ModelInfo(
+                    id=f"model-{i}",
+                    object="model",
+                    created=time.time(),
+                    owned_by="test",
+                )
+            ]
+            cache.set_models(
+                f"provider-{i}", f"https://provider-{i}.com", models
+            )
 
         # Force garbage collection to get accurate memory reading
         gc.collect()
@@ -438,12 +559,23 @@ class TestCachePerformanceBenchmarks:
 
         for i in range(100):
             # Add entry (may trigger eviction)
-            models = [ModelInfo(id=f"model-{i}", object="model", created=time.time(), owned_by="test")]
-            cache.set_models(f"provider-{i}", f"https://provider-{i}.com", models)
+            models = [
+                ModelInfo(
+                    id=f"model-{i}",
+                    object="model",
+                    created=time.time(),
+                    owned_by="test",
+                )
+            ]
+            cache.set_models(
+                f"provider-{i}", f"https://provider-{i}.com", models
+            )
 
             # Measure access time
             start = time.time()
-            cached = cache.get_models(f"provider-{i}", f"https://provider-{i}.com")
+            cached = cache.get_models(
+                f"provider-{i}", f"https://provider-{i}.com"
+            )
             end = time.time()
 
             if cached:
@@ -451,8 +583,12 @@ class TestCachePerformanceBenchmarks:
 
         if access_times:
             avg_access_time = sum(access_times) / len(access_times)
-            print(f"Average access time with evictions: {avg_access_time:.6f}s")
-            assert avg_access_time < 0.001  # Should be very fast even with evictions
+            print(
+                f"Average access time with evictions: {avg_access_time:.6f}s"
+            )
+            assert (
+                avg_access_time < 0.001
+            )  # Should be very fast even with evictions
 
 
 if __name__ == "__main__":

@@ -12,6 +12,7 @@ from src.core.logging import ContextualLogger
 
 logger = ContextualLogger(__name__)
 
+
 class TokenBucket:
     """Token bucket implementation for rate limiting"""
 
@@ -68,9 +69,11 @@ class TokenBucketRateLimiter:
         self._cleanup_interval = 300  # Clean up old buckets every 5 minutes
         self._last_cleanup = time.time()
 
-        logger.info("Token bucket rate limiter initialized",
-                   capacity=self.capacity,
-                   refill_rate=self.refill_rate)
+        logger.info(
+            "Token bucket rate limiter initialized",
+            capacity=self.capacity,
+            refill_rate=self.refill_rate,
+        )
 
     def is_allowed(self, key: str) -> tuple[bool, float]:
         """
@@ -89,10 +92,16 @@ class TokenBucketRateLimiter:
         allowed = bucket.consume(1)
 
         if allowed:
-            logger.debug("Request allowed", key=key, tokens_remaining=bucket.get_tokens_remaining())
+            logger.debug(
+                "Request allowed",
+                key=key,
+                tokens_remaining=bucket.get_tokens_remaining(),
+            )
         else:
             reset_time = bucket.get_reset_time()
-            logger.warning("Rate limit exceeded", key=key, reset_in_seconds=reset_time)
+            logger.warning(
+                "Rate limit exceeded", key=key, reset_in_seconds=reset_time
+            )
 
         return allowed, bucket.get_reset_time()
 
@@ -126,7 +135,7 @@ class TokenBucketRateLimiter:
                 "tokens_remaining": bucket.get_tokens_remaining(),
                 "capacity": bucket.capacity,
                 "reset_in_seconds": bucket.get_reset_time(),
-                "last_refill": bucket.last_refill
+                "last_refill": bucket.last_refill,
             }
 
         return {
@@ -134,7 +143,7 @@ class TokenBucketRateLimiter:
             "capacity": self.capacity,
             "refill_rate": self.refill_rate,
             "requests_per_minute": self.requests_per_minute,
-            "last_cleanup": self._last_cleanup
+            "last_cleanup": self._last_cleanup,
         }
 
     # TODO: Redis integration - placeholder for future implementation
@@ -169,35 +178,51 @@ class RateLimiter:
     def configure_from_config(self, config: Any):
         """Configure rate limiter from unified config"""
         try:
-            settings = config.settings if hasattr(config, 'settings') else config
+            settings = (
+                config.settings if hasattr(config, "settings") else config
+            )
 
             # Global rate limits
-            if hasattr(settings, 'rate_limit_rpm'):
+            if hasattr(settings, "rate_limit_rpm"):
                 self._default_limit = f"{settings.rate_limit_rpm}/minute"
-                self._global_limits['default'] = self._default_limit
+                self._global_limits["default"] = self._default_limit
 
                 # Initialize token bucket limiter with config values
                 rpm = settings.rate_limit_rpm
-                self.token_bucket_limiter = TokenBucketRateLimiter(requests_per_minute=rpm)
+                self.token_bucket_limiter = TokenBucketRateLimiter(
+                    requests_per_minute=rpm
+                )
                 logger.info("Token bucket limiter initialized", rpm=rpm)
 
             # Provider-specific limits
-            if hasattr(config, 'providers'):
+            if hasattr(config, "providers"):
                 for provider in config.providers:
-                    if hasattr(provider, 'rate_limit') and provider.rate_limit:
-                        self._provider_limits[provider.name] = f"{provider.rate_limit}/hour"
+                    if hasattr(provider, "rate_limit") and provider.rate_limit:
+                        self._provider_limits[provider.name] = (
+                            f"{provider.rate_limit}/hour"
+                        )
 
             # Route-specific limits
-            if hasattr(settings, 'rate_limit') and hasattr(settings.rate_limit, 'routes'):
+            if hasattr(settings, "rate_limit") and hasattr(
+                settings.rate_limit, "routes"
+            ):
                 self._route_limits = settings.rate_limit.routes
-                logger.info("Route-specific limits configured", route_limits=self._route_limits)
+                logger.info(
+                    "Route-specific limits configured",
+                    route_limits=self._route_limits,
+                )
 
             # Fallback strategies
-            if hasattr(settings, 'fallback_strategies'):
+            if hasattr(settings, "fallback_strategies"):
                 self._fallback_strategies = settings.fallback_strategies
 
             self._last_config_update = time.time()
-            logger.info("Rate limiter configured", global_limits=self._global_limits, provider_limits=self._provider_limits, route_limits=self._route_limits)
+            logger.info(
+                "Rate limiter configured",
+                global_limits=self._global_limits,
+                provider_limits=self._provider_limits,
+                route_limits=self._route_limits,
+            )
 
         except Exception as e:
             logger.error(f"Failed to configure rate limiter: {e}")
@@ -210,7 +235,12 @@ class RateLimiter:
         """Get rate limit for specific route"""
         return self._route_limits.get(route_path, self._default_limit)
 
-    def limit(self, rate: Optional[str] = None, provider: Optional[str] = None, route: Optional[str] = None):
+    def limit(
+        self,
+        rate: Optional[str] = None,
+        provider: Optional[str] = None,
+        route: Optional[str] = None,
+    ):
         """Create a rate limit decorator with provider-specific or route-specific limits"""
         if route:
             limit_rate = self.get_route_limit(route)
@@ -228,40 +258,60 @@ class RateLimiter:
                 try:
                     return await limited_func(*args, **kwargs)
                 except RateLimitExceeded:
-                    return await self._handle_rate_limit_exceeded(func, provider, *args, **kwargs)
+                    return await self._handle_rate_limit_exceeded(
+                        func, provider, *args, **kwargs
+                    )
 
             # For sync functions
             def sync_wrapper(*args, **kwargs):
                 try:
                     return limited_func(*args, **kwargs)
                 except RateLimitExceeded:
-                    return self._handle_rate_limit_exceeded_sync(func, provider, *args, **kwargs)
+                    return self._handle_rate_limit_exceeded_sync(
+                        func, provider, *args, **kwargs
+                    )
 
-            return wrapper if asyncio.iscoroutinefunction(func) else sync_wrapper
+            return (
+                wrapper if asyncio.iscoroutinefunction(func) else sync_wrapper
+            )
 
         return decorator
 
-    async def _handle_rate_limit_exceeded(self, func: Callable, provider: str, *args, **kwargs):
+    async def _handle_rate_limit_exceeded(
+        self, func: Callable, provider: str, *args, **kwargs
+    ):
         """Handle rate limit exceeded with fallback strategies"""
-        logger.warning("Rate limit exceeded", provider=provider, function=func.__name__)
+        logger.warning(
+            "Rate limit exceeded", provider=provider, function=func.__name__
+        )
 
         # Apply fallback strategies
         if "secondary_provider" in self._fallback_strategies:
-            logger.info("Applying secondary provider fallback", provider=provider)
+            logger.info(
+                "Applying secondary provider fallback", provider=provider
+            )
             # This would need to be implemented based on your provider switching logic
 
         if "delay" in self._fallback_strategies:
             delay = self._fallback_strategies["delay"]
-            logger.info(f"Applying delay fallback: {delay}s", provider=provider)
+            logger.info(
+                f"Applying delay fallback: {delay}s", provider=provider
+            )
             await asyncio.sleep(delay)
             return await func(*args, **kwargs)
 
         # Default: return rate limit error
         raise RateLimitExceeded("Rate limit exceeded")
 
-    def _handle_rate_limit_exceeded_sync(self, func: Callable, provider: str, *args, **kwargs):
+    def _handle_rate_limit_exceeded_sync(
+        self, func: Callable, provider: str, *args, **kwargs
+    ):
         """Handle rate limit exceeded for sync functions"""
-        logger.warning("Rate limit exceeded (sync)", provider=provider, function=func.__name__)
+        logger.warning(
+            "Rate limit exceeded (sync)",
+            provider=provider,
+            function=func.__name__,
+        )
 
         # For sync functions, just re-raise the exception
         # In a real implementation, you might want to implement sync fallback strategies
@@ -270,16 +320,16 @@ class RateLimiter:
     def get_stats(self) -> Dict[str, Any]:
         """Get rate limiter statistics"""
         stats = {
-            'default_limit': self._default_limit,
-            'global_limits': self._global_limits,
-            'provider_limits': self._provider_limits,
-            'route_limits': self._route_limits,
-            'fallback_strategies': list(self._fallback_strategies.keys()),
-            'last_config_update': self._last_config_update
+            "default_limit": self._default_limit,
+            "global_limits": self._global_limits,
+            "provider_limits": self._provider_limits,
+            "route_limits": self._route_limits,
+            "fallback_strategies": list(self._fallback_strategies.keys()),
+            "last_config_update": self._last_config_update,
         }
 
         if self.token_bucket_limiter:
-            stats['token_bucket'] = self.token_bucket_limiter.get_stats()
+            stats["token_bucket"] = self.token_bucket_limiter.get_stats()
 
         return stats
 
@@ -290,7 +340,10 @@ async def token_bucket_rate_limit(request: Request) -> None:
     FastAPI dependency for token bucket rate limiting.
     Raises HTTP 429 exception when rate limit is exceeded.
     """
-    if not hasattr(rate_limiter, 'token_bucket_limiter') or rate_limiter.token_bucket_limiter is None:
+    if (
+        not hasattr(rate_limiter, "token_bucket_limiter")
+        or rate_limiter.token_bucket_limiter is None
+    ):
         # If token bucket limiter is not initialized, allow the request
         return
 
@@ -298,7 +351,9 @@ async def token_bucket_rate_limit(request: Request) -> None:
     client_ip = request.client.host if request.client else "unknown"
 
     # Check rate limit
-    allowed, reset_time = rate_limiter.token_bucket_limiter.is_allowed(client_ip)
+    allowed, reset_time = rate_limiter.token_bucket_limiter.is_allowed(
+        client_ip
+    )
 
     if not allowed:
         # Return HTTP 429 with Retry-After header
@@ -307,9 +362,9 @@ async def token_bucket_rate_limit(request: Request) -> None:
             detail={
                 "error": "Too Many Requests",
                 "message": "Rate limit exceeded. Please try again later.",
-                "retry_after": int(reset_time)
+                "retry_after": int(reset_time),
             },
-            headers={"Retry-After": str(int(reset_time))}
+            headers={"Retry-After": str(int(reset_time))},
         )
 
 

@@ -1,16 +1,25 @@
 """
 Test suite for advanced retry strategies
 """
+
 import asyncio
 import pytest
 from unittest.mock import Mock, AsyncMock
 import time
 
 from src.core.retry_strategies import (
-    RetryConfig, ProviderRetryConfig, ErrorType,
-    ExponentialBackoffStrategy, ImmediateRetryStrategy, AdaptiveRetryStrategy
+    RetryConfig,
+    ProviderRetryConfig,
+    ErrorType,
+    ExponentialBackoffStrategy,
+    ImmediateRetryStrategy,
+    AdaptiveRetryStrategy,
 )
-from src.core.exceptions import RateLimitError, APIConnectionError, ServiceUnavailableError
+from src.core.exceptions import (
+    RateLimitError,
+    APIConnectionError,
+    ServiceUnavailableError,
+)
 
 
 class TestRetryStrategies:
@@ -24,7 +33,7 @@ class TestRetryStrategies:
             max_delay=60.0,
             backoff_factor=2.0,
             jitter=True,
-            jitter_factor=0.1
+            jitter_factor=0.1,
         )
 
     @pytest.mark.asyncio
@@ -80,20 +89,17 @@ class TestRetryStrategies:
             max_attempts=5,
             base_delay=2.0,
             error_configs={
-                ErrorType.RATE_LIMIT: {
-                    'max_attempts': 10,
-                    'base_delay': 5.0
-                }
-            }
+                ErrorType.RATE_LIMIT: {"max_attempts": 10, "base_delay": 5.0}
+            },
         )
 
-        config = RetryConfig(provider_configs={'openai': provider_config})
+        config = RetryConfig(provider_configs={"openai": provider_config})
         strategy = ExponentialBackoffStrategy(config, "openai")
 
         # Test effective configuration
         effective = strategy.get_effective_config(ErrorType.RATE_LIMIT)
-        assert effective['max_attempts'] == 10
-        assert effective['base_delay'] == 5.0
+        assert effective["max_attempts"] == 10
+        assert effective["base_delay"] == 5.0
 
     @pytest.mark.asyncio
     async def test_retry_execution_success(self):
@@ -113,12 +119,16 @@ class TestRetryStrategies:
         strategy = ExponentialBackoffStrategy(self.config, "test_provider")
 
         # Mock function that always fails
-        mock_func = AsyncMock(side_effect=APIConnectionError("Connection failed"))
+        mock_func = AsyncMock(
+            side_effect=APIConnectionError("Connection failed")
+        )
 
         with pytest.raises(APIConnectionError):
             await strategy.execute_with_retry(mock_func)
 
-        assert strategy.history.failure_count == 2  # Connection errors only retry up to 2 times
+        assert (
+            strategy.history.failure_count == 2
+        )  # Connection errors only retry up to 2 times
 
     @pytest.mark.asyncio
     async def test_no_retry_on_auth_errors(self):
@@ -126,6 +136,7 @@ class TestRetryStrategies:
         strategy = ExponentialBackoffStrategy(self.config, "test_provider")
 
         from src.core.exceptions import AuthenticationError
+
         error = AuthenticationError("Invalid API key")
 
         # Should not retry auth errors

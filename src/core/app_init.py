@@ -17,65 +17,74 @@ from .logging import setup_logging
 
 class ApplicationInitializer:
     """Handles all application initialization tasks using existing core components."""
-    
+
     def __init__(self, config_path: str = None):
         self.config_path = config_path or "config.yaml"
         self.logger = None
         self._shutdown_event = asyncio.Event()
-        
+
     async def initialize(self) -> Dict[str, Any]:
         """
         Initialize the application with existing core components.
-        
+
         Returns:
             Dict containing initialized components for the application.
-            
+
         Raises:
             InitializationError: If any initialization step fails.
         """
         try:
             # Step 1: Use existing settings (already validated)
             config = settings
-            
+
             # Step 2: Setup logging using existing logging setup
             self.logger = setup_logging(config)
             self.logger.info("🚀 Starting application initialization...")
-            
+
             # Step 3: Setup signal handlers for graceful shutdown
             await self._setup_signal_handlers()
-            
+
             # Step 4: Initialize core services using existing components
             services = await self._initialize_services(config)
-            
-            self.logger.info("✅ Application initialization completed successfully")
-            
+
+            self.logger.info(
+                "✅ Application initialization completed successfully"
+            )
+
             return {
-                'config': config,
-                'services': services,
-                'logger': self.logger
+                "config": config,
+                "services": services,
+                "logger": self.logger,
             }
-            
+
         except Exception as e:
             if self.logger:
                 self.logger.error(f"Application initialization failed: {e}")
             else:
-                print(f"Application initialization failed: {e}", file=sys.stderr)
-            raise InitializationError(f"Failed to initialize application: {e}") from e
-    
+                print(
+                    f"Application initialization failed: {e}", file=sys.stderr
+                )
+            raise InitializationError(
+                f"Failed to initialize application: {e}"
+            ) from e
+
     async def _setup_signal_handlers(self):
         """Setup graceful shutdown handlers."""
+
         def signal_handler(signum, frame):
             if self.logger:
-                self.logger.info(f"Received signal {signum}, initiating graceful shutdown...")
+                self.logger.info(
+                    f"Received signal {signum}, initiating graceful shutdown..."
+                )
             self._shutdown_event.set()
-        
+
         try:
             signal.signal(signal.SIGINT, signal_handler)
             signal.signal(signal.SIGTERM, signal_handler)
         except Exception as e:
             if self.logger:
                 self.logger.warning(f"Failed to setup signal handlers: {e}")
-    
+
     async def _initialize_services(self, config) -> Dict[str, Any]:
         """Initialize all core services using existing infrastructure."""
         services = {}
@@ -84,8 +93,8 @@ class ApplicationInitializer:
         self.logger.info("📋 Initializing core services...")
 
         # Core services are already initialized through the core module structure
-        services['config'] = config
-        services['logger'] = self.logger
+        services["config"] = config
+        services["logger"] = self.logger
 
         # Initialize parallel execution components
         await self._initialize_parallel_execution_components()
@@ -116,13 +125,17 @@ class ApplicationInitializer:
             await load_balancer.start_load_monitoring()
             self.logger.info("✅ Load Balancer monitoring started")
 
-            self.logger.info("🚀 Parallel execution system initialized successfully")
+            self.logger.info(
+                "🚀 Parallel execution system initialized successfully"
+            )
 
         except Exception as e:
-            self.logger.error(f"Failed to initialize parallel execution system: {e}")
+            self.logger.error(
+                f"Failed to initialize parallel execution system: {e}"
+            )
             # Don't fail the entire initialization, but log the error
             # The system can still operate with sequential fallback
-    
+
     async def shutdown(self):
         """Perform graceful shutdown of all services."""
         if self.logger:

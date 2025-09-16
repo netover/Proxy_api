@@ -9,7 +9,7 @@ from src.core.metrics import metrics_collector
 from src.core.provider_factory import ProviderStatus
 import asyncio
 from src.core.rate_limiter import rate_limiter
-from src.core.unified_config import ProviderConfig, config_manager
+from src.core.unified_config import ProviderConfig
 from src.core.provider_factory import provider_factory
 
 logger = ContextualLogger(__name__)
@@ -25,18 +25,24 @@ async def perform_parallel_health_checks(request: Request) -> Dict[str, Any]:
     config = request.app.state.app_state.config
     providers = config.providers
 
-    async def check_provider_health(provider: ProviderConfig) -> Dict[str, Any]:
+    async def check_provider_health(
+        provider: ProviderConfig,
+    ) -> Dict[str, Any]:
         """Check individual provider health"""
         try:
-            provider_instance = await provider_factory.get_provider(provider.name)
+            provider_instance = await provider_factory.get_provider(
+                provider.name
+            )
             if not provider_instance:
-                provider_instance = await provider_factory.create_provider(provider)
+                provider_instance = await provider_factory.create_provider(
+                    provider
+                )
 
             if not provider_instance:
                 return {
                     "name": provider.name,
                     "status": "error",
-                    "error": "Failed to initialize provider"
+                    "error": "Failed to initialize provider",
                 }
 
             # Quick health check
@@ -46,16 +52,14 @@ async def perform_parallel_health_checks(request: Request) -> Dict[str, Any]:
 
             return {
                 "name": provider.name,
-                "status": "healthy" if result.get("healthy", False) else "unhealthy",
+                "status": (
+                    "healthy" if result.get("healthy", False) else "unhealthy"
+                ),
                 "response_time": response_time,
-                "details": result
+                "details": result,
             }
         except Exception as e:
-            return {
-                "name": provider.name,
-                "status": "error",
-                "error": str(e)
-            }
+            return {"name": provider.name, "status": "error", "error": str(e)}
 
     # Create tasks for parallel execution
     tasks = [check_provider_health(provider) for provider in providers]
@@ -64,11 +68,17 @@ async def perform_parallel_health_checks(request: Request) -> Dict[str, Any]:
     try:
         results = await asyncio.wait_for(
             asyncio.gather(*tasks, return_exceptions=True),
-            timeout=30.0  # 30 second timeout for all checks
+            timeout=30.0,  # 30 second timeout for all checks
         )
     except asyncio.TimeoutError:
         logger.error("Parallel health checks timed out")
-        results = [{"name": "timeout", "status": "error", "error": "Health check timeout"}]
+        results = [
+            {
+                "name": "timeout",
+                "status": "error",
+                "error": "Health check timeout",
+            }
+        ]
 
     # Process results
     health_results = {}
@@ -84,14 +94,16 @@ async def perform_parallel_health_checks(request: Request) -> Dict[str, Any]:
         if result["status"] == "healthy":
             healthy_count += 1
 
-    logger.info(f"Parallel health checks completed: {healthy_count}/{total_count} providers healthy")
+    logger.info(
+        f"Parallel health checks completed: {healthy_count}/{total_count} providers healthy"
+    )
 
     return {
         "timestamp": time.time(),
         "total_providers": total_count,
         "healthy_providers": healthy_count,
         "unhealthy_providers": total_count - healthy_count,
-        "providers": health_results
+        "providers": health_results,
     }
 
 
@@ -100,6 +112,7 @@ async def perform_parallel_health_checks(request: Request) -> Dict[str, Any]:
 async def provider_health_check(request: Request):
     """Deep health check of all providers in parallel"""
     return await perform_parallel_health_checks(request)
+
 
 @router.get("/health")
 @rate_limiter.limit(route="/v1/health")
@@ -112,8 +125,9 @@ async def health_check(request: Request):
     provider_info = await app_state.provider_factory.get_all_provider_info()
 
     # Provider health summary
-    healthy_count = sum(1 for p in provider_info
-                        if p.status == ProviderStatus.HEALTHY)
+    healthy_count = sum(
+        1 for p in provider_info if p.status == ProviderStatus.HEALTHY
+    )
     total_count = len(provider_info)
     overall_status = "healthy" if healthy_count > 0 else "unhealthy"
 
@@ -132,7 +146,9 @@ async def health_check(request: Request):
     # Provider health impact
     if total_count > 0:
         provider_health_ratio = healthy_count / total_count
-        health_score -= (1 - provider_health_ratio) * 40  # 40% weight for providers
+        health_score -= (
+            1 - provider_health_ratio
+        ) * 40  # 40% weight for providers
 
     # System resource impact
     cpu_percent = system_health.get("cpu_percent", 0)
@@ -183,40 +199,55 @@ async def health_check(request: Request):
         "response_time": round(response_time, 3),
         "version": "1.0.0",
         "uptime": system_metrics.get("uptime", 0),
-
         "providers": {
             "total": total_count,
             "healthy": healthy_count,
-            "degraded": sum(1 for p in provider_info if p.status == ProviderStatus.DEGRADED),
-            "unhealthy": sum(1 for p in provider_info if p.status == ProviderStatus.UNHEALTHY),
-            "disabled": sum(1 for p in provider_info if p.status == ProviderStatus.DISABLED)
+            "degraded": sum(
+                1 for p in provider_info if p.status == ProviderStatus.DEGRADED
+            ),
+            "unhealthy": sum(
+                1
+                for p in provider_info
+                if p.status == ProviderStatus.UNHEALTHY
+            ),
+            "disabled": sum(
+                1 for p in provider_info if p.status == ProviderStatus.DISABLED
+            ),
         },
-
         "system": {
             "cpu_percent": round(system_health.get("cpu_percent", 0), 1),
             "memory_percent": round(system_health.get("memory_percent", 0), 1),
             "memory_used_mb": round(system_health.get("memory_used_mb", 0), 1),
             "disk_percent": round(system_health.get("disk_percent", 0), 1),
             "network_connections": system_health.get("network_connections", 0),
-            "threads_count": system_health.get("threads_count", 0)
+            "threads_count": system_health.get("threads_count", 0),
         },
-
         "alerts": {
             "active": len(active_alerts),
             "critical": len(critical_alerts),
             "warning": len(warning_alerts),
-            "recent": active_alerts[:5]  # Show last 5 alerts
+            "recent": active_alerts[:5],  # Show last 5 alerts
         },
-
         "performance": {
             "total_requests": system_metrics.get("total_requests", 0),
-            "successful_requests": system_metrics.get("successful_requests", 0),
+            "successful_requests": system_metrics.get(
+                "successful_requests", 0
+            ),
             "failed_requests": system_metrics.get("failed_requests", 0),
-            "overall_success_rate": round(system_metrics.get("overall_success_rate", 0) * 100, 1),
-            "cache_hit_rate": round(system_metrics.get("cache_performance", {}).get("hit_rate", 0), 1),
-            "avg_response_time": round(system_metrics.get("providers", {}).get("avg_response_time", 0), 3)
+            "overall_success_rate": round(
+                system_metrics.get("overall_success_rate", 0) * 100, 1
+            ),
+            "cache_hit_rate": round(
+                system_metrics.get("cache_performance", {}).get("hit_rate", 0),
+                1,
+            ),
+            "avg_response_time": round(
+                system_metrics.get("providers", {}).get(
+                    "avg_response_time", 0
+                ),
+                3,
+            ),
         },
-
         "details": [
             {
                 "name": p.name,
@@ -226,18 +257,20 @@ async def health_check(request: Request):
                 "enabled": p.enabled,
                 "forced": p.forced,
                 "last_check": p.last_health_check,
-                "error_count": p.error_count
+                "error_count": p.error_count,
             }
             for p in provider_info
-        ]
+        ],
     }
 
-    logger.info("Health check completed",
-               overall_status=overall_status,
-               health_score=health_score,
-               total_providers=total_count,
-               healthy_providers=healthy_count,
-               active_alerts=len(active_alerts),
-               response_time=response_time)
+    logger.info(
+        "Health check completed",
+        overall_status=overall_status,
+        health_score=health_score,
+        total_providers=total_count,
+        healthy_providers=healthy_count,
+        active_alerts=len(active_alerts),
+        response_time=response_time,
+    )
 
     return health_response

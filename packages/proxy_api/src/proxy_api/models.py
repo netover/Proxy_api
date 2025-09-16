@@ -7,6 +7,7 @@ from datetime import datetime
 
 class ModelSelectionRequest(BaseModel):
     """Request model for updating model selection."""
+
     selected_model: str
     editable: bool = True
     priority: int = 100
@@ -16,6 +17,7 @@ class ModelSelectionRequest(BaseModel):
 
 class ModelListResponse(BaseModel):
     """Response model for listing models."""
+
     object: str = "list"
     data: List[Dict[str, Any]]
     provider: str
@@ -26,6 +28,7 @@ class ModelListResponse(BaseModel):
 
 class ModelDetailResponse(BaseModel):
     """Response model for model details."""
+
     object: str = "model"
     data: Dict[str, Any]
     provider: str
@@ -35,6 +38,7 @@ class ModelDetailResponse(BaseModel):
 
 class RefreshResponse(BaseModel):
     """Response model for refresh operations."""
+
     success: bool
     provider: str
     models_refreshed: int
@@ -45,6 +49,7 @@ class RefreshResponse(BaseModel):
 
 class ModelInfoExtended(BaseModel):
     """Extended model information."""
+
     id: str
     created: int
     owned_by: str
@@ -57,6 +62,7 @@ class ModelInfoExtended(BaseModel):
 
 class ProviderConfig(BaseModel):
     """Configuration for provider discovery."""
+
     name: str
     base_url: str
     api_key: str

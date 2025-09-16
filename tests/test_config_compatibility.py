@@ -18,7 +18,7 @@ from src.core.config_compatibility import (
     check_legacy_presence,
     get_migration_report,
     migrate_specific_format,
-    rollback_format
+    rollback_format,
 )
 
 
@@ -30,7 +30,9 @@ class TestLegacyFormatDetector:
         detector = LegacyFormatDetector()
 
         # Test with legacy format
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".json", delete=False
+        ) as f:
             json.dump({"openai": "gpt-3.5-turbo", "anthropic": "claude-3"}, f)
             legacy_path = Path(f.name)
 
@@ -40,11 +42,19 @@ class TestLegacyFormatDetector:
             legacy_path.unlink()
 
         # Test with new format
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
-            json.dump({
-                "openai": {"model_name": "gpt-3.5-turbo", "editable": True},
-                "anthropic": {"model_name": "claude-3", "editable": True}
-            }, f)
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".json", delete=False
+        ) as f:
+            json.dump(
+                {
+                    "openai": {
+                        "model_name": "gpt-3.5-turbo",
+                        "editable": True,
+                    },
+                    "anthropic": {"model_name": "claude-3", "editable": True},
+                },
+                f,
+            )
             new_path = Path(f.name)
 
         try:
@@ -63,10 +73,12 @@ class TestLegacyFormatDetector:
             "api_keys": "key1,key2",
             "providers": [
                 {"name": "openai", "base_url": "https://api.openai.com/v1"}
-            ]
+            ],
         }
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".yaml", delete=False
+        ) as f:
             yaml.safe_dump(legacy_config, f)
             legacy_path = Path(f.name)
 
@@ -80,7 +92,7 @@ class TestLegacyFormatDetector:
         detector = LegacyFormatDetector()
 
         # Test with legacy indicators
-        legacy_content = '''
+        legacy_content = """
 PRODUCTION_CONFIG = {
     "old_key_name": "value",
     "legacy_config_format": True
@@ -88,9 +100,11 @@ PRODUCTION_CONFIG = {
 
 def old_function():
     pass
-'''
+"""
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".py", delete=False
+        ) as f:
             f.write(legacy_content)
             legacy_path = Path(f.name)
 
@@ -110,11 +124,15 @@ class TestLegacyConfigMigrator:
         # Create legacy format
         legacy_data = {"openai": "gpt-3.5-turbo", "anthropic": "claude-3"}
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".json", delete=False
+        ) as f:
             json.dump(legacy_data, f)
             legacy_path = Path(f.name)
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".json", delete=False
+        ) as f:
             f.write("{}")  # Empty new file
             new_path = Path(f.name)
 
@@ -123,7 +141,7 @@ class TestLegacyConfigMigrator:
             assert success == True
 
             # Check migrated content
-            with open(new_path, 'r') as f:
+            with open(new_path, "r") as f:
                 migrated_data = json.load(f)
 
             assert "openai" in migrated_data
@@ -136,7 +154,7 @@ class TestLegacyConfigMigrator:
             for path in [legacy_path, new_path]:
                 if path.exists():
                     path.unlink()
-                backup_path = path.with_suffix('.legacy.json')
+                backup_path = path.with_suffix(".legacy.json")
                 if backup_path.exists():
                     backup_path.unlink()
 
@@ -151,14 +169,18 @@ class TestLegacyConfigMigrator:
             "api_keys": "key1,key2",
             "providers": [
                 {"name": "openai", "base_url": "https://api.openai.com/v1"}
-            ]
+            ],
         }
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".yaml", delete=False
+        ) as f:
             yaml.safe_dump(legacy_data, f)
             legacy_path = Path(f.name)
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".yaml", delete=False
+        ) as f:
             f.write("")  # Empty new file
             new_path = Path(f.name)
 
@@ -167,7 +189,7 @@ class TestLegacyConfigMigrator:
             assert success == True
 
             # Check migrated content
-            with open(new_path, 'r') as f:
+            with open(new_path, "r") as f:
                 migrated_data = yaml.safe_load(f)
 
             assert "settings" in migrated_data
@@ -180,7 +202,7 @@ class TestLegacyConfigMigrator:
             for path in [legacy_path, new_path]:
                 if path.exists():
                     path.unlink()
-                backup_path = path.with_suffix('.legacy.yaml')
+                backup_path = path.with_suffix(".legacy.yaml")
                 if backup_path.exists():
                     backup_path.unlink()
 
@@ -230,7 +252,7 @@ class TestConfigCompatibilityLayer:
         assert "legacy_formats_detected" in status
         assert "migration_needed" in status
 
-    @patch('src.core.config_compatibility.warnings.warn')
+    @patch("src.core.config_compatibility.warnings.warn")
     def test_migrate_on_demand(self, mock_warn):
         """Test on-demand migration"""
         layer = ConfigCompatibilityLayer()

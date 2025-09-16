@@ -10,6 +10,7 @@ class Provider(CoreBaseProvider):
     This class is maintained for compatibility but delegates to the core implementation.
     """
 
+
 async def get_provider(config: ProviderConfig) -> Provider:
     """Updated factory function using the centralized ProviderFactory"""
     # Use the centralized factory
@@ -17,4 +18,6 @@ async def get_provider(config: ProviderConfig) -> Provider:
         provider = await provider_factory.create_provider(config)
         return provider  # Returns BaseProvider instance, which is compatible
     except Exception as e:
-        raise ValueError(f"Failed to load provider class for {config.type}: {e}")
+        raise ValueError(
+            f"Failed to load provider class for {config.type}: {e}"
+        )

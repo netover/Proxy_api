@@ -13,11 +13,13 @@ from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
+
 class SmartContextManager:
     """
     Manages session contexts with an LRU eviction policy to prevent unbounded memory growth.
     It also triggers proactive garbage collection when memory usage reaches a certain threshold.
     """
+
     def __init__(self, max_size: int = 1000):
         """
         Initializes the context manager.
@@ -26,9 +28,11 @@ class SmartContextManager:
         """
         self.max_size = max_size
         self.contexts = OrderedDict()
-        self.gc_threshold = int(max_size * 0.8) # Trigger GC at 80% capacity
+        self.gc_threshold = int(max_size * 0.8)  # Trigger GC at 80% capacity
         self.lock = asyncio.Lock()
-        logger.info(f"SmartContextManager initialized with max_size={max_size} and gc_threshold={self.gc_threshold}")
+        logger.info(
+            f"SmartContextManager initialized with max_size={max_size} and gc_threshold={self.gc_threshold}"
+        )
 
     async def add_context(self, session_id: str, context: Any):
         """
@@ -40,7 +44,7 @@ class SmartContextManager:
                 await self._evict_oldest()
 
             self.contexts[session_id] = context
-            self.contexts.move_to_end(session_id) # Mark as most recently used
+            self.contexts.move_to_end(session_id)  # Mark as most recently used
 
             if len(self.contexts) > self.gc_threshold:
                 await self._trigger_gc()
@@ -68,14 +72,18 @@ class SmartContextManager:
         if not self.contexts:
             return
         oldest_key, _ = self.contexts.popitem(last=False)
-        logger.info(f"Evicted oldest context '{oldest_key}' due to size limit.")
+        logger.info(
+            f"Evicted oldest context '{oldest_key}' due to size limit."
+        )
 
     async def _trigger_gc(self):
         """
         Triggers a generational garbage collection.
         This is an expensive operation and should be called sparingly.
         """
-        logger.info(f"Context manager threshold ({self.gc_threshold}) reached, triggering GC.")
+        logger.info(
+            f"Context manager threshold ({self.gc_threshold}) reached, triggering GC."
+        )
         # gc.collect(2) is a full, aggressive collection of long-lived objects.
         gc.collect(2)
 
@@ -93,9 +101,11 @@ class SmartContextManager:
             "gc_threshold": self.gc_threshold,
         }
 
+
 # --- Global Instance Management ---
 
 _memory_manager: Optional[SmartContextManager] = None
+
 
 def get_memory_manager() -> SmartContextManager:
     """
@@ -108,9 +118,11 @@ def get_memory_manager() -> SmartContextManager:
         _memory_manager = SmartContextManager(max_size=1000)
     return _memory_manager
 
+
 async def initialize_memory_manager() -> SmartContextManager:
     """Initializes and returns the global memory manager instance."""
     return get_memory_manager()
+
 
 async def shutdown_memory_manager():
     """

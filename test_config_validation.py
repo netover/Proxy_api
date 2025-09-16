@@ -7,12 +7,14 @@ from pathlib import Path
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
+
 def test_config_schema_validation():
     """Test JSON schema validation"""
     print("Testing JSON schema validation...")
 
     try:
         from src.core.config_schema import validate_config_at_startup
+
         config_path = Path("config.yaml")
         config_data = validate_config_at_startup(config_path)
         print("PASS: JSON schema validation passed")
@@ -21,18 +23,23 @@ def test_config_schema_validation():
         print(f"FAIL: JSON schema validation failed: {e}")
         return False, None
 
+
 def test_app_config_loading():
     """Test app config loading with Pydantic models"""
     print("Testing app config loading...")
 
     try:
         from src.core.app_config import load_config
+
         config = load_config()
-        print(f"PASS: App config loading passed - {len(config.providers)} providers loaded")
+        print(
+            f"PASS: App config loading passed - {len(config.providers)} providers loaded"
+        )
         return True, config
     except Exception as e:
         print(f"FAIL: App config loading failed: {e}")
         return False, None
+
 
 def test_unified_config_loading():
     """Test unified config loading"""
@@ -40,12 +47,16 @@ def test_unified_config_loading():
 
     try:
         from src.core.unified_config import config_manager
+
         config = config_manager.load_config()
-        print(f"PASS: Unified config loading passed - {len(config.providers)} providers loaded")
+        print(
+            f"PASS: Unified config loading passed - {len(config.providers)} providers loaded"
+        )
         return True, config
     except Exception as e:
         print(f"FAIL: Unified config loading failed: {e}")
         return False, None
+
 
 def test_provider_validation():
     """Test provider configuration validation"""
@@ -53,6 +64,7 @@ def test_provider_validation():
 
     try:
         from src.core.app_config import load_config
+
         config = load_config()
 
         # Check provider uniqueness
@@ -73,21 +85,23 @@ def test_provider_validation():
         print(f"FAIL: Provider validation failed: {e}")
         return False
 
+
 def test_rate_limiting_config():
     """Test rate limiting configuration"""
     print("Testing rate limiting configuration...")
 
     try:
         import yaml
-        with open("config.yaml", 'r') as f:
+
+        with open("config.yaml", "r") as f:
             config = yaml.safe_load(f)
 
-        rate_limit = config.get('rate_limit', {})
+        rate_limit = config.get("rate_limit", {})
         if not rate_limit:
             print("FAIL: Rate limiting config missing")
             return False
 
-        required_fields = ['requests_per_window', 'window_seconds']
+        required_fields = ["requests_per_window", "window_seconds"]
         for field in required_fields:
             if field not in rate_limit:
                 print(f"FAIL: Rate limiting config missing field: {field}")
@@ -99,16 +113,18 @@ def test_rate_limiting_config():
         print(f"FAIL: Rate limiting config validation failed: {e}")
         return False
 
+
 def test_caching_config():
     """Test caching configuration"""
     print("Testing caching configuration...")
 
     try:
         import yaml
-        with open("config.yaml", 'r') as f:
+
+        with open("config.yaml", "r") as f:
             config = yaml.safe_load(f)
 
-        caching = config.get('caching', {})
+        caching = config.get("caching", {})
         if not caching:
             print("FAIL: Caching config missing")
             return False
@@ -118,6 +134,7 @@ def test_caching_config():
     except Exception as e:
         print(f"FAIL: Caching config validation failed: {e}")
         return False
+
 
 def main():
     """Run all validation tests"""
@@ -166,6 +183,7 @@ def main():
     else:
         print("Some validation tests failed. Check output above.")
         return 1
+
 
 if __name__ == "__main__":
     sys.exit(main())
