@@ -166,6 +166,17 @@ curl http://localhost:8000/health
 curl http://localhost:8000/v1/health
 ```
 
+### Running the Web UI
+
+The web UI is a separate application that provides a dashboard for monitoring and interacting with the proxy. For stability, it should be run as a separate process.
+
+```bash
+# Run the web UI (from the project root directory)
+python web_ui.py
+```
+
+The UI will be available at `http://localhost:10000`.
+
 ## 📖 Documentation
 
 ### For New Users

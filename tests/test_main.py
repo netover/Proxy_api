@@ -3,7 +3,6 @@ import asyncio
 from unittest.mock import AsyncMock, MagicMock
 from fastapi.testclient import TestClient
 from main import app
-from src.core.config import settings
 
 
 @pytest.fixture

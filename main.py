@@ -5,23 +5,16 @@ High-performance proxy with intelligent routing and fallback capabilities.
 
 import asyncio
 import os
-import threading
 import time
 from contextlib import asynccontextmanager
 
 import uvicorn
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
-
-# Use orjson for faster JSON serialization if available
-try:
-    import orjson
-except ImportError:
-    orjson = None
 
 # New API router imports
 from src.api.router import (
@@ -31,18 +24,19 @@ from src.api.router import (
     setup_middleware,
 )
 from src.core.alerting import alert_manager
-from src.core.app_state import app_state
 from src.core.auth import APIKeyAuth
 from src.core.chaos_engineering import chaos_monkey
 
-# Core imports
-from src.core.config import settings
+# --- Core Unified Configuration ---
+from src.core.unified_config import get_config, UnifiedConfig
 
-# Performance optimization imports
+# Initialize configuration early
+config = get_config()
+
+# --- Core Imports ---
 from src.core.http_client_v2 import get_advanced_http_client
 from src.core.logging import ContextualLogger, setup_logging
 from src.core.memory_manager import get_memory_manager, shutdown_memory_manager
-from src.core.provider_factory import provider_factory
 from src.core.retry_strategies import RetryConfig
 from src.core.smart_cache import (
     get_response_cache,
@@ -50,171 +44,111 @@ from src.core.smart_cache import (
     shutdown_caches,
 )
 from src.core.telemetry import TracedSpan, telemetry
+from src.utils.context_condenser import AsyncLRUCache
 
-# Setup logging with environment variable support
-import os
-
-log_level = os.getenv(
-    "LOG_LEVEL", "DEBUG" if settings.debug else "INFO"
-).upper()
+# Setup logging with the unified configuration
+log_level = os.getenv("LOG_LEVEL", config.logging.get("level", "INFO")).upper()
 setup_logging(log_level=log_level)
 logger = ContextualLogger(__name__)
 
-# Rate limiting
+
+# Rate limiting (to be configured in lifespan)
 limiter = Limiter(key_func=get_remote_address)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Application lifespan management with performance optimizations"""
-    logger.info("Starting LLM Proxy API with performance optimizations")
+    """Application lifespan management with the new unified config."""
+    logger.info("Starting LLM Proxy API...")
 
     # Set start time for uptime tracking
     app.state.start_time = time.time()
+    app.state.config = config
 
-    # Initialize configuration
     try:
-        # Initialize app state with the new approach
-        await app_state.initialize()
-        config = app_state.config
-
-        # Set config in app state for backward compatibility
-        app.state.config = config
-        app.state.condensation_config = config.settings.condensation
-
-        # Initialize performance systems
-        logger.info("Initializing performance optimization systems...")
+        # --- Initialize Systems from Unified Config ---
+        logger.info("Initializing systems with unified configuration...")
 
         # Configure OpenTelemetry
-        telemetry.configure(settings)
+        telemetry.configure(config.telemetry)
         telemetry.instrument_fastapi(app)
         telemetry.instrument_httpx()
         logger.info("OpenTelemetry configured successfully")
 
         # Initialize HTTP client
-        with TracedSpan("http_client.initialize") as span:
-            http_client = get_advanced_http_client(retry_config=RetryConfig())
+        with TracedSpan("http_client.initialize"):
+            http_client = get_advanced_http_client(config=config.http_client)
             await http_client.initialize()
             app.state.http_client = http_client
-            span.set_attribute("http.client.initialized", True)
             logger.info("HTTP client initialized")
 
         # Initialize caches
-        with TracedSpan("cache.initialize") as span:
-            app.state.response_cache = await get_response_cache()
-            app.state.summary_cache_obj = await get_summary_cache()
-            span.set_attribute("cache.response.initialized", True)
-            span.set_attribute("cache.summary.initialized", True)
+        with TracedSpan("cache.initialize"):
+            app.state.response_cache = await get_response_cache(config.caching)
+            app.state.summary_cache_obj = await get_summary_cache(config.caching)
             logger.info("Smart caches initialized")
 
         # Initialize memory manager
-        with TracedSpan("memory_manager.initialize") as span:
-            app.state.memory_manager = await get_memory_manager()
-            span.set_attribute("memory_manager.initialized", True)
+        with TracedSpan("memory_manager.initialize"):
+            app.state.memory_manager = await get_memory_manager(config.memory)
             logger.info("Memory manager initialized")
 
-        # Initialize context condensation cache with persistence
-        from src.utils.context_condenser import AsyncLRUCache
-
-        persist_file = (
-            "cache.json"
-            if config.settings.condensation.cache_persist
-            else None
-        )
-        redis_url = getattr(
-            config.settings.condensation, "cache_redis_url", None
-        )
+        # Initialize context condensation cache
+        persist_file = "cache.json" if config.condensation.cache_persist else None
         app.state.lru_cache = AsyncLRUCache(
-            maxsize=config.settings.condensation.cache_size,
+            maxsize=config.condensation.cache_size,
             persist_file=persist_file,
-            redis_url=redis_url,
+            redis_url=config.condensation.cache_redis_url,
         )
-        if persist_file:
+        if persist_file or config.condensation.cache_redis_url:
             await app.state.lru_cache.initialize()
         logger.info("Context condensation cache initialized")
 
-        # Legacy cache support (for backward compatibility)
-        app.state.cache = {}
-        app.state.summary_cache = {}
-
         # Initialize authentication
-        api_key_auth = APIKeyAuth(settings.proxy_api_keys)
+        api_key_auth = APIKeyAuth(config.proxy_api_keys)
         app.state.api_key_auth = api_key_auth
+        logger.info(f"Authentication initialized with {len(config.proxy_api_keys)} API key(s).")
 
         # Configure rate limiter
         from src.core.rate_limiter import rate_limiter
-
-        rate_limiter.configure_from_config(config)
+        # Configure rate limiter with the specific rate_limit settings
+        rate_limiter.configure_from_settings(config.rate_limit)
         app.state.rate_limiter = rate_limiter
-        logger.info("Rate limiter configured and initialized")
+        logger.info("Per-route rate limiting configured")
 
         # Configure chaos engineering
-        chaos_monkey.configure(config.settings.get("chaos_engineering", {}))
+        chaos_monkey.configure(config.chaos_engineering)
         logger.info("Chaos engineering configured")
 
         # Start alerting system
-        with TracedSpan("alerting.initialize") as span:
+        with TracedSpan("alerting.initialize"):
             await alert_manager.start_monitoring()
-            span.set_attribute("alerting.initialized", True)
             logger.info("Alerting system initialized and monitoring started")
 
-        app.state.config_mtime = app_state.config_manager._last_modified
-
-        # Start web UI in background thread
-        def start_web_ui():
-            try:
-                from web_ui import app as web_app
-
-                logger.info("Starting web UI on port 10000")
-                web_app.run(
-                    host="0.0.0.0", port=10000, debug=False, use_reloader=False
-                )
-            except Exception as e:
-                logger.error(f"Failed to start web UI: {e}")
-
-        # TODO: The web UI should be run as a separate process in production.
-        # Running as a daemon thread is not recommended for production systems
-        # as it can be terminated abruptly on shutdown.
-        web_ui_thread = threading.Thread(target=start_web_ui, daemon=True)
-        web_ui_thread.start()
-        logger.info("Web UI thread started")
+        logger.warning("The integrated web UI has been disabled by default for stability. "
+                       "Please run 'python web_ui.py' as a separate process.")
 
         logger.info("All systems initialized successfully")
 
     except Exception as e:
-        logger.error(f"Failed to initialize application: {e}")
+        logger.error(f"Failed to initialize application: {e}", exc_info=True)
         raise
 
     yield
 
-    # Cleanup with proper shutdown sequence - CRITICAL FIX FOR RACE CONDITIONS
+    # --- Shutdown Sequence ---
     logger.info("Shutting down LLM Proxy API")
-
     try:
-        # Shutdown app state first
-        await app_state.shutdown()
-        logger.info("App state shutdown complete")
-
-        # Shutdown performance systems in reverse order with proper async handling
-        shutdown_tasks = []
-
-        if hasattr(app.state, "memory_manager"):
-            shutdown_tasks.append(shutdown_memory_manager())
-
-        if hasattr(app.state, "response_cache"):
-            shutdown_tasks.append(shutdown_caches())
-
-        # Shutdown context condensation cache
+        shutdown_tasks = [
+            shutdown_memory_manager(),
+            shutdown_caches(),
+            alert_manager.stop_monitoring(),
+        ]
         if hasattr(app.state, "lru_cache") and app.state.lru_cache:
             shutdown_tasks.append(app.state.lru_cache.shutdown())
 
-        # Shutdown alerting system
-        shutdown_tasks.append(alert_manager.stop_monitoring())
-
-        # Wait for all shutdown tasks to complete
-        if shutdown_tasks:
-            await asyncio.gather(*shutdown_tasks, return_exceptions=True)
-            logger.info("All performance systems shutdown successfully")
+        await asyncio.gather(*shutdown_tasks, return_exceptions=True)
+        logger.info("All primary systems shutdown successfully")
 
         # Cancel any remaining background tasks
         tasks = [t for t in asyncio.all_tasks() if t != asyncio.current_task()]
@@ -223,8 +157,6 @@ async def lifespan(app: FastAPI):
             for task in tasks:
                 if not task.done():
                     task.cancel()
-
-            # Wait for cancelled tasks to complete
             await asyncio.gather(*tasks, return_exceptions=True)
             logger.info("All background tasks cancelled")
 
@@ -234,58 +166,43 @@ async def lifespan(app: FastAPI):
     logger.info("LLM Proxy API shutdown complete")
 
 
-# FastAPI app setup
+# --- FastAPI App Setup ---
 app = FastAPI(
-    title=settings.app_name,
-    version=settings.app_version,
+    title=config.app.name,
+    version=config.app.version,
     description="High-performance LLM proxy with intelligent routing and fallback",
     lifespan=lifespan,
 )
 
-# Include new API routers
+# Include API routers
 app.include_router(root_router)
 app.include_router(main_router)
 
-# Setup middleware and exception handlers from new API structure
+# Setup middleware and exception handlers from the new API structure
 setup_middleware(app)
 setup_exception_handlers(app)
 
-# Legacy middleware setup (keeping for compatibility)
+# Add legacy exception handler for rate limiting
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# Exception handlers are now managed by the new error handling framework in src/api/errors/
-
+# Add core middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.allowed_origins,
+    allow_origins=config.app.cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
-# Root endpoint is now handled by root_router in src/api/router.py
-
-# Health endpoint is now handled by health_controller in src/api/controllers/health_controller.py
-
-# Metrics endpoint is now handled by analytics_controller in src/api/controllers/analytics_controller.py
-
-# Providers endpoint is now handled by model_controller in src/api/controllers/model_controller.py
-
-
-# API endpoints are now handled by the new thin controllers in src/api/controllers/
-
-# Additional models endpoint is now handled by the new model controller
-
-# Global exception handler is now managed by the error handling framework in src/api/errors/
 
 if __name__ == "__main__":
+    server_config = config.server
     uvicorn.run(
-        app,
-        host=settings.host,
-        port=settings.port,
-        reload=settings.debug,
+        "main:app",
+        host=server_config.host,
+        port=server_config.port,
+        reload=server_config.reload,
         log_level=log_level.lower(),
     )

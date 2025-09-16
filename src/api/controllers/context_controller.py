@@ -6,9 +6,9 @@ from fastapi import APIRouter, Request
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
-from src.core.config import settings
 from src.core.exceptions import ServiceUnavailableError
 from src.core.logging import ContextualLogger
+from src.core.unified_config import get_config
 from src.core.metrics import metrics_collector
 
 logger = ContextualLogger(__name__)
@@ -23,8 +23,8 @@ async def condense_context_via_service(
     request: Request, chunks: List[str], max_tokens: int = 512
 ) -> str:
     """Call the context condensation service via HTTP"""
-    config = request.app.state.app_state.config
-    context_service_url = config.settings.services.get(
+    config = request.app.state.config
+    context_service_url = config.services.get(
         "context_service_url", "http://localhost:8001"
     )
 
@@ -95,11 +95,9 @@ async def background_condense(
 
 
 @router.get("/summary/{request_id}")
-@limiter.limit(
-    f"{settings.rate_limit_requests}/{settings.rate_limit_window}second"
-)
 async def get_summary_status(request_id: str, request: Request):
     """Poll for background summarization status with smart cache"""
+    # Rate limiting for this endpoint is now handled globally via config.yaml
     cache_key = f"summary_{request_id}"
 
     if hasattr(request.app.state, "summary_cache_obj"):

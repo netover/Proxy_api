@@ -175,57 +175,32 @@ class RateLimiter:
         # Token bucket rate limiter for sensitive endpoints
         self.token_bucket_limiter = None
 
-    def configure_from_config(self, config: Any):
-        """Configure rate limiter from unified config"""
+    def configure_from_settings(self, settings: "RateLimitSettings"):
+        """Configure the rate limiter from a RateLimitSettings object."""
         try:
-            settings = (
-                config.settings if hasattr(config, "settings") else config
+            self._default_limit = (
+                f"{settings.requests_per_window}/{settings.window_seconds}s"
             )
+            self._global_limits["default"] = self._default_limit
+            self._route_limits = settings.routes
 
-            # Global rate limits
-            if hasattr(settings, "rate_limit_rpm"):
-                self._default_limit = f"{settings.rate_limit_rpm}/minute"
-                self._global_limits["default"] = self._default_limit
-
-                # Initialize token bucket limiter with config values
-                rpm = settings.rate_limit_rpm
-                self.token_bucket_limiter = TokenBucketRateLimiter(
-                    requests_per_minute=rpm
-                )
-                logger.info("Token bucket limiter initialized", rpm=rpm)
-
-            # Provider-specific limits
-            if hasattr(config, "providers"):
-                for provider in config.providers:
-                    if hasattr(provider, "rate_limit") and provider.rate_limit:
-                        self._provider_limits[provider.name] = (
-                            f"{provider.rate_limit}/hour"
-                        )
-
-            # Route-specific limits
-            if hasattr(settings, "rate_limit") and hasattr(
-                settings.rate_limit, "routes"
-            ):
-                self._route_limits = settings.rate_limit.routes
-                logger.info(
-                    "Route-specific limits configured",
-                    route_limits=self._route_limits,
-                )
-
-            # Fallback strategies
-            if hasattr(settings, "fallback_strategies"):
-                self._fallback_strategies = settings.fallback_strategies
+            # Initialize token bucket limiter with config values
+            # Convert requests per window to requests per minute for the token bucket
+            rpm = int(
+                settings.requests_per_window * (60 / settings.window_seconds)
+            )
+            self.token_bucket_limiter = TokenBucketRateLimiter(
+                requests_per_minute=rpm
+            )
 
             self._last_config_update = time.time()
             logger.info(
-                "Rate limiter configured",
-                global_limits=self._global_limits,
-                provider_limits=self._provider_limits,
+                "Rate limiter configured successfully",
+                default_limit=self._default_limit,
                 route_limits=self._route_limits,
             )
-
         except Exception as e:
-            logger.error(f"Failed to configure rate limiter: {e}")
+            logger.error(f"Failed to configure rate limiter from settings: {e}")
 
     def get_provider_limit(self, provider_name: str) -> str:
         """Get rate limit for specific provider"""
