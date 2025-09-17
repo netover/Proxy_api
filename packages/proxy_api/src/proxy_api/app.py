@@ -2,26 +2,16 @@
 
 import os
 import time
-from typing import Dict, Any, Optional
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
-import logging
 
 # Import from our packages
-from proxy_core import (
-    CircuitBreaker,
-    RateLimiter,
-    OptimizedHTTPClient,
-    ProviderFactory,
-)
 from proxy_context import (
-    ContextCondenser,
     SmartCache,
-    ModelCache,
     MemoryManager,
 )
 from proxy_logging import (
@@ -202,8 +192,7 @@ def create_app() -> FastAPI:
             "status": "healthy",
             "timestamp": int(time.time()),
             "version": "1.0.0",
-            "uptime": time.time()
-            - getattr(app.state, "start_time", time.time()),
+            "uptime": time.time() - getattr(app.state, "start_time", time.time()),
         }
 
     # Telemetry configuration endpoint

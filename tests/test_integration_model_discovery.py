@@ -6,19 +6,13 @@ system, including API endpoints, web UI, provider discovery, and caching.
 """
 
 import asyncio
-import json
-import os
 import tempfile
 import time
-from datetime import datetime, timedelta
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import patch
 import pytest
-import aiohttp
 from fastapi.testclient import TestClient
 
 from src.core.model_discovery import ModelDiscoveryService
-from src.core.cache_manager import CacheManager
-from src.core.provider_factory import ProviderFactory
 from main import app
 from src.models.model_info import ModelInfo
 
@@ -66,9 +60,7 @@ class TestModelDiscoveryIntegration:
             },
         ]
 
-        with patch(
-            "src.providers.openai.OpenAIDiscovery.get_models"
-        ) as mock_openai:
+        with patch("src.providers.openai.OpenAIDiscovery.get_models") as mock_openai:
             with patch(
                 "src.providers.anthropic.AnthropicDiscovery.get_models"
             ) as mock_anthropic:
@@ -123,18 +115,14 @@ class TestModelDiscoveryIntegration:
                 ]
 
                 # Execute discovery
-                result = asyncio.run(
-                    discovery_service.discover_all_models(test_config)
-                )
+                result = asyncio.run(discovery_service.discover_all_models(test_config))
 
                 # Verify results
                 assert len(result) == 4
                 assert all(isinstance(model, ModelInfo) for model in result)
 
                 # Verify cache was populated
-                cached_models = discovery_service.cache_manager.get(
-                    "all_models"
-                )
+                cached_models = discovery_service.cache_manager.get("all_models")
                 assert cached_models is not None
                 assert len(cached_models) == 4
 
@@ -188,9 +176,7 @@ class TestModelDiscoveryIntegration:
                 ]
 
                 models = asyncio.run(
-                    discovery_service.discover_provider_models(
-                        provider_name, {}
-                    )
+                    discovery_service.discover_provider_models(provider_name, {})
                 )
 
                 assert len(models) == 1
@@ -214,9 +200,7 @@ class TestModelDiscoveryIntegration:
         ]
 
         # Mock provider to return test models
-        with patch(
-            "src.providers.openai.OpenAIDiscovery.get_models"
-        ) as mock_openai:
+        with patch("src.providers.openai.OpenAIDiscovery.get_models") as mock_openai:
             mock_openai.return_value = test_models
 
             # First call - should hit provider and cache results
@@ -260,9 +244,7 @@ class TestModelDiscoveryIntegration:
             )
         ]
 
-        with patch(
-            "src.providers.openai.OpenAIDiscovery.get_models"
-        ) as mock_openai:
+        with patch("src.providers.openai.OpenAIDiscovery.get_models") as mock_openai:
             mock_openai.return_value = test_models
 
             # Set short TTL for testing
@@ -291,9 +273,7 @@ class TestModelDiscoveryIntegration:
     def test_error_handling_integration(self, discovery_service):
         """Test error handling across the entire system."""
         # Test provider failure handling
-        with patch(
-            "src.providers.openai.OpenAIDiscovery.get_models"
-        ) as mock_openai:
+        with patch("src.providers.openai.OpenAIDiscovery.get_models") as mock_openai:
             mock_openai.side_effect = Exception("API Error")
 
             # Should handle error gracefully
@@ -326,9 +306,7 @@ class TestModelDiscoveryIntegration:
             )
         ]
 
-        with patch(
-            "src.providers.openai.OpenAIDiscovery.get_models"
-        ) as mock_openai:
+        with patch("src.providers.openai.OpenAIDiscovery.get_models") as mock_openai:
             mock_openai.return_value = test_models
 
             # Run multiple concurrent discoveries
@@ -378,9 +356,7 @@ class TestModelDiscoveryIntegration:
             ),
         ]
 
-        with patch(
-            "src.providers.openai.OpenAIDiscovery.get_models"
-        ) as mock_openai:
+        with patch("src.providers.openai.OpenAIDiscovery.get_models") as mock_openai:
             mock_openai.return_value = test_models
 
             # Test filtering by provider

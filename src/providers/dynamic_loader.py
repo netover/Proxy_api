@@ -5,9 +5,8 @@ Inspirado no LiteLLM's providers.py, mas integrado com sua arquitetura.
 
 import importlib
 import os
-from typing import Optional, Dict, Any, Callable
+from typing import Dict, Any, Callable
 from .registry import (
-    ProviderConfig,
     registry as global_registry,
     ProviderRegistry,
 )
@@ -21,9 +20,7 @@ class DynamicProviderLoader:
     def __init__(self, registry: ProviderRegistry):
         self.registry = registry
         self.loaded_providers: Dict[str, Any] = {}
-        self.transformers: Dict[str, Callable] = (
-            self._load_builtin_transformers()
-        )
+        self.transformers: Dict[str, Callable] = self._load_builtin_transformers()
 
     def _load_builtin_transformers(self) -> Dict[str, Callable]:
         """
@@ -59,12 +56,8 @@ class DynamicProviderLoader:
             module_path = f"src.providers.{provider_name}"
             module = importlib.import_module(module_path)
             # Convention: Specific provider classes are named e.g., OpenaiProvider
-            provider_class = getattr(
-                module, f"{provider_name.title()}Provider"
-            )
-            logger.info(
-                f"Loaded specific wrapper for provider '{provider_name}'"
-            )
+            provider_class = getattr(module, f"{provider_name.title()}Provider")
+            logger.info(f"Loaded specific wrapper for provider '{provider_name}'")
         except (ImportError, AttributeError):
             # 2. Se falhar, usar o wrapper genérico OpenAI-compatível
             try:
@@ -75,9 +68,7 @@ class DynamicProviderLoader:
                     f"Using GenericOpenAIWrapper for provider '{provider_name}'"
                 )
             except ImportError:
-                logger.error(
-                    "GenericOpenAIWrapper not found. Cannot fall back."
-                )
+                logger.error("GenericOpenAIWrapper not found. Cannot fall back.")
                 raise ProviderNotFoundError(
                     f"Wrapper for provider '{provider_name}' not found and fallback failed."
                 )
@@ -99,9 +90,7 @@ class DynamicProviderLoader:
         api_key = os.getenv(config.api_key_env) if config.api_key_env else None
 
         # Instanciar o wrapper com a configuração necessária
-        client_instance = ProviderWrapper(
-            api_key=api_key, base_url=config.api_base
-        )
+        client_instance = ProviderWrapper(api_key=api_key, base_url=config.api_base)
 
         # Aplicar o transformer se um estiver especificado na configuração
         if config.payload_transformer:

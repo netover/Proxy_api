@@ -50,9 +50,9 @@ class DynamicAnthropicProvider(DynamicProvider):
             )
             result = response.json()
             response_time = time.time() - start_time
-            tokens = result.get("usage", {}).get(
-                "input_tokens", 0
-            ) + result.get("usage", {}).get("output_tokens", 0)
+            tokens = result.get("usage", {}).get("input_tokens", 0) + result.get(
+                "usage", {}
+            ).get("output_tokens", 0)
             metrics_collector.record_request(
                 self.name,
                 success=True,
@@ -76,9 +76,7 @@ class DynamicAnthropicProvider(DynamicProvider):
             self.logger.error(f"{request_type} failed: {e}")
             raise
 
-    async def create_completion(
-        self, request: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def create_completion(self, request: Dict[str, Any]) -> Dict[str, Any]:
         """Create a chat completion using Anthropic's API"""
         anthropic_request = {
             "model": request.get("model"),
@@ -99,21 +97,15 @@ class DynamicAnthropicProvider(DynamicProvider):
                     "index": 0,
                     "message": {
                         "role": "assistant",
-                        "content": result.get("content", [{}])[0].get(
-                            "text", ""
-                        ),
+                        "content": result.get("content", [{}])[0].get("text", ""),
                     },
-                    "finish_reason": self._map_finish_reason(
-                        result.get("stop_reason")
-                    ),
+                    "finish_reason": self._map_finish_reason(result.get("stop_reason")),
                 }
             ],
             "usage": result.get("usage"),
         }
 
-    async def create_text_completion(
-        self, request: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def create_text_completion(self, request: Dict[str, Any]) -> Dict[str, Any]:
         """Create a text completion using Anthropic's API by adapting the prompt."""
         prompt = request.get("prompt", "")
         anthropic_request = {
@@ -135,20 +127,14 @@ class DynamicAnthropicProvider(DynamicProvider):
                     "text": result.get("content", [{}])[0].get("text", ""),
                     "index": 0,
                     "logprobs": None,
-                    "finish_reason": self._map_finish_reason(
-                        result.get("stop_reason")
-                    ),
+                    "finish_reason": self._map_finish_reason(result.get("stop_reason")),
                 }
             ],
             "usage": result.get("usage"),
         }
 
-    async def create_embeddings(
-        self, request: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def create_embeddings(self, request: Dict[str, Any]) -> Dict[str, Any]:
         """Create embeddings using Anthropic's API"""
         # Anthropic doesn't have a native embeddings API
         # We'll raise an exception indicating this feature is not supported
-        raise NotImplementedError(
-            "Anthropic provider does not support embeddings"
-        )
+        raise NotImplementedError("Anthropic provider does not support embeddings")

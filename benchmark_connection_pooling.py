@@ -79,7 +79,7 @@ async def benchmark_connection_pooling():
     concurrent_requests = 10
     test_duration = 30  # seconds for sustained load test
 
-    print(f"Test Configuration:")
+    print("Test Configuration:")
     print(f"  URL: {test_url}")
     print(f"  Total Requests: {num_requests}")
     print(f"  Concurrent Requests: {concurrent_requests}")
@@ -130,7 +130,7 @@ async def benchmark_connection_pooling():
     v2_avg = v2_result.avg_response_time * 1000
     improvement = ((v1_avg - v2_avg) / v1_avg * 100) if v1_avg > 0 else 0
 
-    print(".2f" ".2f" "+.1f")
+    print(".2" ".2" "+.1")
 
     v1_median = v1_result.median_response_time * 1000
     v2_median = v2_result.median_response_time * 1000
@@ -138,16 +138,16 @@ async def benchmark_connection_pooling():
         ((v1_median - v2_median) / v1_median * 100) if v1_median > 0 else 0
     )
 
-    print(".2f" ".2f" "+.1f")
+    print(".2" ".2" "+.1")
 
     v1_p95 = v1_result.p95_response_time * 1000
     v2_p95 = v2_result.p95_response_time * 1000
     improvement = ((v1_p95 - v2_p95) / v1_p95 * 100) if v1_p95 > 0 else 0
 
-    print(".2f" ".2f" "+.1f")
+    print(".2" ".2" "+.1")
 
     # Throughput metrics
-    print(".1f" ".1f" "+.1f")
+    print(".1" ".1" "+.1")
 
     # Error rates
     v1_error_rate = (
@@ -158,7 +158,7 @@ async def benchmark_connection_pooling():
     )
     improvement = v1_error_rate - v2_error_rate
 
-    print(".2f" ".2f" "+.2f")
+    print(".2" ".2" "+.2")
 
     # Connection pool metrics
     print("\nConnection Pool Metrics:")

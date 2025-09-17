@@ -1,8 +1,6 @@
 """Prometheus metrics exporter for monitoring and observability."""
 
-import os
-import time
-from typing import Dict, Any, Optional
+from typing import Any, Optional
 import logging
 
 try:
@@ -141,9 +139,7 @@ class PrometheusExporter:
             )
             return True
         except Exception as e:
-            logging.getLogger(__name__).error(
-                f"Failed to start Prometheus server: {e}"
-            )
+            logging.getLogger(__name__).error(f"Failed to start Prometheus server: {e}")
             return False
 
     def record_request(
@@ -159,9 +155,9 @@ class PrometheusExporter:
             status_code=str(status_code),
         ).inc()
 
-        self.request_duration.labels(
-            method=method.upper(), endpoint=endpoint
-        ).observe(duration)
+        self.request_duration.labels(method=method.upper(), endpoint=endpoint).observe(
+            duration
+        )
 
     def record_provider_request(
         self, provider: str, model: str, status: str, latency: float
@@ -174,9 +170,7 @@ class PrometheusExporter:
             provider=provider, model=model, status=status
         ).inc()
 
-        self.provider_latency.labels(provider=provider, model=model).observe(
-            latency
-        )
+        self.provider_latency.labels(provider=provider, model=model).observe(latency)
 
     def record_cache_hit(self, cache_type: str) -> None:
         """Record a cache hit."""

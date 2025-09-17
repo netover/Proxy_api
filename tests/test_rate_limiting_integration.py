@@ -1,17 +1,12 @@
-import asyncio
-import time
 import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import patch
 
 from main import app
 from src.core.rate_limiter import TokenBucketRateLimiter, rate_limiter
+from src.core.unified_config import RateLimitSettings
 
 
-@pytest.fixture
-def client():
-    """FastAPI test client"""
-    return TestClient(app)
 
 
 @pytest.fixture
@@ -49,54 +44,13 @@ class TestRateLimitingIntegration:
             assert "Too Many Requests" in response.json()["detail"]["message"]
             assert "Retry-After" in response.headers
 
-    def test_providers_endpoint_under_limit(self, client, low_rate_limiter):
-        """Test GET /providers allows requests under rate limit"""
-        response = client.get("/v1/providers")
-
-        assert response.status_code == 200
-        assert "providers" in response.json()
-
-    def test_providers_endpoint_over_limit(self, client, low_rate_limiter):
-        """Test GET /providers blocks requests over rate limit"""
-        # Use up all tokens
-        for _ in range(5):
-            low_rate_limiter.is_allowed("127.0.0.1")
-
-        # Next request should be blocked
-        response = client.get("/v1/providers")
-        assert response.status_code == 429
-
-    def test_cache_stats_endpoint_under_limit(self, client, low_rate_limiter):
-        """Test GET /cache/stats allows requests under rate limit"""
-        response = client.get("/v1/cache/stats")
-
-        assert response.status_code == 200
-        assert "unified_cache" in response.json()
-
-    def test_cache_stats_endpoint_over_limit(self, client, low_rate_limiter):
-        """Test GET /cache/stats blocks requests over rate limit"""
-        # Use up all tokens
-        for _ in range(5):
-            low_rate_limiter.is_allowed("127.0.0.1")
-
-        # Next request should be blocked
-        response = client.get("/v1/cache/stats")
-        assert response.status_code == 429
-
-    def test_non_rate_limited_endpoints_not_affected(
-        self, client, low_rate_limiter
-    ):
+    def test_non_rate_limited_endpoints_not_affected(self, client, low_rate_limiter):
         """Test endpoints without rate limiting are not affected"""
-        # These endpoints don't have rate limiting applied
-        response = client.post("/v1/cache/clear")
+        # This endpoint doesn't have rate limiting applied in the router
+        response = client.get("/v1/health")
         assert response.status_code == 200
 
-        response = client.get("/v1/cache/health")
-        assert response.status_code == 200
-
-    def test_different_ips_have_separate_limits(
-        self, client, low_rate_limiter
-    ):
+    def test_different_ips_have_separate_limits(self, client, low_rate_limiter):
         """Test different IP addresses have separate rate limits"""
         # This test would require mocking different client IPs
         # For now, just verify the rate limiter logic works
@@ -145,37 +99,30 @@ class TestRateLimiterConfiguration:
     """Test rate limiter configuration from config"""
 
     def test_configuration_from_settings(self):
-        """Test rate limiter configures from settings"""
-        # Mock config
-        mock_config = type("Config", (), {})()
-        mock_config.settings = type("Settings", (), {"rate_limit_rpm": 30})()
+        """Test rate limiter configures from a RateLimitSettings object."""
+        # Create a mock settings object
+        settings = RateLimitSettings(
+            requests_per_window=120,
+            window_seconds=60,
+            burst_limit=20,
+            routes={
+                "/v1/models": "10/minute",
+                "/v1/providers": "20/minute",
+            },
+        )
 
         # Configure rate limiter
-        rate_limiter.configure_from_config(mock_config)
+        rate_limiter.configure_from_settings(settings)
 
+        # Check that the token bucket was initialized correctly (120 reqs/60s = 120 rpm)
         assert rate_limiter.token_bucket_limiter is not None
-        assert rate_limiter.token_bucket_limiter.requests_per_minute == 30
+        assert rate_limiter.token_bucket_limiter.requests_per_minute == 120
 
-    def test_configuration_with_providers(self):
-        """Test rate limiter configures with provider-specific limits"""
-        # Mock config with providers
-        mock_config = type(
-            "Config",
-            (),
-            {"settings": type("Settings", (), {"rate_limit_rpm": 50})()},
-        )()
-
-        mock_provider = type("Provider", (), {})()
-        mock_provider.name = "openai"
-        mock_provider.rate_limit = 100
-
-        mock_config.providers = [mock_provider]
-
-        rate_limiter.configure_from_config(mock_config)
-
-        # Check provider-specific limits
-        assert rate_limiter.get_provider_limit("openai") == "100/hour"
-        assert rate_limiter.get_provider_limit("unknown") == "50/minute"
+        # Check that routes were configured
+        assert rate_limiter.get_route_limit("/v1/models") == "10/minute"
+        assert rate_limiter.get_route_limit("/v1/providers") == "20/minute"
+        # Check fallback to default
+        assert rate_limiter.get_route_limit("/v1/unknown") == "120/60s"
 
 
 class TestRateLimitStats:

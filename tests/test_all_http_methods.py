@@ -1,4 +1,3 @@
-import pytest
 from unittest.mock import Mock, patch
 from fastapi.testclient import TestClient
 from main import app
@@ -23,9 +22,7 @@ class TestHealthEndpointHTTPMethods:
             mock_provider.forced = False
             mock_provider.last_health_check = 1234567890
             mock_provider.error_count = 0
-            mock_provider_factory.get_all_provider_info.return_value = [
-                mock_provider
-            ]
+            mock_provider_factory.get_all_provider_info.return_value = [mock_provider]
             mock_app_state.provider_factory = mock_provider_factory
 
             response = client.get("/health")
@@ -82,9 +79,7 @@ class TestChatEndpointHTTPMethods:
                 "choices": [{"message": {"content": "Test response"}}],
                 "model": "gpt-4",
             }
-            mock_provider_factory.get_providers_for_model.return_value = [
-                mock_provider
-            ]
+            mock_provider_factory.get_providers_for_model.return_value = [mock_provider]
             mock_provider_factory.get_provider.return_value = mock_provider
             mock_app_state.provider_factory = mock_provider_factory
 
@@ -93,16 +88,11 @@ class TestChatEndpointHTTPMethods:
                 "messages": [{"role": "user", "content": "Hello"}],
             }
             headers = {"Authorization": "Bearer test_key"}
-            response = client.post(
-                "/v1/chat/completions", json=data, headers=headers
-            )
+            response = client.post("/v1/chat/completions", json=data, headers=headers)
             assert response.status_code == 200
             json_response = response.json()
             assert "choices" in json_response
-            assert (
-                json_response["choices"][0]["message"]["content"]
-                == "Test response"
-            )
+            assert json_response["choices"][0]["message"]["content"] == "Test response"
 
     def test_chat_completions_get_method_not_allowed(self):
         """Test GET /v1/chat/completions returns 405 Method Not Allowed."""
@@ -139,9 +129,7 @@ class TestModelsEndpointHTTPMethods:
             mock_provider.models = ["gpt-4", "gpt-3.5-turbo"]
             mock_provider.enabled = True
             mock_provider.forced = False
-            mock_provider_factory.get_all_provider_info.return_value = [
-                mock_provider
-            ]
+            mock_provider_factory.get_all_provider_info.return_value = [mock_provider]
             mock_app_state.provider_factory = mock_provider_factory
 
             response = client.get("/v1/models")
@@ -217,9 +205,7 @@ class TestConfigEndpointHTTPMethods:
             "src.api.controllers.config_controller.config_manager"
         ) as mock_config_manager:
             mock_config_manager.config_path.exists.return_value = True
-            mock_config_manager.config_path.stat.return_value.st_mtime = (
-                1234567890
-            )
+            mock_config_manager.config_path.stat.return_value.st_mtime = 1234567890
 
             headers = {"Authorization": "Bearer test_key"}
             response = client.get("/v1/config/status", headers=headers)
@@ -244,17 +230,13 @@ class TestMetricsEndpointHTTPMethods:
         ) as mock_collector, patch.object(
             app.state, "app_state", Mock()
         ) as mock_app_state:
-            mock_stats = {
-                "openai": {"total_requests": 10, "success_rate": 0.9}
-            }
+            mock_stats = {"openai": {"total_requests": 10, "success_rate": 0.9}}
             mock_collector.get_all_stats.return_value = mock_stats
             mock_provider_factory = Mock()
             mock_provider = Mock()
             mock_provider.name = "openai"
             mock_provider.status.value = "healthy"
-            mock_provider_factory.get_all_provider_info.return_value = [
-                mock_provider
-            ]
+            mock_provider_factory.get_all_provider_info.return_value = [mock_provider]
             mock_app_state.provider_factory = mock_provider_factory
 
             headers = {"Authorization": "Bearer test_key"}
@@ -274,9 +256,7 @@ class TestMetricsEndpointHTTPMethods:
         with patch(
             "src.api.controllers.analytics_controller.metrics_collector"
         ) as mock_collector:
-            mock_collector.get_prometheus_metrics.return_value = (
-                "# Prometheus metrics"
-            )
+            mock_collector.get_prometheus_metrics.return_value = "# Prometheus metrics"
 
             headers = {"Authorization": "Bearer test_key"}
             response = client.get("/v1/metrics/prometheus", headers=headers)
@@ -307,9 +287,7 @@ class TestProvidersEndpointHTTPMethods:
             mock_provider.last_health_check = 1234567890
             mock_provider.error_count = 0
             mock_provider.last_error = None
-            mock_provider_factory.get_all_provider_info.return_value = [
-                mock_provider
-            ]
+            mock_provider_factory.get_all_provider_info.return_value = [mock_provider]
             mock_app_state.provider_factory = mock_provider_factory
 
             headers = {"Authorization": "Bearer test_key"}
@@ -331,9 +309,7 @@ class TestModelManagementEndpointHTTPMethods:
 
     def test_provider_models_get_success(self):
         """Test GET /v1/providers/{provider_name}/models success."""
-        with patch.object(
-            app.state, "app_state", Mock()
-        ) as mock_app_state, patch(
+        with patch.object(app.state, "app_state", Mock()) as mock_app_state, patch(
             "src.api.model_endpoints.app_state.model_discovery"
         ) as mock_discovery:
             mock_provider_factory = Mock()
@@ -341,9 +317,7 @@ class TestModelManagementEndpointHTTPMethods:
             mock_provider.name = "openai"
             mock_provider.base_url = "https://api.openai.com/v1"
             mock_provider.api_key = "test_key"
-            mock_provider_factory.get_all_provider_info.return_value = [
-                mock_provider
-            ]
+            mock_provider_factory.get_all_provider_info.return_value = [mock_provider]
             mock_app_state.provider_factory = mock_provider_factory
 
             mock_model = Mock()
@@ -353,9 +327,7 @@ class TestModelManagementEndpointHTTPMethods:
             mock_discovery.discover_models.return_value = [mock_model]
 
             headers = {"Authorization": "Bearer test_key"}
-            response = client.get(
-                "/v1/providers/openai/models", headers=headers
-            )
+            response = client.get("/v1/providers/openai/models", headers=headers)
             assert response.status_code == 200
             json_response = response.json()
             assert "data" in json_response
@@ -368,9 +340,7 @@ class TestModelManagementEndpointHTTPMethods:
 
     def test_provider_model_selection_put_success(self):
         """Test PUT /v1/providers/{provider_name}/model_selection success."""
-        with patch.object(
-            app.state, "app_state", Mock()
-        ) as mock_app_state, patch(
+        with patch.object(app.state, "app_state", Mock()) as mock_app_state, patch(
             "src.api.model_endpoints.app_state.model_discovery"
         ) as mock_discovery, patch(
             "src.api.model_endpoints.app_state.config_manager"
@@ -380,9 +350,7 @@ class TestModelManagementEndpointHTTPMethods:
             mock_provider.name = "openai"
             mock_provider.base_url = "https://api.openai.com/v1"
             mock_provider.api_key = "test_key"
-            mock_provider_factory.get_all_provider_info.return_value = [
-                mock_provider
-            ]
+            mock_provider_factory.get_all_provider_info.return_value = [mock_provider]
             mock_app_state.provider_factory = mock_provider_factory
 
             mock_model = Mock()
@@ -412,9 +380,7 @@ class TestModelManagementEndpointHTTPMethods:
 
     def test_provider_models_refresh_post_success(self):
         """Test POST /v1/providers/{provider_name}/models/refresh success."""
-        with patch.object(
-            app.state, "app_state", Mock()
-        ) as mock_app_state, patch(
+        with patch.object(app.state, "app_state", Mock()) as mock_app_state, patch(
             "src.api.model_endpoints.app_state.model_discovery"
         ) as mock_discovery, patch(
             "src.api.model_endpoints.app_state.cache_manager"
@@ -424,9 +390,7 @@ class TestModelManagementEndpointHTTPMethods:
             mock_provider.name = "openai"
             mock_provider.base_url = "https://api.openai.com/v1"
             mock_provider.api_key = "test_key"
-            mock_provider_factory.get_all_provider_info.return_value = [
-                mock_provider
-            ]
+            mock_provider_factory.get_all_provider_info.return_value = [mock_provider]
             mock_app_state.provider_factory = mock_provider_factory
 
             mock_model = Mock()
@@ -454,9 +418,7 @@ class TestCacheEndpointHTTPMethods:
 
     def test_cache_stats_get_success(self):
         """Test GET /v1/cache/stats success."""
-        with patch(
-            "src.core.unified_cache.get_unified_cache"
-        ) as mock_get_cache:
+        with patch("src.core.unified_cache.get_unified_cache") as mock_get_cache:
             mock_cache = Mock()
             mock_cache.get_stats.return_value = {
                 "entries": 100,
@@ -472,9 +434,7 @@ class TestCacheEndpointHTTPMethods:
 
     def test_cache_clear_post_success(self):
         """Test POST /v1/cache/clear success."""
-        with patch(
-            "src.core.unified_cache.get_unified_cache"
-        ) as mock_get_cache:
+        with patch("src.core.unified_cache.get_unified_cache") as mock_get_cache:
             mock_cache = Mock()
             mock_cache.clear.return_value = 50
             mock_get_cache.return_value = mock_cache
@@ -492,9 +452,7 @@ class TestCacheEndpointHTTPMethods:
 
     def test_cache_health_get_success(self):
         """Test GET /v1/cache/health success."""
-        with patch(
-            "src.core.cache_monitor.get_cache_health_report"
-        ) as mock_health:
+        with patch("src.core.cache_monitor.get_cache_health_report") as mock_health:
             mock_health.return_value = {"status": "healthy", "hit_rate": 0.9}
 
             response = client.get("/v1/cache/health")
@@ -612,9 +570,7 @@ class TestErrorHandling:
         """Test handling of missing required fields."""
         headers = {"Authorization": "Bearer test_key"}
         data = {"model": "gpt-4"}  # Missing messages
-        response = client.post(
-            "/v1/chat/completions", json=data, headers=headers
-        )
+        response = client.post("/v1/chat/completions", json=data, headers=headers)
         assert response.status_code == 422  # Validation error
 
     def test_unsupported_content_type(self):
@@ -624,9 +580,7 @@ class TestErrorHandling:
             "Content-Type": "text/plain",
         }
         data = "plain text data"
-        response = client.post(
-            "/v1/chat/completions", data=data, headers=headers
-        )
+        response = client.post("/v1/chat/completions", data=data, headers=headers)
         assert response.status_code == 422  # Validation error
 
     def test_nonexistent_endpoint(self):
@@ -637,7 +591,5 @@ class TestErrorHandling:
     def test_invalid_path_parameters(self):
         """Test handling of invalid path parameters."""
         headers = {"Authorization": "Bearer test_key"}
-        response = client.get(
-            "/v1/providers/nonexistent/models", headers=headers
-        )
+        response = client.get("/v1/providers/nonexistent/models", headers=headers)
         assert response.status_code == 404

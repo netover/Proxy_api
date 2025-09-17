@@ -6,11 +6,9 @@ Validates 60%+ latency reduction and throughput improvements
 import asyncio
 import time
 import statistics
-from typing import Dict, List, Any, Tuple
+from typing import Dict, List, Any
 from dataclasses import dataclass
-from concurrent.futures import ThreadPoolExecutor
 import json
-import os
 
 from src.core.parallel_fallback import (
     parallel_fallback_engine,
@@ -42,17 +40,13 @@ class BenchmarkResult:
 class MockBenchmarkProvider:
     """Benchmark provider with configurable performance characteristics"""
 
-    def __init__(
-        self, name: str, latency_ms: float, failure_rate: float = 0.0
-    ):
+    def __init__(self, name: str, latency_ms: float, failure_rate: float = 0.0):
         self.name = name
         self.latency_ms = latency_ms
         self.failure_rate = failure_rate
         self.requests_served = 0
 
-    async def execute_request(
-        self, request_data: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def execute_request(self, request_data: Dict[str, Any]) -> Dict[str, Any]:
         self.requests_served += 1
 
         # Simulate failure
@@ -68,11 +62,7 @@ class MockBenchmarkProvider:
 
         return {
             "choices": [
-                {
-                    "message": {
-                        "content": f"Benchmark response from {self.name}"
-                    }
-                }
+                {"message": {"content": f"Benchmark response from {self.name}"}}
             ],
             "usage": {"total_tokens": 100},
         }
@@ -152,9 +142,7 @@ class ParallelExecutionBenchmark:
         """Benchmark sequential vs parallel execution performance"""
         print("\n🔬 Benchmarking Sequential vs Parallel Execution")
 
-        request_data = {
-            "messages": [{"role": "user", "content": "Performance test"}]
-        }
+        request_data = {"messages": [{"role": "user", "content": "Performance test"}]}
         num_requests = 50
 
         # Test sequential execution (simulated)
@@ -225,10 +213,7 @@ class ParallelExecutionBenchmark:
                             "unreliable_provider"
                         ].execute_request(request_data)
                     except (Exception, asyncio.TimeoutError, ValueError) as e:
-                        print(
-                            f"Unreliable provider failed as last resort: {e}"
-                        )
-                        pass
+                        print(f"Unreliable provider failed as last resort: {e}")
 
                 latencies.append((time.time() - start_time) * 1000)
 
@@ -274,9 +259,7 @@ class ParallelExecutionBenchmark:
         for concurrent in concurrent_levels:
             print(f"  📊 Testing {concurrent} concurrent requests...")
 
-            latencies = await self._run_high_concurrency_test(
-                concurrent, request_data
-            )
+            latencies = await self._run_high_concurrency_test(concurrent, request_data)
             result = self._analyze_latencies(
                 f"concurrent_{concurrent}", latencies, concurrent
             )
@@ -312,7 +295,7 @@ class ParallelExecutionBenchmark:
                 tasks.append(task)
 
             results = await asyncio.gather(*tasks, return_exceptions=True)
-            total_time = time.time() - start_time
+            time.time() - start_time
 
             for result in results:
                 if isinstance(result, dict):
@@ -331,19 +314,13 @@ class ParallelExecutionBenchmark:
         self.test_providers["medium_provider"].failure_rate = 0.40
 
         request_data = {
-            "messages": [
-                {"role": "user", "content": "Failure resilience test"}
-            ]
+            "messages": [{"role": "user", "content": "Failure resilience test"}]
         }
         num_requests = 100
 
         print("  📊 Testing under failure conditions...")
-        latencies = await self._run_parallel_execution(
-            num_requests, request_data
-        )
-        result = self._analyze_latencies(
-            "failure_resilience", latencies, num_requests
-        )
+        latencies = await self._run_parallel_execution(num_requests, request_data)
+        result = self._analyze_latencies("failure_resilience", latencies, num_requests)
 
         error_rate = result.error_rate * 100
         print(f"  📊 Error Rate: {error_rate:.1f}%")
@@ -365,9 +342,7 @@ class ParallelExecutionBenchmark:
         """Benchmark provider selection optimization"""
         print("\n🔬 Benchmarking Provider Selection Optimization")
 
-        request_data = {
-            "messages": [{"role": "user", "content": "Selection test"}]
-        }
+        request_data = {"messages": [{"role": "user", "content": "Selection test"}]}
         num_requests = 30
 
         # Run with different provider selection strategies
@@ -428,9 +403,7 @@ class ParallelExecutionBenchmark:
 
         total_time = sum(latencies) / 1000  # Convert to seconds
         avg_latency = statistics.mean(latencies) if latencies else 0
-        p50_latency = (
-            statistics.median(sorted_latencies) if sorted_latencies else 0
-        )
+        p50_latency = statistics.median(sorted_latencies) if sorted_latencies else 0
         p95_latency = (
             sorted_latencies[int(len(sorted_latencies) * 0.95)]
             if len(sorted_latencies) > 1
@@ -443,9 +416,7 @@ class ParallelExecutionBenchmark:
         )
 
         throughput_rps = (
-            successful_requests / (total_time / total_requests)
-            if total_time > 0
-            else 0
+            successful_requests / (total_time / total_requests) if total_time > 0 else 0
         )
         error_rate = failed_requests / total_requests
 
@@ -461,9 +432,7 @@ class ParallelExecutionBenchmark:
             p99_latency=p99_latency,
             throughput_rps=throughput_rps,
             error_rate=error_rate,
-            metadata={
-                "latencies": latencies[:10]
-            },  # Sample first 10 latencies
+            metadata={"latencies": latencies[:10]},  # Sample first 10 latencies
         )
 
     def _generate_benchmark_report(self) -> Dict[str, Any]:
@@ -475,7 +444,7 @@ class ParallelExecutionBenchmark:
             "summary": {
                 "total_tests": len(self.results),
                 "overall_success_rate": 0.0,
-                "best_p95_latency": float("inf"),
+                "best_p95_latency": float("in"),
                 "best_throughput": 0.0,
                 "targets_achieved": [],
             },
@@ -488,9 +457,7 @@ class ParallelExecutionBenchmark:
             report["results"].append(
                 {
                     "test_name": result.test_name,
-                    "success_rate": (
-                        result.successful_requests / result.total_requests
-                    )
+                    "success_rate": (result.successful_requests / result.total_requests)
                     * 100,
                     "avg_latency_ms": result.avg_latency,
                     "p95_latency_ms": result.p95_latency,
@@ -523,9 +490,7 @@ class ParallelExecutionBenchmark:
         ]
 
         if parallel_results and sequential_results:
-            avg_parallel_p95 = statistics.mean(
-                r.p95_latency for r in parallel_results
-            )
+            avg_parallel_p95 = statistics.mean(r.p95_latency for r in parallel_results)
             avg_sequential_p95 = statistics.mean(
                 r.p95_latency for r in sequential_results
             )
@@ -534,37 +499,25 @@ class ParallelExecutionBenchmark:
             ) * 100
 
             if improvement >= 60:
-                report["summary"]["targets_achieved"].append(
-                    "60%_latency_reduction"
-                )
+                report["summary"]["targets_achieved"].append("60%_latency_reduction")
             if avg_parallel_p95 <= 500:
                 report["summary"]["targets_achieved"].append("p95_under_500ms")
 
-        high_load_results = [
-            r for r in self.results if "concurrent" in r.test_name
-        ]
+        high_load_results = [r for r in self.results if "concurrent" in r.test_name]
         if high_load_results:
             max_throughput = max(r.throughput_rps for r in high_load_results)
             if max_throughput >= 500:
-                report["summary"]["targets_achieved"].append(
-                    "500_rps_throughput"
-                )
+                report["summary"]["targets_achieved"].append("500_rps_throughput")
 
         # Generate recommendations
         if report["summary"]["best_p95_latency"] > 500:
-            report["recommendations"].append(
-                "Optimize provider selection algorithm"
-            )
+            report["recommendations"].append("Optimize provider selection algorithm")
 
         if report["summary"]["best_throughput"] < 200:
-            report["recommendations"].append(
-                "Improve concurrent request handling"
-            )
+            report["recommendations"].append("Improve concurrent request handling")
 
         if report["summary"]["overall_success_rate"] < 95:
-            report["recommendations"].append(
-                "Enhance error handling and retry logic"
-            )
+            report["recommendations"].append("Enhance error handling and retry logic")
 
         return report
 
@@ -588,12 +541,8 @@ class ParallelExecutionBenchmark:
             def mock_get_provider(name):
                 return self.test_providers.get(name)
 
-            with patch(
-                "src.core.parallel_fallback.provider_factory"
-            ) as mock_factory:
-                mock_factory.get_provider = AsyncMock(
-                    side_effect=mock_get_provider
-                )
+            with patch("src.core.parallel_fallback.provider_factory") as mock_factory:
+                mock_factory.get_provider = AsyncMock(side_effect=mock_get_provider)
                 mock_factory.get_all_provider_info = AsyncMock(
                     return_value=[
                         type(
@@ -628,15 +577,9 @@ async def run_benchmarks():
     print("🏆 BENCHMARK SUITE COMPLETE")
     print("=" * 60)
 
-    print(
-        f"📊 Overall Success Rate: {report['summary']['overall_success_rate']:.1f}%"
-    )
-    print(
-        f"⚡ Best P95 Latency: {report['summary']['best_p95_latency']:.1f}ms"
-    )
-    print(
-        f"🚀 Best Throughput: {report['summary']['best_throughput']:.0f} req/s"
-    )
+    print(f"📊 Overall Success Rate: {report['summary']['overall_success_rate']:.1f}%")
+    print(f"⚡ Best P95 Latency: {report['summary']['best_p95_latency']:.1f}ms")
+    print(f"🚀 Best Throughput: {report['summary']['best_throughput']:.0f} req/s")
 
     targets = report["summary"]["targets_achieved"]
     if targets:

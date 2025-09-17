@@ -22,9 +22,7 @@ class ModelSelection(BaseModel):
     )
     last_updated: datetime = Field(default_factory=datetime.utcnow)
 
-    model_config = ConfigDict(
-        json_encoders={datetime: lambda v: v.isoformat()}
-    )
+    model_config = ConfigDict(json_encoders={datetime: lambda v: v.isoformat()})
 
 
 class ModelConfigManager:
@@ -69,9 +67,7 @@ class ModelConfigManager:
                         last_updated = selection_data.get("last_updated")
                         if last_updated:
                             try:
-                                last_updated = datetime.fromisoformat(
-                                    last_updated
-                                )
+                                last_updated = datetime.fromisoformat(last_updated)
                             except (ValueError, TypeError):
                                 last_updated = datetime.utcnow()
 
@@ -121,9 +117,7 @@ class ModelConfigManager:
             except OSError as e:
                 raise RuntimeError(f"Failed to save model selections: {e}")
 
-    def get_model_selection(
-        self, provider_name: str
-    ) -> Optional[ModelSelection]:
+    def get_model_selection(self, provider_name: str) -> Optional[ModelSelection]:
         """Get the model selection for a specific provider"""
         with self._lock:
             return self._selections.get(provider_name)

@@ -39,9 +39,7 @@ class ChatCompletionRequest(BaseModel):
         if v:
             for k in v:
                 if not (-100 <= v[k] <= 100):
-                    raise ValueError(
-                        "Logit bias values must be between -100 and 100"
-                    )
+                    raise ValueError("Logit bias values must be between -100 and 100")
         return v
 
 
@@ -71,9 +69,7 @@ class TextCompletionRequest(BaseModel):
         if v:
             for k in v:
                 if not (-100 <= v[k] <= 100):
-                    raise ValueError(
-                        "Logit bias values must be between -100 and 100"
-                    )
+                    raise ValueError("Logit bias values must be between -100 and 100")
         return v
 
 
@@ -118,9 +114,7 @@ class ImageGenerationRequest(BaseModel):
                 "1024x1792",
             }
             if v not in valid_sizes:
-                raise ValueError(
-                    f"size must be one of: {', '.join(valid_sizes)}"
-                )
+                raise ValueError(f"size must be one of: {', '.join(valid_sizes)}")
 
 
 # Model Management Request/Response Models
@@ -173,21 +167,13 @@ class ModelInfoExtended(BaseModel):
     context_window: Optional[int] = Field(
         None, description="Maximum context window size"
     )
-    max_tokens: Optional[int] = Field(
-        None, description="Maximum output tokens"
-    )
+    max_tokens: Optional[int] = Field(None, description="Maximum output tokens")
     pricing: Optional[Dict[str, float]] = Field(
         None, description="Pricing information per 1K tokens"
     )
-    description: Optional[str] = Field(
-        None, description="Human-readable description"
-    )
-    version: Optional[str] = Field(
-        None, description="Model version identifier"
-    )
-    last_updated: Optional[int] = Field(
-        None, description="Last update timestamp"
-    )
+    description: Optional[str] = Field(None, description="Human-readable description")
+    version: Optional[str] = Field(None, description="Model version identifier")
+    last_updated: Optional[int] = Field(None, description="Last update timestamp")
 
 
 class ModelListResponse(BaseModel):
@@ -209,9 +195,7 @@ class ModelDetailResponse(BaseModel):
     """Response model for detailed model information"""
 
     object: str = Field("model", description="Object type, always 'model'")
-    data: ModelInfoExtended = Field(
-        ..., description="Detailed model information"
-    )
+    data: ModelInfoExtended = Field(..., description="Detailed model information")
     provider: str = Field(..., description="Provider name")
     cached: bool = Field(True, description="Whether this data came from cache")
     last_refresh: Optional[int] = Field(
@@ -222,17 +206,11 @@ class ModelDetailResponse(BaseModel):
 class RefreshResponse(BaseModel):
     """Response model for cache refresh operations"""
 
-    success: bool = Field(
-        ..., description="Whether the refresh was successful"
-    )
+    success: bool = Field(..., description="Whether the refresh was successful")
     provider: str = Field(..., description="Provider name")
-    models_refreshed: int = Field(
-        ..., description="Number of models refreshed"
-    )
+    models_refreshed: int = Field(..., description="Number of models refreshed")
     cache_cleared: bool = Field(..., description="Whether cache was cleared")
     duration_ms: float = Field(
         ..., description="Duration of refresh operation in milliseconds"
     )
-    timestamp: int = Field(
-        ..., description="Unix timestamp of refresh completion"
-    )
+    timestamp: int = Field(..., description="Unix timestamp of refresh completion")

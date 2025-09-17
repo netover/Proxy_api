@@ -33,9 +33,7 @@ class ErrorHandler:
         self.error_counts = {}
         self.max_error_details_length = 500
 
-    async def handle_exception(
-        self, request: Request, exc: Exception
-    ) -> JSONResponse:
+    async def handle_exception(self, request: Request, exc: Exception) -> JSONResponse:
         """Handle any exception and return standardized JSON response."""
         request_id = getattr(request.state, "request_id", "unknown")
 
@@ -44,9 +42,7 @@ class ErrorHandler:
 
         # Increment error count
         error_type = type(exc).__name__
-        self.error_counts[error_type] = (
-            self.error_counts.get(error_type, 0) + 1
-        )
+        self.error_counts[error_type] = self.error_counts.get(error_type, 0) + 1
 
         # Create standardized error response
         error_response = self._create_error_response(exc, request_id)
@@ -67,16 +63,12 @@ class ErrorHandler:
                 "error_message": str(exc),
                 "url": str(request.url),
                 "method": request.method,
-                "client_ip": (
-                    request.client.host if request.client else "unknown"
-                ),
+                "client_ip": (request.client.host if request.client else "unknown"),
                 "user_agent": request.headers.get("user-agent", "unknown"),
             }
 
             # Add traceback for server errors
-            if isinstance(
-                exc, (ValueError, TypeError, KeyError, AttributeError)
-            ):
+            if isinstance(exc, (ValueError, TypeError, KeyError, AttributeError)):
                 error_details["traceback"] = traceback.format_exc()
 
             # Log at appropriate level
@@ -88,9 +80,7 @@ class ErrorHandler:
         except Exception as log_exc:
             logger.error(f"Failed to log error: {log_exc}")
 
-    def _create_error_response(
-        self, exc: Exception, request_id: str
-    ) -> Dict[str, Any]:
+    def _create_error_response(self, exc: Exception, request_id: str) -> Dict[str, Any]:
         """Create standardized error response structure."""
         base_response = {
             "error": {
@@ -123,9 +113,7 @@ class ErrorHandler:
 
         elif isinstance(exc, RateLimitError):
             base_response["error"]["code"] = "rate_limit_exceeded"
-            base_response["error"]["retry_after"] = getattr(
-                exc, "retry_after", 60
-            )
+            base_response["error"]["retry_after"] = getattr(exc, "retry_after", 60)
 
         return base_response
 
@@ -190,9 +178,7 @@ class ErrorHandler:
         import re
 
         for pattern in sensitive_patterns:
-            message = re.sub(
-                pattern, "[REDACTED]", message, flags=re.IGNORECASE
-            )
+            message = re.sub(pattern, "[REDACTED]", message, flags=re.IGNORECASE)
 
         return message
 
@@ -279,9 +265,7 @@ error_handler = ErrorHandler()
 
 
 # FastAPI exception handlers
-async def global_exception_handler(
-    request: Request, exc: Exception
-) -> JSONResponse:
+async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """Global exception handler for FastAPI."""
     return await error_handler.handle_exception(request, exc)
 
@@ -293,8 +277,6 @@ async def validation_exception_handler(
     return await error_handler.handle_validation_error(request, exc)
 
 
-async def http_exception_handler(
-    request: Request, exc: HTTPException
-) -> JSONResponse:
+async def http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
     """HTTP exception handler for FastAPI."""
     return await error_handler.handle_exception(request, exc)

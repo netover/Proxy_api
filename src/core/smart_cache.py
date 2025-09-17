@@ -149,9 +149,7 @@ class SmartCache:
         elif isinstance(obj, (list, tuple)):
             return sum(self._estimate_size(item) for item in obj)
         elif isinstance(obj, dict):
-            return sum(
-                len(str(k)) + self._estimate_size(v) for k, v in obj.items()
-            )
+            return sum(len(str(k)) + self._estimate_size(v) for k, v in obj.items())
         else:
             # Rough estimate for other objects
             return 256
@@ -209,9 +207,7 @@ class SmartCache:
             if not skip_memory_check and not await self._check_memory_limit(
                 entry.size_bytes
             ):
-                logger.warning(
-                    "Cache memory limit exceeded, skipping cache set"
-                )
+                logger.warning("Cache memory limit exceeded, skipping cache set")
                 return False
 
             # Add to main cache
@@ -254,9 +250,7 @@ class SmartCache:
                 del self._cache[key]
 
             if expired_keys:
-                logger.info(
-                    f"Cleaned up {len(expired_keys)} expired cache entries"
-                )
+                logger.info(f"Cleaned up {len(expired_keys)} expired cache entries")
 
     async def _enforce_size_limit(self):
         """Enforce maximum cache size using LRU eviction"""
@@ -271,9 +265,7 @@ class SmartCache:
     async def _enforce_memory_limit(self):
         """Enforce memory limits by evicting least recently used items"""
         with self._lock:
-            current_memory = sum(
-                entry.size_bytes for entry in self._cache.values()
-            )
+            current_memory = sum(entry.size_bytes for entry in self._cache.values())
 
             if current_memory > self.max_memory_bytes:
                 # Calculate how much memory to free (target 80% of max)
@@ -301,22 +293,14 @@ class SmartCache:
 
     async def _check_memory_limit(self, additional_bytes: int) -> bool:
         """Check if adding additional bytes would exceed memory limit"""
-        current_memory = sum(
-            entry.size_bytes for entry in self._cache.values()
-        )
+        current_memory = sum(entry.size_bytes for entry in self._cache.values())
         return current_memory + additional_bytes <= self.max_memory_bytes
 
     def get_stats(self) -> Dict[str, Any]:
         """Get cache statistics"""
         with self._lock:
-            current_memory = sum(
-                entry.size_bytes for entry in self._cache.values()
-            )
-            hit_rate = (
-                self.hits / self.total_requests
-                if self.total_requests > 0
-                else 0
-            )
+            current_memory = sum(entry.size_bytes for entry in self._cache.values())
+            hit_rate = self.hits / self.total_requests if self.total_requests > 0 else 0
 
             return {
                 "entries": len(self._cache),
@@ -360,32 +344,34 @@ _response_cache: Optional[SmartCache] = None
 _summary_cache: Optional[SmartCache] = None
 
 
-async def get_response_cache() -> SmartCache:
+async def get_response_cache(caching_config: "CachingSettings") -> SmartCache:
     """Get global response cache instance"""
     global _response_cache
 
     if _response_cache is None:
+        response_cache_config = caching_config.response_cache or {}
         _response_cache = SmartCache(
-            max_size=5000,  # Store more responses
-            default_ttl=1800,  # 30 minutes
-            max_memory_mb=256,
-            cleanup_interval=600,  # 10 minutes
+            max_size=response_cache_config.get("max_size", 5000),
+            default_ttl=response_cache_config.get("ttl", 1800),
+            max_memory_mb=response_cache_config.get("max_size_mb", 256),
+            enable_compression=response_cache_config.get("compression", True),
         )
         await _response_cache.start()
 
     return _response_cache
 
 
-async def get_summary_cache() -> SmartCache:
+async def get_summary_cache(caching_config: "CachingSettings") -> SmartCache:
     """Get global summary cache instance"""
     global _summary_cache
 
     if _summary_cache is None:
+        summary_cache_config = caching_config.summary_cache or {}
         _summary_cache = SmartCache(
-            max_size=2000,  # Store fewer summaries (more expensive to generate)
-            default_ttl=3600,  # 1 hour
-            max_memory_mb=128,
-            cleanup_interval=900,  # 15 minutes
+            max_size=summary_cache_config.get("max_size", 2000),
+            default_ttl=summary_cache_config.get("ttl", 3600),
+            max_memory_mb=summary_cache_config.get("max_size_mb", 128),
+            enable_compression=summary_cache_config.get("compression", True),
         )
         await _summary_cache.start()
 

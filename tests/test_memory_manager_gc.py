@@ -4,8 +4,7 @@ Verifies LRU eviction, GC triggering, and thread-safe context management.
 """
 
 import asyncio
-import gc
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 import pytest
 
@@ -119,8 +118,7 @@ async def test_concurrent_add(manager: SmartContextManager):
     """Test that concurrent additions are handled correctly and do not exceed max_size."""
     # Concurrently add more items than the manager can hold
     tasks = [
-        manager.add_context(f"concurrent_session_{i}", {"id": i})
-        for i in range(20)
+        manager.add_context(f"concurrent_session_{i}", {"id": i}) for i in range(20)
     ]
     await asyncio.gather(*tasks)
 

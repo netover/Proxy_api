@@ -5,10 +5,9 @@ Mantém compatibilidade OpenAI enquanto roteia para providers reais.
 
 import json
 import yaml
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional
 from enum import Enum
 from pydantic import BaseModel
-import importlib
 import logging
 
 logger = logging.getLogger(__name__)
@@ -79,9 +78,7 @@ class ProviderRegistry:
                     f"Provider carregado: {provider_id} ({config_data.get('provider')})"
                 )
             except Exception as e:
-                logger.error(
-                    f"Failed to load provider config for '{provider_id}': {e}"
-                )
+                logger.error(f"Failed to load provider config for '{provider_id}': {e}")
 
     def _get_default_registry(self) -> Dict:
         """Registry default com providers principais (expansível para 100+)."""
@@ -139,9 +136,7 @@ class ProviderRegistry:
         )
         return None
 
-    def list_models(
-        self, provider_type: Optional[ProviderType] = None
-    ) -> List[str]:
+    def list_models(self, provider_type: Optional[ProviderType] = None) -> List[str]:
         """Lista todos os models disponíveis."""
         models = []
         for config in self.providers.values():

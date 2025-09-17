@@ -131,9 +131,7 @@ class BaseDiscoveryProvider(ABC):
         except (ProviderError, ValidationError):
             return []
 
-    async def get_models_created_after(
-        self, timestamp: int
-    ) -> List[ModelInfo]:
+    async def get_models_created_after(self, timestamp: int) -> List[ModelInfo]:
         """
         Get all models created after a specific timestamp.
 
@@ -175,10 +173,6 @@ class BaseDiscoveryProvider(ABC):
         try:
             all_models = await self.list_models()
             query_lower = query.lower()
-            return [
-                model
-                for model in all_models
-                if query_lower in model.id.lower()
-            ]
+            return [model for model in all_models if query_lower in model.id.lower()]
         except (ProviderError, ValidationError):
             return []

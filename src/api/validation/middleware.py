@@ -33,9 +33,7 @@ class MiddlewarePipeline:
         """Add a middleware to the pipeline."""
         self.middlewares.append(middleware)
 
-    async def process_request(
-        self, request: Request, call_next: Callable
-    ) -> Response:
+    async def process_request(self, request: Request, call_next: Callable) -> Response:
         """Process incoming request through middleware pipeline."""
         start_time = time.time()
         self.request_count += 1
@@ -59,9 +57,7 @@ class MiddlewarePipeline:
             # Apply response middlewares
             for middleware in reversed(self.middlewares):
                 if hasattr(middleware, "process_response"):
-                    response = await middleware.process_response(
-                        request, response
-                    )
+                    response = await middleware.process_response(request, response)
 
             # Log response
             await self._log_response(request, response, start_time, request_id)
@@ -70,15 +66,11 @@ class MiddlewarePipeline:
 
         except Exception as e:
             self.error_count += 1
-            logger.error(
-                f"Request processing error: {e}", request_id=request_id
-            )
+            logger.error(f"Request processing error: {e}", request_id=request_id)
 
             # Create error response
             error_response = await self._create_error_response(e, request_id)
-            await self._log_response(
-                request, error_response, start_time, request_id
-            )
+            await self._log_response(request, error_response, start_time, request_id)
 
             return error_response
 
@@ -100,9 +92,7 @@ class MiddlewarePipeline:
                 if header in request_info["headers"]:
                     request_info["headers"][header] = "[REDACTED]"
 
-            logger.info(
-                "Incoming request", request_id=request_id, **request_info
-            )
+            logger.info("Incoming request", request_id=request_id, **request_info)
 
         except Exception as e:
             logger.error(f"Failed to log request: {e}", request_id=request_id)
@@ -121,22 +111,14 @@ class MiddlewarePipeline:
             response_info = {
                 "status_code": response.status_code,
                 "duration_ms": round(duration * 1000, 2),
-                "content_type": response.headers.get(
-                    "content-type", "unknown"
-                ),
-                "content_length": response.headers.get(
-                    "content-length", "unknown"
-                ),
+                "content_type": response.headers.get("content-type", "unknown"),
+                "content_length": response.headers.get("content-length", "unknown"),
             }
 
             if response.status_code >= 400:
-                logger.warning(
-                    "Error response", request_id=request_id, **response_info
-                )
+                logger.warning("Error response", request_id=request_id, **response_info)
             else:
-                logger.info(
-                    "Response sent", request_id=request_id, **response_info
-                )
+                logger.info("Response sent", request_id=request_id, **response_info)
 
         except Exception as e:
             logger.error(f"Failed to log response: {e}", request_id=request_id)
@@ -182,29 +164,34 @@ class ValidationMiddleware:
         if any(path in str(request.url.path) for path in skip_paths):
             return request
 
-        # Parse request body for validation
-        try:
-            body = await request.json()
-            request.state.validated_body = body
+        # Parse request body for validation, only for relevant methods
+        if request.method in ["POST", "PUT", "PATCH"]:
+            try:
+                body = await request.json()
+                request.state.validated_body = body
 
-            # Basic validation
+                # Basic validation
+            except Exception as e:
+                logger.warning(f"Request body parsing failed: {e}")
+                # Continue with empty body if parsing fails
+                request.state.validated_body = {}
+        else:
+            request.state.validated_body = {}
+
+        try:
             if str(request.url.path).startswith("/v1/chat/completions"):
                 validated_body = (
-                    await request_validator.validate_chat_completion_request(
-                        body
-                    )
+                    await request_validator.validate_chat_completion_request(body)
                 )
                 request.state.validated_body = validated_body
             elif str(request.url.path).startswith("/v1/completions"):
                 validated_body = (
-                    await request_validator.validate_text_completion_request(
-                        body
-                    )
+                    await request_validator.validate_text_completion_request(body)
                 )
                 request.state.validated_body = validated_body
             elif str(request.url.path).startswith("/v1/embeddings"):
-                validated_body = (
-                    await request_validator.validate_embedding_request(body)
+                validated_body = await request_validator.validate_embedding_request(
+                    body
                 )
                 request.state.validated_body = validated_body
 
@@ -214,30 +201,29 @@ class ValidationMiddleware:
 
         return request
 
-    async def process_response(
-        self, request: Request, response: Response
-    ) -> Response:
+    async def process_response(self, request: Request, response: Response) -> Response:
         """Validate outgoing response."""
         if response.status_code >= 400:
             return response  # Don't validate error responses
 
         try:
             # Only validate JSON responses
-            if (
-                hasattr(response, "body")
-                and response.media_type == "application/json"
-            ):
+            if hasattr(response, "body") and response.media_type == "application/json":
                 # Parse response body
                 response_data = json.loads(response.body.decode("utf-8"))
 
                 # Apply appropriate validation
                 if str(request.url.path).startswith("/v1/chat/completions"):
-                    validated_data = await response_validator.validate_chat_completion_response(
-                        response_data
+                    validated_data = (
+                        await response_validator.validate_chat_completion_response(
+                            response_data
+                        )
                     )
                 elif str(request.url.path).startswith("/v1/completions"):
-                    validated_data = await response_validator.validate_text_completion_response(
-                        response_data
+                    validated_data = (
+                        await response_validator.validate_text_completion_response(
+                            response_data
+                        )
                     )
                 elif str(request.url.path).startswith("/v1/embeddings"):
                     validated_data = (
@@ -245,17 +231,15 @@ class ValidationMiddleware:
                             response_data
                         )
                     )
-                elif str(request.url.path).startswith(
-                    "/v1/images/generations"
-                ):
-                    validated_data = await response_validator.validate_image_generation_response(
-                        response_data
-                    )
-                else:
+                elif str(request.url.path).startswith("/v1/images/generations"):
                     validated_data = (
-                        await response_validator.validate_generic_response(
+                        await response_validator.validate_image_generation_response(
                             response_data
                         )
+                    )
+                else:
+                    validated_data = await response_validator.validate_generic_response(
+                        response_data
                     )
 
                 # Create new response with validated data
@@ -290,9 +274,7 @@ class SecurityMiddleware:
         url_path = str(request.url.path)
         for pattern in self.suspicious_patterns:
             if re.search(pattern, url_path, re.IGNORECASE):
-                logger.warning(
-                    f"Suspicious pattern detected in URL: {pattern}"
-                )
+                logger.warning(f"Suspicious pattern detected in URL: {pattern}")
                 # Could add additional security measures here
 
         # Basic rate limiting check (simplified)

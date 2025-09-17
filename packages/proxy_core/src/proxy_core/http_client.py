@@ -5,7 +5,7 @@ High-performance HTTP client with connection pooling, retries, and monitoring.
 
 import asyncio
 import time
-from typing import Dict, Any, Optional, Union, Callable
+from typing import Dict, Any, Optional
 import httpx
 from contextlib import asynccontextmanager
 import logging
@@ -254,9 +254,7 @@ class OptimizedHTTPClient:
             "errors_total": self.error_count,
             "avg_response_time_ms": round(avg_response_time * 1000, 2),
             "error_rate": (
-                self.error_count / self.request_count
-                if self.request_count > 0
-                else 0
+                self.error_count / self.request_count if self.request_count > 0 else 0
             ),
             "max_connections": self.max_connections,
             "active_connections": (

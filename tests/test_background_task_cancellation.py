@@ -223,18 +223,14 @@ class TestParallelFallbackCancellation:
     async def test_execution_cancellation(self, engine):
         """Test that parallel execution properly cancels tasks"""
         # Mock provider discovery
-        with patch(
-            "src.core.parallel_fallback.provider_discovery"
-        ) as mock_discovery:
+        with patch("src.core.parallel_fallback.provider_discovery") as mock_discovery:
             mock_discovery.get_healthy_providers_for_model.return_value = [
                 "provider1",
                 "provider2",
             ]
 
             # Mock provider factory
-            with patch(
-                "src.core.parallel_fallback.provider_factory"
-            ) as mock_factory:
+            with patch("src.core.parallel_fallback.provider_factory") as mock_factory:
                 mock_provider = AsyncMock()
                 mock_provider.create_completion = AsyncMock(
                     side_effect=asyncio.sleep(10)
@@ -243,9 +239,7 @@ class TestParallelFallbackCancellation:
 
                 # Start execution
                 execution_task = asyncio.create_task(
-                    engine.execute_parallel(
-                        "test-model", {"messages": []}, timeout=0.1
-                    )
+                    engine.execute_parallel("test-model", {"messages": []}, timeout=0.1)
                 )
 
                 # Wait for timeout

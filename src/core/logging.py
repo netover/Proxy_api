@@ -87,9 +87,7 @@ class StructuredLogger:
             name: The name of the span (e.g., "proxy_request").
             attributes: A dictionary of attributes to add to the span.
         """
-        with self.tracer.start_as_current_span(
-            name, attributes=attributes
-        ) as span:
+        with self.tracer.start_as_current_span(name, attributes=attributes) as span:
             span_context = span.get_span_context()
             context = {
                 "trace_id": f"0x{span_context.trace_id:032x}",

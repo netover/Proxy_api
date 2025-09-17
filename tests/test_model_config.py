@@ -4,20 +4,17 @@ import tempfile
 import os
 from pathlib import Path
 from datetime import datetime
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock
 
 # Import the modules to test
 from src.core.model_config import (
     ModelSelection,
     ModelConfigManager,
-    model_config_manager,
 )
 from src.services.model_config_service import (
     ModelConfigService,
-    model_config_service,
 )
-from src.core.unified_config import config_manager
-from src.core.exceptions import ValidationError, ConfigurationError
+from src.core.exceptions import ValidationError
 
 
 class TestModelSelection:
@@ -69,9 +66,7 @@ class TestModelConfigManager:
     def test_initialization(self):
         """Test manager initialization"""
         assert self.manager.config_dir.exists()
-        assert (
-            self.manager.config_file.exists() is False
-        )  # Should not exist initially
+        assert self.manager.config_file.exists() is False  # Should not exist initially
 
     def test_set_and_get_model_selection(self):
         """Test setting and getting model selections"""
@@ -250,9 +245,7 @@ class TestModelConfigService:
         self.mock_config.providers = [self.mock_provider]
         self.mock_config_manager = MagicMock()
         self.mock_config_manager.load_config.return_value = self.mock_config
-        self.mock_config_manager.get_provider_by_name.return_value = (
-            self.mock_provider
-        )
+        self.mock_config_manager.get_provider_by_name.return_value = self.mock_provider
         self.mock_config_manager.get_available_models.return_value = [
             "model1",
             "model2",
@@ -370,9 +363,7 @@ class TestModelConfigService:
 
     def test_validate_model_selection(self):
         """Test model selection validation"""
-        result = self.service.validate_model_selection(
-            "test_provider", "model1"
-        )
+        result = self.service.validate_model_selection("test_provider", "model1")
 
         assert result["valid"] is True
         assert result["provider_exists"] is True
@@ -381,9 +372,7 @@ class TestModelConfigService:
 
     def test_validate_invalid_model_selection(self):
         """Test validation of invalid model selection"""
-        result = self.service.validate_model_selection(
-            "test_provider", "invalid_model"
-        )
+        result = self.service.validate_model_selection("test_provider", "invalid_model")
 
         assert result["valid"] is False
         assert result["provider_exists"] is True
@@ -404,10 +393,8 @@ class TestModelConfigService:
     def test_bulk_set_with_invalid_selections(self):
         """Test bulk setting with some invalid selections"""
         # Mock the config manager to return None for invalid provider
-        self.mock_config_manager.get_provider_by_name.side_effect = (
-            lambda name: (
-                self.mock_provider if name == "test_provider" else None
-            )
+        self.mock_config_manager.get_provider_by_name.side_effect = lambda name: (
+            self.mock_provider if name == "test_provider" else None
         )
 
         selections = {"test_provider": "model1", "invalid_provider": "model1"}
@@ -524,9 +511,7 @@ providers:
     def test_end_to_end_model_selection(self):
         """Test complete end-to-end model selection workflow"""
         # Set model selections using the actual provider names from config
-        result1 = self.service.set_model_selection(
-            self.openai_provider, "gpt-4"
-        )
+        result1 = self.service.set_model_selection(self.openai_provider, "gpt-4")
         assert result1["success"] is True
 
         result2 = self.service.set_model_selection(
@@ -537,10 +522,7 @@ providers:
         # Verify selections
         selections = self.service.get_all_model_selections()
         assert selections[self.openai_provider]["model_name"] == "gpt-4"
-        assert (
-            selections[self.anthropic_provider]["model_name"]
-            == "claude-3-sonnet"
-        )
+        assert selections[self.anthropic_provider]["model_name"] == "claude-3-sonnet"
 
         # Test persistence
         new_service = ModelConfigService()
@@ -548,9 +530,7 @@ providers:
         new_service._model_manager = ModelConfigManager(self.config_dir)
 
         persisted_selections = new_service.get_all_model_selections()
-        assert (
-            persisted_selections[self.openai_provider]["model_name"] == "gpt-4"
-        )
+        assert persisted_selections[self.openai_provider]["model_name"] == "gpt-4"
         assert (
             persisted_selections[self.anthropic_provider]["model_name"]
             == "claude-3-sonnet"

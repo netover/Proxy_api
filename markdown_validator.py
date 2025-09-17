@@ -1368,7 +1368,7 @@ def main():
                 )
 
         severity = patterns.get("severity_distribution", {})
-        print(f"\n[*] Severity Distribution:")
+        print("\n[*] Severity Distribution:")
         print(f"  - Errors: {severity.get('error', 0)}")
         print(f"  - Warnings: {severity.get('warning', 0)}")
         print(f"  - Info: {severity.get('info', 0)}")

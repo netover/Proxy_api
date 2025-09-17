@@ -62,32 +62,22 @@ class DynamicPerplexityProvider(DynamicProvider):
             self.logger.error(f"{request_type} failed: {e}")
             raise
 
-    async def create_completion(
-        self, request: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def create_completion(self, request: Dict[str, Any]) -> Dict[str, Any]:
         """Create a chat completion using Perplexity's API."""
         return await self._make_request(request, "Chat completion")
 
-    async def create_text_completion(
-        self, request: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def create_text_completion(self, request: Dict[str, Any]) -> Dict[str, Any]:
         """Create a text completion using Perplexity's API by adapting the request."""
         # Adapt the text completion request to a chat completion format
         chat_request = {
             "model": request.get("model"),
-            "messages": [
-                {"role": "user", "content": request.get("prompt", "")}
-            ],
+            "messages": [{"role": "user", "content": request.get("prompt", "")}],
             "max_tokens": request.get("max_tokens", 1024),
             "temperature": request.get("temperature", 0.7),
         }
         # Perplexity API is OpenAI-compatible, so the response is also compatible
         return await self.create_completion(chat_request)
 
-    async def create_embeddings(
-        self, request: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def create_embeddings(self, request: Dict[str, Any]) -> Dict[str, Any]:
         """Create embeddings using Perplexity's API (not supported)."""
-        raise NotImplementedError(
-            "Perplexity provider does not support embeddings"
-        )
+        raise NotImplementedError("Perplexity provider does not support embeddings")

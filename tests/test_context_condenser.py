@@ -1,16 +1,12 @@
 import pytest
 import asyncio
 import time
-import json
 import os
 import hashlib
-from unittest.mock import Mock, AsyncMock, patch, MagicMock
-from pathlib import Path
+from unittest.mock import Mock, AsyncMock, patch
 from src.utils.context_condenser import condense_context, AsyncLRUCache
 from src.core.unified_config import (
     CondensationSettings,
-    ProviderConfig,
-    ProviderType,
 )
 from src.core.provider_factory import BaseProvider
 
@@ -66,9 +62,7 @@ async def test_cache_hit(mock_request, mock_provider):
     mock_request.app.state.lru_cache = AsyncLRUCache(maxsize=1)
     chunks = ["test chunk"]
     hash_key = hashlib.md5("".join(chunks).encode()).hexdigest()
-    mock_request.app.state.lru_cache.set(
-        hash_key, ("cached summary", time.time())
-    )
+    mock_request.app.state.lru_cache.set(hash_key, ("cached summary", time.time()))
     mock_request.app.state.condensation_config.cache_ttl = 3600
     with patch(
         "src.utils.context_condenser.provider_factory.create_provider",
@@ -118,17 +112,13 @@ async def test_adaptive_limit_disabled(mock_request, mock_provider):
         return_value=AsyncMock(return_value=mock_provider),
     ):
         summary = await condense_context(mock_request, chunks, max_tokens=1000)
-    assert (
-        mock_provider.create_completion.call_args[0][0]["max_tokens"] == 1000
-    )
+    assert mock_provider.create_completion.call_args[0][0]["max_tokens"] == 1000
 
 
 @pytest.mark.asyncio
 async def test_fallback_truncate(mock_request, mock_provider):
     mock_request.app.state.condensation_config.error_keywords = ["timeout"]
-    mock_request.app.state.condensation_config.fallback_strategies = [
-        "truncate"
-    ]
+    mock_request.app.state.condensation_config.fallback_strategies = ["truncate"]
     chunks = ["full content" * 10]
     mock_provider.create_completion.side_effect = [
         Exception("timeout"),
@@ -142,9 +132,7 @@ async def test_fallback_truncate(mock_request, mock_provider):
     assert "truncated summary" == summary
     # Check truncate applied
     call_args = mock_provider.create_completion.call_args_list[1][0][0]
-    assert len(call_args["messages"][1]["content"]) < len(
-        "full content" * 10 * 2
-    )
+    assert len(call_args["messages"][1]["content"]) < len("full content" * 10 * 2)
 
 
 @pytest.mark.asyncio
@@ -173,9 +161,7 @@ async def test_fallback_secondary_provider(
 
 
 @pytest.mark.asyncio
-async def test_parallelism_success(
-    mock_request, mock_provider1, mock_provider2
-):
+async def test_parallelism_success(mock_request, mock_provider1, mock_provider2):
     mock_request.app.state.condensation_config.parallel_providers = 2
     mock_request.app.state.config.providers = [
         Mock(priority=1, models=["model1"], timeout=10),
@@ -183,9 +169,7 @@ async def test_parallelism_success(
     ]
     chunks = ["test"]
     mock_provider1.create_completion = AsyncMock(
-        return_value={
-            "choices": [{"message": {"content": "parallel summary"}}]
-        }
+        return_value={"choices": [{"message": {"content": "parallel summary"}}]}
     )
     mock_provider2.create_completion = AsyncMock(
         return_value={"choices": [{"message": {"content": "other"}}]}
@@ -206,13 +190,9 @@ async def test_dynamic_reload(mock_request):
         config_manager, "_last_modified", 50
     ), patch(
         "src.utils.context_condenser.config_manager.load_config",
-        return_value=Mock(
-            settings=Mock(condensation=Mock(parallel_providers=2))
-        ),
+        return_value=Mock(settings=Mock(condensation=Mock(parallel_providers=2))),
     ):
-        summary = await condense_context(
-            mock_request, ["test"], max_tokens=512
-        )
+        summary = await condense_context(mock_request, ["test"], max_tokens=512)
     # Check reload was triggered and config updated
     assert mock_request.app.state.condensation_config.parallel_providers == 2
 
@@ -235,13 +215,11 @@ async def test_proactive_truncation(mock_request, mock_provider):
         "src.utils.context_condenser.get_provider",
         return_value=AsyncMock(return_value=mock_provider),
     ):
-        summary = await condense_context(
-            mock_request, long_chunks, max_tokens=512
-        )
+        summary = await condense_context(mock_request, long_chunks, max_tokens=512)
     # Verify truncation applied by checking content length in call
-    call_content = mock_provider.create_completion.call_args[0][0]["messages"][
-        1
-    ]["content"]
+    call_content = mock_provider.create_completion.call_args[0][0]["messages"][1][
+        "content"
+    ]
     assert len(call_content) <= 100  # Truncated
     assert summary == "test summary"
 
@@ -251,16 +229,14 @@ async def test_background_non_blocking(mock_request):
     """Test proactive long context detection and background task addition (simulating route)"""
     from fastapi import BackgroundTasks
 
-    mock_bg_tasks = Mock()
+    Mock()
     mock_request.app.state.condensation_config.truncation_threshold = 100
     long_messages = [{"content": "long" * 50}] * 3  # Total > 100
     req = {"messages": long_messages}
     with patch("uuid.uuid4", return_value="test-request-id"), patch(
         "src.utils.context_condenser.condense_context",
         new_callable=AsyncMock(return_value="summary"),
-    ), patch.object(
-        BackgroundTasks, "add_task", return_value=None
-    ) as mock_add_task:
+    ), patch.object(BackgroundTasks, "add_task", return_value=None) as mock_add_task:
         # Simulate route call
         from main import background_condense
 
@@ -277,9 +253,7 @@ async def test_regex_error_detection(mock_request, mock_provider):
         "context.*exceeded",
         "token.*limit",
     ]
-    mock_request.app.state.condensation_config.fallback_strategies = [
-        "truncate"
-    ]
+    mock_request.app.state.condensation_config.fallback_strategies = ["truncate"]
     chunks = ["test"]
     error_msg = "The context length exceeded the maximum allowed tokens"
     mock_provider.create_completion.side_effect = Exception(error_msg)
@@ -293,9 +267,7 @@ async def test_regex_error_detection(mock_request, mock_provider):
         with pytest.raises(ValueError):  # Expect fallback but test detection
             await condense_context(mock_request, chunks, max_tokens=512)
     # Verify regex matched and fallback applied
-    assert "fallback summary" in str(
-        mock_provider.create_completion.call_args_list[-1]
-    )
+    assert "fallback summary" in str(mock_provider.create_completion.call_args_list[-1])
 
 
 @pytest.mark.asyncio
@@ -321,9 +293,7 @@ async def test_background_offload_simulation(mock_request, mock_provider):
 
 
 @pytest.mark.asyncio
-async def test_multi_provider_retrial(
-    mock_request, mock_provider1, mock_provider2
-):
+async def test_multi_provider_retrial(mock_request, mock_provider1, mock_provider2):
     """Test multi-provider fallback on error"""
     mock_request.app.state.config.providers = [
         Mock(priority=1, models=["model"], name="prov1"),
@@ -335,9 +305,7 @@ async def test_multi_provider_retrial(
     ]
     mock_request.app.state.condensation_config.parallel_providers = 1
     chunks = ["test"]
-    mock_provider1.create_completion.side_effect = Exception(
-        "Rate limit exceeded"
-    )
+    mock_provider1.create_completion.side_effect = Exception("Rate limit exceeded")
     mock_provider2.create_completion.return_value = {
         "choices": [{"message": {"content": "retrial summary"}}]
     }
@@ -359,9 +327,7 @@ async def test_varied_provider_errors(mock_request, mock_provider):
     ]
     for error_msg, pattern in error_cases:
         mock_request.app.state.condensation_config.error_patterns = [pattern]
-        mock_request.app.state.condensation_config.fallback_strategies = [
-            "truncate"
-        ]
+        mock_request.app.state.condensation_config.fallback_strategies = ["truncate"]
         mock_provider.create_completion.side_effect = [
             Exception(error_msg),
             {"choices": [{"message": {"content": f"handled {pattern}"}}]},
@@ -370,9 +336,7 @@ async def test_varied_provider_errors(mock_request, mock_provider):
             "src.utils.context_condenser.get_provider",
             return_value=AsyncMock(return_value=mock_provider),
         ):
-            summary = await condense_context(
-                mock_request, ["chunk"], max_tokens=512
-            )
+            summary = await condense_context(mock_request, ["chunk"], max_tokens=512)
             assert f"handled {pattern}" in summary
 
 
@@ -380,9 +344,7 @@ async def test_varied_provider_errors(mock_request, mock_provider):
 async def test_timeout_error_fallback(mock_request, mock_provider):
     """Test fallback on timeout error"""
     mock_request.app.state.condensation_config.error_patterns = ["timeout"]
-    mock_request.app.state.condensation_config.fallback_strategies = [
-        "truncate"
-    ]
+    mock_request.app.state.condensation_config.fallback_strategies = ["truncate"]
     chunks = ["test chunk"]
     mock_provider.create_completion.side_effect = asyncio.TimeoutError(
         "Request timed out"
@@ -410,13 +372,9 @@ async def test_rate_limit_error_fallback(mock_request, mock_provider):
         Mock(priority=2, models=["model"], name="prov2"),
     ]
     chunks = ["test"]
-    mock_provider.create_completion.side_effect = RateLimitError(
-        "Rate limit exceeded"
-    )
+    mock_provider.create_completion.side_effect = RateLimitError("Rate limit exceeded")
     mock_provider2 = AsyncMock(
-        return_value={
-            "choices": [{"message": {"content": "rate limit fallback"}}]
-        }
+        return_value={"choices": [{"message": {"content": "rate limit fallback"}}]}
     )
     with patch(
         "src.utils.context_condenser.get_provider",
@@ -441,13 +399,9 @@ async def test_provider_failure_fallback_sequential(mock_request):
     prov1 = AsyncMock()
     prov1.create_completion.side_effect = Exception("Provider failed")
     prov2 = AsyncMock(
-        return_value={
-            "choices": [{"message": {"content": "sequential fallback"}}]
-        }
+        return_value={"choices": [{"message": {"content": "sequential fallback"}}]}
     )
-    with patch(
-        "src.utils.context_condenser.get_provider", side_effect=[prov1, prov2]
-    ):
+    with patch("src.utils.context_condenser.get_provider", side_effect=[prov1, prov2]):
         summary = await condense_context(mock_request, chunks, max_tokens=512)
     assert "sequential fallback" == summary
 
@@ -462,9 +416,7 @@ async def test_provider_failure_fallback_parallel(mock_request):
     ]
     chunks = ["test"]
     prov1_success = AsyncMock(
-        return_value={
-            "choices": [{"message": {"content": "parallel success"}}]
-        }
+        return_value={"choices": [{"message": {"content": "parallel success"}}]}
     )
     prov2_fail = AsyncMock(side_effect=Exception("Failed"))
     with patch(
@@ -504,9 +456,7 @@ async def test_metric_recording_cache_hit(mock_request):
     mock_request.app.state.condensation_config.cache_ttl = 3600
     chunks = ["test"]
     await condense_context(mock_request, chunks, max_tokens=512)
-    assert (
-        metrics_collector.summarization_metrics.cache_hits == original_hits + 1
-    )
+    assert metrics_collector.summarization_metrics.cache_hits == original_hits + 1
 
 
 @pytest.mark.asyncio
@@ -523,14 +473,8 @@ async def test_metric_recording_cache_miss(mock_request, mock_provider):
         return_value=AsyncMock(return_value=mock_provider),
     ):
         await condense_context(mock_request, chunks, max_tokens=512)
-    assert (
-        metrics_collector.summarization_metrics.cache_misses
-        == original_misses + 1
-    )
-    assert (
-        metrics_collector.summarization_metrics.total_latency
-        > original_latency
-    )
+    assert metrics_collector.summarization_metrics.cache_misses == original_misses + 1
+    assert metrics_collector.summarization_metrics.total_latency > original_latency
 
 
 @pytest.mark.asyncio
@@ -554,13 +498,11 @@ async def test_exact_threshold_truncation(mock_request, mock_provider):
                 )
             ],
         ):
-            summary = await condense_context(
-                mock_request, chunks, max_tokens=512
-            )
+            summary = await condense_context(mock_request, chunks, max_tokens=512)
     # Should not truncate since == threshold
-    call_content = mock_provider.create_completion.call_args[0][0]["messages"][
-        1
-    ]["content"]
+    call_content = mock_provider.create_completion.call_args[0][0]["messages"][1][
+        "content"
+    ]
     assert len(call_content) == 53  # 50 + separators
     assert summary == "test summary"
 
@@ -569,12 +511,8 @@ async def test_exact_threshold_truncation(mock_request, mock_provider):
 async def test_multiple_truncation_levels(mock_request, mock_provider):
     """Test proactive truncation followed by fallback truncation"""
     mock_request.app.state.condensation_config.truncation_threshold = 100
-    mock_request.app.state.condensation_config.error_keywords = [
-        "context.*exceeded"
-    ]
-    mock_request.app.state.condensation_config.fallback_strategies = [
-        "truncate"
-    ]
+    mock_request.app.state.condensation_config.error_keywords = ["context.*exceeded"]
+    mock_request.app.state.condensation_config.fallback_strategies = ["truncate"]
     long_content = "x" * 200  # > threshold
     chunks = [long_content]
     # First call fails with error, second succeeds after truncation
@@ -598,17 +536,13 @@ async def test_multiple_truncation_levels(mock_request, mock_provider):
                 )
             ],
         ):
-            summary = await condense_context(
-                mock_request, chunks, max_tokens=512
-            )
+            summary = await condense_context(mock_request, chunks, max_tokens=512)
     assert summary == "fallback summary"
     # Check that content was truncated twice: proactive then fallback
     calls = mock_provider.create_completion.call_args_list
     first_call_content = calls[0][0][0]["messages"][1]["content"]
     second_call_content = calls[1][0][0]["messages"][1]["content"]
-    assert (
-        len(first_call_content) <= 50
-    )  # Proactive truncation to half of threshold
+    assert len(first_call_content) <= 50  # Proactive truncation to half of threshold
     assert (
         len(second_call_content) <= len(first_call_content) // 2
     )  # Fallback truncation
@@ -642,9 +576,9 @@ async def test_truncation_with_unicode(mock_request, mock_provider):
             summary = await condense_context(
                 mock_request, unicode_chunks, max_tokens=512
             )
-    call_content = mock_provider.create_completion.call_args[0][0]["messages"][
-        1
-    ]["content"]
+    call_content = mock_provider.create_completion.call_args[0][0]["messages"][1][
+        "content"
+    ]
     # Should handle unicode properly, truncated if needed
     assert isinstance(call_content, str)
     assert summary == "test summary"
@@ -670,9 +604,7 @@ async def test_empty_chunks_list(mock_request, mock_provider):
                 )
             ],
         ):
-            summary = await condense_context(
-                mock_request, chunks, max_tokens=512
-            )
+            summary = await condense_context(mock_request, chunks, max_tokens=512)
     # Should handle empty input gracefully
     assert summary == "test summary"
 
@@ -699,12 +631,10 @@ async def test_very_large_single_chunk(mock_request, mock_provider):
                 )
             ],
         ):
-            summary = await condense_context(
-                mock_request, chunks, max_tokens=512
-            )
-    call_content = mock_provider.create_completion.call_args[0][0]["messages"][
-        1
-    ]["content"]
+            summary = await condense_context(mock_request, chunks, max_tokens=512)
+    call_content = mock_provider.create_completion.call_args[0][0]["messages"][1][
+        "content"
+    ]
     # Should be truncated to threshold
     assert len(call_content) <= 1000
     assert summary == "test summary"
@@ -738,14 +668,12 @@ async def test_unicode_special_characters(mock_request, mock_provider):
                 )
             ],
         ):
-            summary = await condense_context(
-                mock_request, chunks, max_tokens=512
-            )
+            summary = await condense_context(mock_request, chunks, max_tokens=512)
     assert summary == "test summary"
     # Verify content is properly joined and handled
-    call_content = mock_provider.create_completion.call_args[0][0]["messages"][
-        1
-    ]["content"]
+    call_content = mock_provider.create_completion.call_args[0][0]["messages"][1][
+        "content"
+    ]
     assert "Normal text" in call_content
     assert "🚀" in call_content
 
@@ -771,9 +699,7 @@ async def test_invalid_max_tokens(mock_request, mock_provider):
                 )
             ],
         ):
-            summary = await condense_context(
-                mock_request, chunks, max_tokens=0
-            )
+            summary = await condense_context(mock_request, chunks, max_tokens=0)
     assert summary == "test summary"
     # Test negative
     with patch(
@@ -792,9 +718,7 @@ async def test_invalid_max_tokens(mock_request, mock_provider):
                 )
             ],
         ):
-            summary = await condense_context(
-                mock_request, chunks, max_tokens=-10
-            )
+            summary = await condense_context(mock_request, chunks, max_tokens=-10)
     assert summary == "test summary"
 
 
@@ -839,9 +763,7 @@ async def test_all_providers_fail_parallel(mock_request):
 
 
 @pytest.mark.asyncio
-async def test_cache_persistence_file_error(
-    mock_request, mock_provider, tmp_path
-):
+async def test_cache_persistence_file_error(mock_request, mock_provider, tmp_path):
     """Test cache persistence file write error"""
     persist_file = tmp_path / "test_cache.json"
     # Make file read-only to simulate write error
@@ -866,9 +788,7 @@ async def test_cache_persistence_file_error(
                 )
             ],
         ):
-            summary = await condense_context(
-                mock_request, chunks, max_tokens=512
-            )
+            summary = await condense_context(mock_request, chunks, max_tokens=512)
     # Should still work despite save error
     assert summary == "test summary"
 
@@ -993,9 +913,7 @@ async def test_parallel_timeout(mock_request):
     ]
     chunks = ["test"]
     slow_provider = AsyncMock()
-    slow_provider.create_completion = AsyncMock(
-        side_effect=asyncio.TimeoutError
-    )
+    slow_provider.create_completion = AsyncMock(side_effect=asyncio.TimeoutError)
     fast_provider = AsyncMock()
     fast_provider.create_completion.return_value = {
         "choices": [{"message": {"content": "fast summary"}}]
@@ -1010,9 +928,7 @@ async def test_parallel_timeout(mock_request):
                 tasks, return_when=asyncio.FIRST_COMPLETED
             ),
         ):
-            summary = await condense_context(
-                mock_request, chunks, max_tokens=512
-            )
+            summary = await condense_context(mock_request, chunks, max_tokens=512)
     assert summary == "fast summary"
 
 

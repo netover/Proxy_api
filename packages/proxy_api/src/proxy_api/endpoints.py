@@ -1,7 +1,6 @@
 """API endpoints for the proxy service."""
 
-from fastapi import APIRouter, HTTPException, Request
-from typing import Dict, Any, List
+from fastapi import APIRouter, HTTPException
 import time
 
 from proxy_core import ProviderFactory
@@ -65,9 +64,7 @@ async def list_models() -> ModelsResponse:
     try:
         # Return mock data for now
         models = [
-            ModelInfo(
-                id="gpt-3.5-turbo", created=int(time.time()), owned_by="openai"
-            ),
+            ModelInfo(id="gpt-3.5-turbo", created=int(time.time()), owned_by="openai"),
             ModelInfo(id="gpt-4", created=int(time.time()), owned_by="openai"),
             ModelInfo(
                 id="claude-3-sonnet",

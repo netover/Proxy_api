@@ -3,8 +3,7 @@ Wrappers e Transformers para compatibilidade OpenAI.
 Converte payloads de providers não-OpenAI para formato padrão.
 """
 
-from typing import Dict, Any, List, Callable
-import httpx
+from typing import Dict, List, Callable
 from src.core.logging import logger
 
 # A classe base do cliente OpenAI é frequentemente usada para tipagem e compatibilidade.
@@ -13,9 +12,7 @@ try:
     from openai import AsyncOpenAI
     from openai.types.chat import ChatCompletion
 except ImportError:
-    logger.warning(
-        "openai library not found. Using mock classes for type hinting."
-    )
+    logger.warning("openai library not found. Using mock classes for type hinting.")
     AsyncOpenAI = object
     ChatCompletion = object
 
@@ -49,17 +46,13 @@ class GenericOpenAIWrapper:
         transformed_payload = self.transformer(payload)
 
         try:
-            response: ChatCompletion = (
-                await self.client.chat.completions.create(
-                    **transformed_payload
-                )
+            response: ChatCompletion = await self.client.chat.completions.create(
+                **transformed_payload
             )
             # Retorna o dicionário para consistência com o formato JSON da API
             return response.model_dump()
         except Exception as e:
-            logger.error(
-                f"Erro no wrapper genérico para {self.client.base_url}: {e}"
-            )
+            logger.error(f"Erro no wrapper genérico para {self.client.base_url}: {e}")
             raise
 
     async def embeddings(self, model: str, input: List[str], **kwargs) -> Dict:
@@ -68,9 +61,7 @@ class GenericOpenAIWrapper:
         transformed_payload = self.transformer(payload)
 
         try:
-            response = await self.client.embeddings.create(
-                **transformed_payload
-            )
+            response = await self.client.embeddings.create(**transformed_payload)
             return response.model_dump()
         except Exception as e:
             logger.error(
@@ -117,9 +108,7 @@ class GoogleTransformer:
         for msg in payload.get("messages", []):
             # O role 'assistant' do OpenAI mapeia para 'model' no Gemini
             role = "user" if msg["role"] == "user" else "model"
-            contents.append(
-                {"role": role, "parts": [{"text": msg["content"]}]}
-            )
+            contents.append({"role": role, "parts": [{"text": msg["content"]}]})
 
         payload["contents"] = contents
 

@@ -101,16 +101,12 @@ class OpenTelemetryConfig:
             # Report sampling rate to Prometheus if exporter is available
             if self.prometheus_exporter:
                 sampling_rate = self._get_sampling_rate()
-                self.prometheus_exporter.set_telemetry_sampling_rate(
-                    sampling_rate
-                )
+                self.prometheus_exporter.set_telemetry_sampling_rate(sampling_rate)
 
             return True
 
         except Exception as e:
-            logging.getLogger(__name__).error(
-                f"Failed to configure OpenTelemetry: {e}"
-            )
+            logging.getLogger(__name__).error(f"Failed to configure OpenTelemetry: {e}")
             return False
 
     def get_tracer(self, name: str) -> Optional[Any]:

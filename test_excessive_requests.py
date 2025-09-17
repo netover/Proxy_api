@@ -108,7 +108,7 @@ class RateLimitTester:
             rate_limited_percentage = (
                 self.stats["rate_limited"] / total_requests
             ) * 100
-            print(".1f")
+            print(".1")
             print(
                 f"Success Rate: {(self.stats['success'] / total_requests) * 100:.1f}%"
             )

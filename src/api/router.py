@@ -27,6 +27,7 @@ from .errors.error_handlers import (
 )
 from .validation.middleware import middleware_pipeline
 from src.core.provider_factory import provider_factory
+from src.core.auth import verify_api_key
 from src.core.circuit_breaker import get_circuit_breaker
 from src.core.logging import StructuredLogger
 
@@ -39,13 +40,16 @@ main_router = APIRouter(prefix="/v1")
 
 
 @main_router.get("/models", tags=["models"])
-async def list_models():
+@rate_limiter.limit(route="/v1/models")
+async def list_models(request: Request):
     """OpenAI-compatible /v1/models endpoint to list all 100+ models from the registry."""
     return {"object": "list", "data": await provider_factory.list_all_models()}
 
 
+from fastapi import Depends
+
 @main_router.post("/chat/completions", tags=["chat"])
-async def chat_completions(request: Request):
+async def chat_completions(request: Request, auth_result: bool = Depends(verify_api_key)):
     """
     Main dynamic routing endpoint for chat completions.
     Routes requests to the appropriate provider based on the 'model' field.
@@ -53,17 +57,11 @@ async def chat_completions(request: Request):
     body = await request.json()
     model_name = body.get("model")
     if not model_name:
-        raise HTTPException(
-            status_code=400, detail="'model' field is required."
-        )
+        raise HTTPException(status_code=400, detail="'model' field is required.")
 
-    with logger.span(
-        "dynamic_chat_completions", attributes={"model": model_name}
-    ):
+    with logger.span("dynamic_chat_completions", attributes={"model": model_name}):
         try:
-            client, config = await provider_factory.get_provider_client(
-                model_name
-            )
+            client, config = await provider_factory.get_provider_client(model_name)
             breaker = get_circuit_breaker(config.provider)
 
             # Use the circuit breaker to make the call
@@ -71,11 +69,7 @@ async def chat_completions(request: Request):
                 client.chat_completions,
                 model=model_name,
                 messages=body.get("messages", []),
-                **{
-                    k: v
-                    for k, v in body.items()
-                    if k not in ["model", "messages"]
-                },
+                **{k: v for k, v in body.items() if k not in ["model", "messages"]},
             )
 
             # Log spend if pricing info is available
@@ -86,9 +80,7 @@ async def chat_completions(request: Request):
                 cost = (input_tokens * pricing["input"] / 1000) + (
                     output_tokens * pricing["output"] / 1000
                 )
-                logger.info(
-                    f"Request cost estimated: ${cost:.6f}", model=model_name
-                )
+                logger.info(f"Request cost estimated: ${cost:.6f}", model=model_name)
 
             return response
 
@@ -107,31 +99,23 @@ async def chat_completions(request: Request):
 
 
 @main_router.post("/embeddings", tags=["embeddings"])
-async def embeddings(request: Request):
+async def embeddings(request: Request, auth_result: bool = Depends(verify_api_key)):
     """Dynamic routing endpoint for embeddings."""
     body = await request.json()
     model_name = body.get("model")
     if not model_name:
-        raise HTTPException(
-            status_code=400, detail="'model' field is required."
-        )
+        raise HTTPException(status_code=400, detail="'model' field is required.")
 
     with logger.span("dynamic_embeddings", attributes={"model": model_name}):
         try:
-            client, config = await provider_factory.get_provider_client(
-                model_name
-            )
+            client, config = await provider_factory.get_provider_client(model_name)
             breaker = get_circuit_breaker(config.provider)
 
             response = await breaker.call(
                 client.embeddings,
                 model=model_name,
                 input=body.get("input", []),
-                **{
-                    k: v
-                    for k, v in body.items()
-                    if k not in ["model", "input"]
-                },
+                **{k: v for k, v in body.items() if k not in ["model", "input"]},
             )
             return response
         except ProviderNotFoundError as e:
@@ -139,9 +123,7 @@ async def embeddings(request: Request):
         except ProviderUnavailableError as e:
             raise HTTPException(status_code=503, detail=str(e))
         except Exception as e:
-            logger.error(
-                "An unexpected error occurred during embeddings", error=str(e)
-            )
+            logger.error("An unexpected error occurred during embeddings", error=str(e))
             raise HTTPException(
                 status_code=500, detail="An internal server error occurred."
             )
@@ -179,9 +161,7 @@ def setup_exception_handlers(app):
 
     # Register exception handlers
     app.add_exception_handler(Exception, global_exception_handler)
-    app.add_exception_handler(
-        RequestValidationError, validation_exception_handler
-    )
+    app.add_exception_handler(RequestValidationError, validation_exception_handler)
     app.add_exception_handler(APIException, global_exception_handler)
 
     # Add additional handlers for common HTTP exceptions
@@ -233,9 +213,7 @@ async def root_info():
 async def monitoring_dashboard():
     """Serve the monitoring dashboard."""
     try:
-        with open(
-            "templates/monitoring_dashboard.html", "r", encoding="utf-8"
-        ) as f:
+        with open("templates/monitoring_dashboard.html", "r", encoding="utf-8") as f:
             content = f.read()
         return HTMLResponse(content=content, status_code=200)
     except FileNotFoundError:
@@ -246,9 +224,7 @@ async def monitoring_dashboard():
     except Exception as e:
         return JSONResponse(
             status_code=500,
-            content={
-                "error": f"Failed to load monitoring dashboard: {str(e)}"
-            },
+            content={"error": f"Failed to load monitoring dashboard: {str(e)}"},
         )
 
 
@@ -282,9 +258,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         start_time = time.time()
 
         # Log request
-        print(
-            f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] {request.method} {request.url}"
-        )
+        print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] {request.method} {request.url}")
 
         response = await call_next(request)
 
@@ -313,9 +287,7 @@ class CORSMiddleware(BaseHTTPMiddleware):
         response = await call_next(request)
 
         # Add CORS headers
-        response.headers["Access-Control-Allow-Origin"] = ", ".join(
-            self.allow_origins
-        )
+        response.headers["Access-Control-Allow-Origin"] = ", ".join(self.allow_origins)
         response.headers["Access-Control-Allow-Methods"] = (
             "GET, POST, PUT, DELETE, OPTIONS"
         )

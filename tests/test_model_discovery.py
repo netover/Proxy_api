@@ -1,8 +1,6 @@
 """Unit tests for model discovery functionality."""
 
 import pytest
-import asyncio
-from datetime import datetime
 from unittest.mock import AsyncMock, patch
 import aiohttp
 
@@ -52,9 +50,7 @@ class TestModelInfo:
 
         # Empty id
         with pytest.raises(ValueError, match="id cannot be empty"):
-            ModelInfo(
-                id="", created=1234567890, owned_by="test", permissions=[]
-            )
+            ModelInfo(id="", created=1234567890, owned_by="test", permissions=[])
 
         # Invalid timestamp
         with pytest.raises(
@@ -99,9 +95,7 @@ class TestModelInfo:
     def test_created_datetime_property(self):
         """Test the created_datetime property."""
         timestamp = 1234567890
-        model = ModelInfo(
-            id="test", created=timestamp, owned_by="test", permissions=[]
-        )
+        model = ModelInfo(id="test", created=timestamp, owned_by="test", permissions=[])
 
         dt = model.created_datetime
         assert dt.timestamp() == timestamp
@@ -135,9 +129,7 @@ class TestProviderConfig:
             max_retries=5,
         )
 
-        assert (
-            config.base_url == "https://api.test.com"
-        )  # Trailing slash removed
+        assert config.base_url == "https://api.test.com"  # Trailing slash removed
         assert config.organization == "org-123"
         assert config.timeout == 60
         assert config.max_retries == 5
@@ -201,9 +193,7 @@ class TestModelDiscoveryService:
             assert models[0].owned_by == "openai"
 
     @pytest.mark.asyncio
-    async def test_discover_models_empty_response(
-        self, service, provider_config
-    ):
+    async def test_discover_models_empty_response(self, service, provider_config):
         """Test handling empty model list."""
         mock_response = {"object": "list", "data": []}
 
@@ -218,9 +208,7 @@ class TestModelDiscoveryService:
             assert len(models) == 0
 
     @pytest.mark.asyncio
-    async def test_discover_models_invalid_response(
-        self, service, provider_config
-    ):
+    async def test_discover_models_invalid_response(self, service, provider_config):
         """Test handling invalid response format."""
         mock_response = {"invalid": "format"}
 
@@ -230,9 +218,7 @@ class TestModelDiscoveryService:
             mock_response_obj.json = AsyncMock(return_value=mock_response)
             mock_get.return_value.__aenter__.return_value = mock_response_obj
 
-            with pytest.raises(
-                ValidationError, match="Invalid response format"
-            ):
+            with pytest.raises(ValidationError, match="Invalid response format"):
                 await service.discover_models(provider_config)
 
     @pytest.mark.asyncio
@@ -350,9 +336,7 @@ class TestModelDiscoveryService:
             assert is_valid is False
 
     @pytest.mark.asyncio
-    async def test_validate_model_provider_error(
-        self, service, provider_config
-    ):
+    async def test_validate_model_provider_error(self, service, provider_config):
         """Test validation when provider is unreachable."""
         with patch("aiohttp.ClientSession.get") as mock_get:
             mock_get.side_effect = aiohttp.ClientError("Connection failed")
@@ -410,9 +394,7 @@ class TestModelDiscoveryService:
             mock_response_obj.json = AsyncMock(return_value=mock_response)
             mock_get.return_value.__aenter__.return_value = mock_response_obj
 
-            model_info = await service.get_model_info(
-                provider_config, "non-existent"
-            )
+            model_info = await service.get_model_info(provider_config, "non-existent")
             assert model_info is None
 
     @pytest.mark.asyncio

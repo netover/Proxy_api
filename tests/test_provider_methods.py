@@ -5,13 +5,11 @@ This module tests all provider methods including create_completion, create_text_
 create_embeddings, and other methods with proper mocking and various error scenarios.
 """
 
-import asyncio
 import json
 import time
-from typing import Any, AsyncGenerator, Dict, List, Optional, Set, Union
-from unittest.mock import AsyncMock, patch, MagicMock, Mock
+from typing import Any, AsyncGenerator, Dict, Union
+from unittest.mock import AsyncMock, patch, Mock
 import pytest
-import pytest_asyncio
 import httpx
 
 from src.core.provider_factory import BaseProvider, ProviderCapability
@@ -22,7 +20,6 @@ from src.core.exceptions import (
     InvalidRequestError,
     RateLimitError,
 )
-from src.models.model_info import ModelInfo
 
 
 class MockProvider(BaseProvider):
@@ -44,9 +41,7 @@ class MockProvider(BaseProvider):
         """Mock create_text_completion implementation."""
         return await self._mock_create_text_completion(request)
 
-    async def create_embeddings(
-        self, request: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def create_embeddings(self, request: Dict[str, Any]) -> Dict[str, Any]:
         """Mock create_embeddings implementation."""
         return await self._mock_create_embeddings(request)
 
@@ -68,9 +63,7 @@ class MockProvider(BaseProvider):
         )
         return response.json()
 
-    async def _mock_create_embeddings(
-        self, request: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def _mock_create_embeddings(self, request: Dict[str, Any]) -> Dict[str, Any]:
         """Mock implementation that makes HTTP request."""
         response = await self.make_request(
             "POST", f"{self.config.base_url}/embeddings", json=request
@@ -127,9 +120,7 @@ class TestProviderMethods:
                     return provider
 
     @pytest.mark.asyncio
-    async def test_create_completion_success(
-        self, mock_provider, mock_http_client
-    ):
+    async def test_create_completion_success(self, mock_provider, mock_http_client):
         """Test successful create_completion with proper response."""
         # Setup
         request = {
@@ -171,8 +162,7 @@ class TestProviderMethods:
         assert result["id"] == "chatcmpl-123"
         assert result["model"] == "gpt-4"
         assert (
-            result["choices"][0]["message"]["content"]
-            == "Hello! How can I help you?"
+            result["choices"][0]["message"]["content"] == "Hello! How can I help you?"
         )
         assert result["usage"]["total_tokens"] == 30
 
@@ -204,9 +194,7 @@ class TestProviderMethods:
             "data: [DONE]\n\n",
         ]
 
-        mock_http_client.request.return_value.__aenter__.return_value = (
-            mock_response
-        )
+        mock_http_client.request.return_value.__aenter__.return_value = mock_response
         mock_http_client.request.return_value.__aexit__.return_value = None
 
         # Execute
@@ -234,7 +222,9 @@ class TestProviderMethods:
 
         mock_response = Mock()
         mock_response.status_code = 401
-        mock_response.text = '{"error": {"message": "Invalid API key", "type": "authentication_error"}}'
+        mock_response.text = (
+            '{"error": {"message": "Invalid API key", "type": "authentication_error"}}'
+        )
 
         mock_http_client.request.return_value = mock_response
 
@@ -256,7 +246,9 @@ class TestProviderMethods:
 
         mock_response = Mock()
         mock_response.status_code = 429
-        mock_response.text = '{"error": {"message": "Rate limit exceeded", "type": "rate_limit_error"}}'
+        mock_response.text = (
+            '{"error": {"message": "Rate limit exceeded", "type": "rate_limit_error"}}'
+        )
 
         mock_http_client.request.return_value = mock_response
 
@@ -278,7 +270,9 @@ class TestProviderMethods:
 
         mock_response = Mock()
         mock_response.status_code = 400
-        mock_response.text = '{"error": {"message": "Invalid model", "type": "invalid_request_error"}}'
+        mock_response.text = (
+            '{"error": {"message": "Invalid model", "type": "invalid_request_error"}}'
+        )
 
         mock_http_client.request.return_value = mock_response
 
@@ -299,9 +293,7 @@ class TestProviderMethods:
         }
 
         # Mock network error
-        mock_http_client.request.side_effect = httpx.ConnectError(
-            "Connection failed"
-        )
+        mock_http_client.request.side_effect = httpx.ConnectError("Connection failed")
 
         # Execute & Verify
         with pytest.raises(APIConnectionError) as exc_info:
@@ -320,9 +312,7 @@ class TestProviderMethods:
         }
 
         # Mock timeout error
-        mock_http_client.request.side_effect = httpx.TimeoutException(
-            "Request timeout"
-        )
+        mock_http_client.request.side_effect = httpx.TimeoutException("Request timeout")
 
         # Execute & Verify
         with pytest.raises(APIConnectionError) as exc_info:
@@ -345,9 +335,7 @@ class TestProviderMethods:
 
         mock_response = Mock()
         mock_response.status_code = 200
-        mock_response.json.side_effect = json.JSONDecodeError(
-            "Invalid JSON", "", 0
-        )
+        mock_response.json.side_effect = json.JSONDecodeError("Invalid JSON", "", 0)
 
         mock_http_client.request.return_value = mock_response
 
@@ -356,9 +344,7 @@ class TestProviderMethods:
             await mock_provider.create_completion(request)
 
     @pytest.mark.asyncio
-    async def test_create_completion_missing_required_params(
-        self, mock_provider
-    ):
+    async def test_create_completion_missing_required_params(self, mock_provider):
         """Test create_completion with missing required parameters."""
         # Missing messages
         request = {"model": "gpt-4"}
@@ -493,16 +479,11 @@ class TestTextCompletionMethods:
 
         # Verify
         assert result["id"] == "cmpl-123"
-        assert (
-            result["choices"][0]["text"]
-            == "This is the completion of the text."
-        )
+        assert result["choices"][0]["text"] == "This is the completion of the text."
         assert result["usage"]["total_tokens"] == 15
 
     @pytest.mark.asyncio
-    async def test_create_text_completion_missing_prompt(
-        self, mock_provider_text
-    ):
+    async def test_create_text_completion_missing_prompt(self, mock_provider_text):
         """Test create_text_completion with missing prompt."""
         request = {"model": "gpt-3.5-turbo"}
 
@@ -605,9 +586,7 @@ class TestEmbeddingsMethods:
         assert result["usage"]["total_tokens"] == 4
 
     @pytest.mark.asyncio
-    async def test_create_embeddings_missing_input(
-        self, mock_provider_embeddings
-    ):
+    async def test_create_embeddings_missing_input(self, mock_provider_embeddings):
         """Test create_embeddings with missing input."""
         request = {"model": "text-embedding-ada-002"}
 
@@ -641,9 +620,7 @@ class TestHealthCheckMethods:
         return client
 
     @pytest.fixture
-    def mock_provider_health(
-        self, mock_config_health, mock_http_client_health
-    ):
+    def mock_provider_health(self, mock_config_health, mock_http_client_health):
         """Create a mock provider instance for health checks."""
         with patch(
             "src.core.provider_factory.get_advanced_http_client",
@@ -689,9 +666,7 @@ class TestHealthCheckMethods:
         self, mock_provider_health, mock_http_client_health
     ):
         """Test failed health check."""
-        mock_http_client.request.side_effect = httpx.ConnectError(
-            "Connection failed"
-        )
+        mock_http_client.request.side_effect = httpx.ConnectError("Connection failed")
 
         # Execute
         result = await mock_provider.health_check()
@@ -778,9 +753,7 @@ class TestModelDiscoveryMethods:
             await mock_provider.list_models()
 
     @pytest.mark.asyncio
-    async def test_retrieve_model_not_implemented(
-        self, mock_provider_discovery
-    ):
+    async def test_retrieve_model_not_implemented(self, mock_provider_discovery):
         """Test retrieve_model raises NotImplementedError by default."""
         with pytest.raises(NotImplementedError):
             await mock_provider.retrieve_model("test-model")
@@ -888,9 +861,7 @@ class TestErrorScenarios:
                     return provider
 
     @pytest.mark.asyncio
-    async def test_server_error_500(
-        self, mock_provider_error, mock_http_client_error
-    ):
+    async def test_server_error_500(self, mock_provider_error, mock_http_client_error):
         """Test handling of 500 server errors."""
         request = {
             "model": "gpt-4",
@@ -937,9 +908,7 @@ class TestErrorScenarios:
 
         mock_response = Mock()
         mock_response.status_code = 200
-        mock_response.json.side_effect = json.JSONDecodeError(
-            "Empty response", "", 0
-        )
+        mock_response.json.side_effect = json.JSONDecodeError("Empty response", "", 0)
 
         mock_http_client.request.return_value = mock_response
 

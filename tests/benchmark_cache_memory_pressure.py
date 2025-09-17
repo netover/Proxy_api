@@ -8,21 +8,15 @@ This module provides detailed benchmarking for:
 - Recovery characteristics after memory pressure relief
 """
 
-import asyncio
-import gc
-import os
 import psutil
 import statistics
 import threading
 import time
-from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import Dict, List, Any
-import pytest
 
 from src.core.model_cache import ModelCache
 from src.core.smart_cache import SmartCache
-from src.core.unified_cache import UnifiedCache
 from src.models.model_info import ModelInfo
 
 
@@ -76,11 +70,9 @@ class CacheMemoryPressureBenchmark:
                         owned_by="benchmark",
                     )
                 ]
-                cache.set_models(
-                    f"provider-{i}", f"https://provider-{i}.com", models
-                )
+                cache.set_models(f"provider-{i}", f"https://provider-{i}.com", models)
 
-            fill_time = time.time() - start_time
+            time.time() - start_time
             fill_memory = self.get_memory_usage() - initial_memory
 
             # Benchmark access patterns under pressure
@@ -124,9 +116,7 @@ class CacheMemoryPressureBenchmark:
         memory_limits = [1, 5, 10, 50]  # MB limits
 
         for limit_mb in memory_limits:
-            cache = SmartCache(
-                max_size=1000, max_memory_mb=limit_mb, default_ttl=300
-            )
+            cache = SmartCache(max_size=1000, max_memory_mb=limit_mb, default_ttl=300)
 
             # Create large entries to trigger memory limits
             large_data = {"data": "x" * 10000}  # ~10KB per entry
@@ -152,8 +142,7 @@ class CacheMemoryPressureBenchmark:
 
                     # Check if we've hit memory limit
                     if (
-                        sum(e.size_bytes for e in cache._cache.values())
-                        / (1024 * 1024)
+                        sum(e.size_bytes for e in cache._cache.values()) / (1024 * 1024)
                         >= limit_mb
                     ):
                         break
@@ -231,9 +220,7 @@ class CacheMemoryPressureBenchmark:
             duration = time.time() - start_time
             final_memory = self.get_memory_usage()
 
-            total_operations = (
-                threads * 200
-            )  # 100 writes + 100 reads per thread
+            total_operations = threads * 200  # 100 writes + 100 reads per thread
 
             results.append(
                 BenchmarkResult(
@@ -272,9 +259,7 @@ class CacheMemoryPressureBenchmark:
                         owned_by="test",
                     )
                 ]
-                cache.set_models(
-                    f"baseline-{i}", f"https://baseline-{i}.com", models
-                )
+                cache.set_models(f"baseline-{i}", f"https://baseline-{i}.com", models)
 
                 start = time.time()
                 cache.get_models(f"baseline-{i}", f"https://baseline-{i}.com")
@@ -295,29 +280,21 @@ class CacheMemoryPressureBenchmark:
                         owned_by="test",
                     )
                 ]
-                cache.set_models(
-                    f"eviction-{i}", f"https://eviction-{i}.com", models
-                )
+                cache.set_models(f"eviction-{i}", f"https://eviction-{i}.com", models)
 
                 start = time.time()
-                cached = cache.get_models(
-                    f"eviction-{i}", f"https://eviction-{i}.com"
-                )
+                cached = cache.get_models(f"eviction-{i}", f"https://eviction-{i}.com")
                 if cached:
                     eviction_times.append(time.time() - start)
 
-            eviction_avg = (
-                statistics.mean(eviction_times) if eviction_times else 0
-            )
+            eviction_avg = statistics.mean(eviction_times) if eviction_times else 0
 
             results.append(
                 BenchmarkResult(
                     operation=f"eviction_impact_size_{max_size}",
                     duration=eviction_avg,
                     memory_usage_mb=0,  # Not measuring memory here
-                    operations_per_second=(
-                        1 / eviction_avg if eviction_avg > 0 else 0
-                    ),
+                    operations_per_second=(1 / eviction_avg if eviction_avg > 0 else 0),
                     metadata={
                         "cache_type": "ModelCache",
                         "max_size": max_size,
@@ -351,9 +328,7 @@ class CacheMemoryPressureBenchmark:
                     owned_by="test",
                 )
             ]
-            cache.set_models(
-                f"pressure-{i}", f"https://pressure-{i}.com", models
-            )
+            cache.set_models(f"pressure-{i}", f"https://pressure-{i}.com", models)
 
         pressure_time = time.time() - pressure_start
         after_pressure_size = cache.get_stats()["size"]
@@ -379,9 +354,7 @@ class CacheMemoryPressureBenchmark:
                     owned_by="test",
                 )
             ]
-            cache.set_models(
-                f"recovery-{i}", f"https://recovery-{i}.com", models
-            )
+            cache.set_models(f"recovery-{i}", f"https://recovery-{i}.com", models)
 
             # Immediate read to test responsiveness
             cache.get_models(f"recovery-{i}", f"https://recovery-{i}.com")

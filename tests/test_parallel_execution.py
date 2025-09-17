@@ -7,10 +7,10 @@ import asyncio
 import time
 import pytest
 import unittest.mock as mock
-from typing import Dict, Any, List
-from unittest.mock import AsyncMock, MagicMock
+from typing import Dict, Any
+from unittest.mock import AsyncMock
 
-from src.core.provider_discovery import provider_discovery, ProviderMetrics
+from src.core.provider_discovery import provider_discovery
 from src.core.parallel_fallback import (
     parallel_fallback_engine,
     ParallelExecutionMode,
@@ -24,7 +24,6 @@ from src.core.load_balancer import load_balancer, LoadBalancingStrategy
 from src.core.provider_factory import (
     BaseProvider,
     ProviderStatus,
-    provider_factory,
 )
 
 
@@ -51,29 +50,21 @@ class MockProvider(BaseProvider):
     async def _perform_health_check(self) -> Dict[str, Any]:
         return {"healthy": True, "response_time": 0.05}
 
-    async def create_completion(
-        self, request: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def create_completion(self, request: Dict[str, Any]) -> Dict[str, Any]:
         self.call_count += 1
         if self.should_fail:
             raise Exception("Mock provider failure")
 
         await asyncio.sleep(self.response_time)
         return {
-            "choices": [
-                {"message": {"content": f"Response from {self.name}"}}
-            ],
+            "choices": [{"message": {"content": f"Response from {self.name}"}}],
             "usage": {"total_tokens": 100},
         }
 
-    async def create_text_completion(
-        self, request: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def create_text_completion(self, request: Dict[str, Any]) -> Dict[str, Any]:
         return await self.create_completion(request)
 
-    async def create_embeddings(
-        self, request: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def create_embeddings(self, request: Dict[str, Any]) -> Dict[str, Any]:
         self.call_count += 1
         await asyncio.sleep(self.response_time)
         return {"data": [{"embedding": [0.1, 0.2, 0.3]}]}
@@ -89,22 +80,14 @@ class TestParallelExecutionIntegration:
         """Setup test fixtures"""
         self.providers = {
             "fast_provider": MockProvider("fast_provider", response_time=0.05),
-            "medium_provider": MockProvider(
-                "medium_provider", response_time=0.15
-            ),
+            "medium_provider": MockProvider("medium_provider", response_time=0.15),
             "slow_provider": MockProvider("slow_provider", response_time=0.30),
-            "failing_provider": MockProvider(
-                "failing_provider", should_fail=True
-            ),
+            "failing_provider": MockProvider("failing_provider", should_fail=True),
         }
 
         # Mock provider factory
-        with mock.patch(
-            "src.core.parallel_fallback.provider_factory"
-        ) as mock_factory:
-            mock_factory.get_provider = AsyncMock(
-                side_effect=self._mock_get_provider
-            )
+        with mock.patch("src.core.parallel_fallback.provider_factory") as mock_factory:
+            mock_factory.get_provider = AsyncMock(side_effect=self._mock_get_provider)
             mock_factory.get_all_provider_info = AsyncMock(
                 return_value=[
                     type(
@@ -148,14 +131,10 @@ class TestParallelExecutionIntegration:
             # Should succeed with fast provider
             assert result.success is True
             assert "fast_provider" in result.provider_name
-            assert (
-                execution_time < 0.2
-            )  # Should be much faster than sequential
+            assert execution_time < 0.2  # Should be much faster than sequential
 
             # Verify only one provider was actually called (first success)
-            called_providers = [
-                p for p in self.providers.values() if p.call_count > 0
-            ]
+            called_providers = [p for p in self.providers.values() if p.call_count > 0]
             assert len(called_providers) == 1
             assert called_providers[0].name == "fast_provider"
 
@@ -167,9 +146,7 @@ class TestParallelExecutionIntegration:
             "fail2": MockProvider("fail2", should_fail=True),
         }
 
-        with mock.patch(
-            "src.core.parallel_fallback.provider_factory"
-        ) as mock_factory:
+        with mock.patch("src.core.parallel_fallback.provider_factory") as mock_factory:
             mock_factory.get_provider = AsyncMock(
                 side_effect=lambda name: failing_providers.get(name)
             )
@@ -194,9 +171,7 @@ class TestParallelExecutionIntegration:
                 return_value=list(failing_providers.keys()),
             ):
 
-                request_data = {
-                    "messages": [{"role": "user", "content": "Hello"}]
-                }
+                request_data = {"messages": [{"role": "user", "content": "Hello"}]}
 
                 result = await parallel_fallback_engine.execute_parallel(
                     model="gpt-3.5-turbo",
@@ -216,15 +191,9 @@ class TestParallelExecutionIntegration:
         await provider_discovery.reset_provider_metrics()
 
         # Record some requests
-        await provider_discovery.record_request_result(
-            "test_provider", True, 100.0
-        )
-        await provider_discovery.record_request_result(
-            "test_provider", False, 200.0
-        )
-        await provider_discovery.record_request_result(
-            "test_provider", True, 50.0
-        )
+        await provider_discovery.record_request_result("test_provider", True, 100.0)
+        await provider_discovery.record_request_result("test_provider", False, 200.0)
+        await provider_discovery.record_request_result("test_provider", True, 50.0)
 
         metrics = provider_discovery.get_provider_metrics("test_provider")
         assert metrics is not None
@@ -233,9 +202,7 @@ class TestParallelExecutionIntegration:
         assert metrics.failed_requests == 1
 
         health = provider_discovery.get_provider_health("test_provider")
-        assert (
-            health.name == "GOOD"
-        )  # Should have good health with 2/3 success rate
+        assert health.name == "GOOD"  # Should have good health with 2/3 success rate
 
     @pytest.mark.asyncio
     async def test_circuit_breaker_pool_adaptive_timeout(self):
@@ -250,9 +217,7 @@ class TestParallelExecutionIntegration:
             adaptation_factor=0.2,
         )
 
-        breaker = await circuit_breaker_pool.get_provider_breaker(
-            provider_name, config
-        )
+        await circuit_breaker_pool.get_provider_breaker(provider_name, config)
 
         # Simulate some requests with varying latency
         async def mock_request():
@@ -264,9 +229,7 @@ class TestParallelExecutionIntegration:
             start_time = time.time()
             await mock_request()
             latency = (time.time() - start_time) * 1000
-            await circuit_breaker_pool._record_execution(
-                provider_name, True, latency
-            )
+            await circuit_breaker_pool._record_execution(provider_name, True, latency)
 
         # Adapt timeout
         await circuit_breaker_pool.adapt_provider_timeout(provider_name)
@@ -335,17 +298,11 @@ class TestParallelExecutionIntegration:
         # Setup realistic provider mix
         realistic_providers = {
             "openai_fast": MockProvider("openai_fast", response_time=0.2),
-            "anthropic_slow": MockProvider(
-                "anthropic_slow", response_time=0.8
-            ),
-            "perplexity_medium": MockProvider(
-                "perplexity_medium", response_time=0.4
-            ),
+            "anthropic_slow": MockProvider("anthropic_slow", response_time=0.8),
+            "perplexity_medium": MockProvider("perplexity_medium", response_time=0.4),
         }
 
-        with mock.patch(
-            "src.core.parallel_fallback.provider_factory"
-        ) as mock_factory:
+        with mock.patch("src.core.parallel_fallback.provider_factory") as mock_factory:
             mock_factory.get_provider = AsyncMock(
                 side_effect=lambda name: realistic_providers.get(name)
             )
@@ -391,20 +348,14 @@ class TestParallelExecutionIntegration:
                 assert len(successful_results) == 5
 
                 # Should use fastest provider (openai_fast)
-                winner_providers = [
-                    r.provider_name for r in successful_results
-                ]
-                assert all(
-                    "openai_fast" in provider for provider in winner_providers
-                )
+                winner_providers = [r.provider_name for r in successful_results]
+                assert all("openai_fast" in provider for provider in winner_providers)
 
                 # Verify performance improvement
                 total_execution_time = (
                     sum(r.latency_ms for r in successful_results) / 1000
                 )
-                avg_execution_time = total_execution_time / len(
-                    successful_results
-                )
+                avg_execution_time = total_execution_time / len(successful_results)
 
                 # With parallel execution, average should be much better than slowest provider
                 assert (
@@ -430,21 +381,15 @@ class TestParallelExecutionIntegration:
                 "src.core.parallel_fallback.provider_factory"
             ) as mock_factory:
                 mock_providers = {
-                    "perf_test_1": MockProvider(
-                        "perf_test_1", response_time=0.1
-                    ),
-                    "perf_test_2": MockProvider(
-                        "perf_test_2", response_time=0.2
-                    ),
+                    "perf_test_1": MockProvider("perf_test_1", response_time=0.1),
+                    "perf_test_2": MockProvider("perf_test_2", response_time=0.2),
                 }
                 mock_factory.get_provider = AsyncMock(
                     side_effect=lambda name: mock_providers.get(name)
                 )
 
                 request_data = {
-                    "messages": [
-                        {"role": "user", "content": "Performance test"}
-                    ]
+                    "messages": [{"role": "user", "content": "Performance test"}]
                 }
 
                 # Execute parallel requests

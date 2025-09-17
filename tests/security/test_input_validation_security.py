@@ -1,12 +1,9 @@
 import pytest
 import json
 import re
-from unittest.mock import Mock, patch
-from fastapi import HTTPException
-from fastapi.testclient import TestClient
 import bleach
 import sqlparse
-from urllib.parse import quote, unquote
+from urllib.parse import unquote
 
 
 class TestInputValidationSecurity:
@@ -37,7 +34,7 @@ class TestInputValidationSecurity:
         def is_sql_injection_safe(query: str) -> bool:
             # Parse the query to detect injection patterns
             try:
-                parsed = sqlparse.parse(query)[0]
+                sqlparse.parse(query)[0]
                 # Check for suspicious tokens
                 suspicious_tokens = [
                     "DROP",
@@ -161,7 +158,7 @@ class TestInputValidationSecurity:
             traversal_patterns = [
                 r"\.\./",
                 r"\.\.\\",
-                r"%2e%2e%2f",
+                r"%2e%2e%2",
                 r"%2e%2e%5c",
             ]
             for pattern in traversal_patterns:
@@ -177,12 +174,8 @@ class TestInputValidationSecurity:
             # Test normalization
             normalized = normalize_path(payload)
             # After normalization, should not contain traversal sequences
-            assert (
-                "../" not in normalized
-            ), f"Path traversal not normalized: {payload}"
-            assert (
-                "..\\" not in normalized
-            ), f"Path traversal not normalized: {payload}"
+            assert "../" not in normalized, f"Path traversal not normalized: {payload}"
+            assert "..\\" not in normalized, f"Path traversal not normalized: {payload}"
 
     def test_json_injection_prevention(self):
         """Test prevention of JSON injection attacks"""
@@ -298,7 +291,6 @@ class TestInputValidationSecurity:
 
         def is_ldap_injection_safe(query: str) -> bool:
             # Check for LDAP injection patterns
-            dangerous_chars = ["*", "(", ")", "|", "&"]
             dangerous_sequences = ["*)", "(*", "))", "((", "*))", ")*)"]
 
             for seq in dangerous_sequences:
@@ -367,13 +359,11 @@ class TestInputValidationSecurity:
             "malware.sh",
         ]
 
-        safe_extensions = [".txt", ".jpg", ".png", ".pdf", ".docx"]
+        safe_extensions = [".txt", ".jpg", ".png", ".pd", ".docx"]
 
         def is_file_upload_safe(filename: str) -> bool:
             # Check file extension
-            if not any(
-                filename.lower().endswith(ext) for ext in safe_extensions
-            ):
+            if not any(filename.lower().endswith(ext) for ext in safe_extensions):
                 return False
 
             # Check for path traversal
@@ -450,18 +440,14 @@ class TestInputValidationSecurity:
         # Simulate API endpoint validation
         def validate_api_input(input_type: str, input_value: str) -> bool:
             if input_type == "sql_injection":
-                return not any(
-                    char in input_value for char in ["'", ";", "--"]
-                )
+                return not any(char in input_value for char in ["'", ";", "--"])
             elif input_type == "xss":
                 return not any(
                     tag in input_value.lower()
                     for tag in ["<script>", "<img", "javascript:"]
                 )
             elif input_type == "command_injection":
-                return not any(
-                    char in input_value for char in [";", "|", "`", "$"]
-                )
+                return not any(char in input_value for char in [";", "|", "`", "$"])
             elif input_type == "path_traversal":
                 return not "../" in input_value and not "..\\" in input_value
             return True
@@ -497,17 +483,13 @@ class TestInputSanitization:
                 tags=["b", "p", "img", "a"],
                 attributes={"img": ["src"], "a": ["href"]},
             )
-            assert (
-                sanitized == expected
-            ), f"HTML sanitization failed for: {input_html}"
+            assert sanitized == expected, f"HTML sanitization failed for: {input_html}"
 
     def test_sql_parameterization(self):
         """Test SQL query parameterization"""
 
         # Simulate parameterized query
-        def execute_parameterized_query(
-            query_template: str, params: tuple
-        ) -> str:
+        def execute_parameterized_query(query_template: str, params: tuple) -> str:
             # In real implementation, use proper parameterized queries
             return query_template % params
 
@@ -519,9 +501,7 @@ class TestInputSanitization:
 
         # Malicious params should be treated as literal values
         malicious_params = ("'; DROP TABLE users; --", "hacker")
-        malicious_result = execute_parameterized_query(
-            safe_query, malicious_params
-        )
+        malicious_result = execute_parameterized_query(safe_query, malicious_params)
         # The malicious SQL should be escaped/treated as literal
         assert "DROP TABLE" not in malicious_result.upper()
 
@@ -536,11 +516,7 @@ class TestInputSanitization:
         for encoded in encoded_payloads:
             decoded = unquote(encoded)
             # After decoding, should still be validated
-            assert (
-                "<script>" in decoded
-                or "../" in decoded
-                or "' OR '1'='1" in decoded
-            )
+            assert "<script>" in decoded or "../" in decoded or "' OR '1'='1" in decoded
 
     def test_input_whitelisting(self):
         """Test input whitelisting approach"""
@@ -566,9 +542,7 @@ class TestInputSanitization:
         ]
 
         for safe_input in safe_inputs:
-            assert whitelist_validate(
-                safe_input
-            ), f"Safe input rejected: {safe_input}"
+            assert whitelist_validate(safe_input), f"Safe input rejected: {safe_input}"
 
         for malicious_input in malicious_inputs:
             assert not whitelist_validate(

@@ -45,9 +45,7 @@ class TelemetryManager:
             raise RuntimeError("Telemetry not configured")
         return MockTracer()
 
-    def create_span(
-        self, name: str, attributes: Optional[Dict[str, Any]] = None
-    ):
+    def create_span(self, name: str, attributes: Optional[Dict[str, Any]] = None):
         """Create a span (mock implementation)."""
         return MockSpan(name, attributes or {})
 
@@ -113,9 +111,7 @@ class MockSpan:
             ):
                 import random
 
-                should_sample = (
-                    random.random() < metrics_collector.sampling_rate
-                )
+                should_sample = random.random() < metrics_collector.sampling_rate
 
             if should_sample:
                 duration = time.time() - self._start_time
@@ -130,8 +126,7 @@ class MockSpan:
                     metrics_collector.record_request(
                         provider_name=provider_name,
                         success=success,
-                        response_time=duration
-                        * 1000,  # Convert to milliseconds
+                        response_time=duration * 1000,  # Convert to milliseconds
                         tokens=self.attributes.get("tokens", 0),
                         error_type=str(exc_val) if exc_val else None,
                         model_name=model_name,
@@ -171,9 +166,7 @@ def traced(operation: str = None, attributes: Optional[Dict[str, Any]] = None):
                     span.record_error(e)
                     raise
                 finally:
-                    span.set_attribute(
-                        "function.duration", time.time() - start_time
-                    )
+                    span.set_attribute("function.duration", time.time() - start_time)
 
         @wraps(func)
         def sync_wrapper(*args, **kwargs):
@@ -189,9 +182,7 @@ def traced(operation: str = None, attributes: Optional[Dict[str, Any]] = None):
                     span.record_error(e)
                     raise
                 finally:
-                    span.set_attribute(
-                        "function.duration", time.time() - start_time
-                    )
+                    span.set_attribute("function.duration", time.time() - start_time)
 
         if hasattr(func, "__call__"):
             # Check if it's a coroutine function

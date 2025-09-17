@@ -38,7 +38,6 @@ class ProviderInfo:
 
 
 # Import ProviderType from the new registry module for compatibility
-from src.providers.registry import ProviderType
 
 # --- End of Backward Compatibility Shims ---
 from src.providers.registry import (
@@ -66,9 +65,7 @@ class EnhancedProviderFactory:
     integrando-se com os sistemas existentes de circuit breaker, cache e rate limiting.
     """
 
-    def __init__(
-        self, registry: ProviderRegistry, loader: DynamicProviderLoader
-    ):
+    def __init__(self, registry: ProviderRegistry, loader: DynamicProviderLoader):
         self.registry = registry
         self.loader = loader
         self.initialized = False
@@ -93,9 +90,7 @@ class EnhancedProviderFactory:
             self._initialize_protection()
             self.initialized = True
         except Exception as e:
-            logger.error(
-                f"Failed to initialize provider factory protections: {e}"
-            )
+            logger.error(f"Failed to initialize provider factory protections: {e}")
             # Decide if we should raise the error or continue without protection
             raise
 
@@ -132,7 +127,7 @@ class EnhancedProviderFactory:
         provider_name = config.provider
 
         # Verificar o circuit breaker antes de tentar carregar o client
-        breaker = get_circuit_breaker(provider_name)
+        get_circuit_breaker(provider_name)
         try:
             # O 'call' do circuit breaker agora envolve a criação do cliente
             # e a chamada ao método do cliente. Aqui, apenas verificamos o estado.
@@ -179,14 +174,10 @@ class EnhancedProviderFactory:
         """Adiciona um novo provider customizado em tempo de execução (hot-reload)."""
         try:
             config = ProviderConfig(**config_data)
-            provider_id = (
-                f"{config.provider}/{config.models[0]}"  # Cria um ID único
-            )
+            provider_id = f"{config.provider}/{config.models[0]}"  # Cria um ID único
             self.registry.providers[provider_id] = config
             self._initialize_protection()  # Re-inicializa a proteção para o novo provider
-            logger.info(
-                f"Provider customizado '{provider_id}' adicionado com sucesso."
-            )
+            logger.info(f"Provider customizado '{provider_id}' adicionado com sucesso.")
         except Exception as e:
             logger.error(f"Falha ao adicionar provider customizado: {e}")
 

@@ -7,11 +7,9 @@ with the new thin controller architecture.
 
 import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import Mock, patch
-import json
+from unittest.mock import patch
 
 from main import app
-from src.core.provider_factory import ProviderStatus
 
 client = TestClient(app)
 

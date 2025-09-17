@@ -4,7 +4,7 @@ Verifies that the distributed lock prevents race conditions during cache warming
 """
 
 import asyncio
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
 import pytest
 import pytest_asyncio
@@ -112,9 +112,7 @@ async def test_distributed_lock_blocks_concurrent_access(mock_redis_client):
     assert not locks  # And now it's released
 
 
-async def test_warm_cache_batch_uses_distributed_lock(
-    cache_manager, mock_redis_client
-):
+async def test_warm_cache_batch_uses_distributed_lock(cache_manager, mock_redis_client):
     """Verify that warm_cache_batch uses the distributed lock."""
     mock_redis, locks = mock_redis_client
 
@@ -127,20 +125,14 @@ async def test_warm_cache_batch_uses_distributed_lock(
     getter_func = AsyncMock(return_value="warmed_value")
 
     # Run the batch warming
-    await cache_manager.warm_cache_batch(
-        keys_to_warm, getter_func, category, ttl=3600
-    )
+    await cache_manager.warm_cache_batch(keys_to_warm, getter_func, category, ttl=3600)
 
     # Assert that the lock was set and then deleted
-    mock_redis.set.assert_called_once_with(
-        expected_lock_key, "locked", nx=True, ex=60
-    )
+    mock_redis.set.assert_called_once_with(expected_lock_key, "locked", nx=True, ex=60)
     mock_redis.delete.assert_called_once_with(expected_lock_key)
 
 
-async def test_warm_cache_batch_concurrent_calls(
-    cache_manager, mock_redis_client
-):
+async def test_warm_cache_batch_concurrent_calls(cache_manager, mock_redis_client):
     """Simulate two instances calling warm_cache_batch for the same batch concurrently."""
     mock_redis, _ = mock_redis_client
 
@@ -171,9 +163,7 @@ async def test_warm_cache_batch_concurrent_calls(
         get_many_side_effect.call_count = 1
         cache_manager._cache.get_many.side_effect = get_many_side_effect
 
-        await cache_manager.warm_cache_batch(
-            keys, getter_func, category, ttl=60
-        )
+        await cache_manager.warm_cache_batch(keys, getter_func, category, ttl=60)
 
     # Simulate two concurrent calls
     task1 = asyncio.create_task(run_warming())

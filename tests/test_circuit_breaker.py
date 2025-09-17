@@ -3,7 +3,6 @@ Tests for the robust, distributed Circuit Breaker implementation.
 Verifies atomic state transitions using a mocked Redis client.
 """
 
-import asyncio
 import json
 import time
 from unittest.mock import AsyncMock, MagicMock
@@ -70,9 +69,7 @@ class TestDistributedCircuitBreaker:
         assert state["failures"] == 0
         mock_redis.get.assert_called_once_with(circuit_breaker.key)
 
-    async def test_successful_call_in_closed_state(
-        self, circuit_breaker, mock_redis
-    ):
+    async def test_successful_call_in_closed_state(self, circuit_breaker, mock_redis):
         result = await circuit_breaker.call(successful_func)
         assert result == "success"
         # No change to state, so no set/delete calls
@@ -106,9 +103,7 @@ class TestDistributedCircuitBreaker:
         assert actual_state["state"] == expected_state["state"]
         assert actual_state["failures"] == expected_state["failures"]
 
-    async def test_circuit_opens_after_threshold(
-        self, circuit_breaker, mock_redis
-    ):
+    async def test_circuit_opens_after_threshold(self, circuit_breaker, mock_redis):
         # Simulate 2 existing failures
         initial_state = json.dumps(
             {
@@ -130,9 +125,7 @@ class TestDistributedCircuitBreaker:
         assert actual_state["state"] == CircuitState.OPEN.value
         assert actual_state["failures"] == 3
 
-    async def test_open_circuit_rejects_calls(
-        self, circuit_breaker, mock_redis
-    ):
+    async def test_open_circuit_rejects_calls(self, circuit_breaker, mock_redis):
         # Set state to OPEN
         open_state = json.dumps(
             {
@@ -146,9 +139,7 @@ class TestDistributedCircuitBreaker:
         with pytest.raises(CircuitBreakerOpenException):
             await circuit_breaker.call(successful_func)
 
-    async def test_circuit_moves_to_half_open(
-        self, circuit_breaker, mock_redis
-    ):
+    async def test_circuit_moves_to_half_open(self, circuit_breaker, mock_redis):
         # Set state to OPEN, but with an expired timestamp
         expired_time = time.time() - circuit_breaker.recovery_timeout - 1
         open_state = json.dumps(
@@ -169,9 +160,7 @@ class TestDistributedCircuitBreaker:
         actual_state = json.loads(call_args[1])
         assert actual_state["state"] == CircuitState.HALF_OPEN.value
 
-    async def test_half_open_closes_on_success(
-        self, circuit_breaker, mock_redis
-    ):
+    async def test_half_open_closes_on_success(self, circuit_breaker, mock_redis):
         # Set state to HALF_OPEN
         half_open_state = json.dumps(
             {
@@ -188,9 +177,7 @@ class TestDistributedCircuitBreaker:
         # Verify the key was deleted (resetting to CLOSED)
         mock_redis.delete.assert_called_once_with(circuit_breaker.key)
 
-    async def test_half_open_reopens_on_failure(
-        self, circuit_breaker, mock_redis
-    ):
+    async def test_half_open_reopens_on_failure(self, circuit_breaker, mock_redis):
         # Set state to HALF_OPEN
         half_open_state = json.dumps(
             {
@@ -213,9 +200,7 @@ class TestDistributedCircuitBreaker:
         actual_state = json.loads(call_args[1])
         assert actual_state["state"] == CircuitState.OPEN.value
 
-    async def test_transaction_retry_on_watch_error(
-        self, circuit_breaker, mock_redis
-    ):
+    async def test_transaction_retry_on_watch_error(self, circuit_breaker, mock_redis):
         """Test that the failure recording logic retries if a WatchError occurs."""
         pipeline = mock_redis.pipeline.return_value
 
@@ -243,9 +228,7 @@ class TestCircuitBreakerFactory:
 
         cb1 = get_circuit_breaker("factory_test_1")
         cb2 = get_circuit_breaker("factory_test_2")
-        cb3 = get_circuit_breaker(
-            "factory_test_1"
-        )  # Should return the same instance
+        cb3 = get_circuit_breaker("factory_test_1")  # Should return the same instance
 
         assert isinstance(cb1, DistributedCircuitBreaker)
         assert cb1 is cb3

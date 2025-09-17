@@ -1,0 +1,69 @@
+# Core Framework (SECURITY UPDATED)
+fastapi>=0.115.0      # Security patches for CVE-2024-24762, CVE-2024-23917
+uvicorn[standard]>=0.30.0 # Performance + HTTP/2 support, security updates
+
+# Data Validation and Settings (COMPATIBILITY UPDATED)
+pydantic>=2.8.0         # Latest stable with performance improvements
+pydantic-settings>=2.3.0 # Compatibility fix for pydantic 2.8+
+jsonschema>=4.21.0      # JSON Schema validation for configuration
+
+# Configuration and HTTP (SECURITY UPDATED)
+PyYAML>=6.0.2         # Security patch for CVE-2024-35327
+httpx[http2]>=0.27.0  # Performance + HTTP/2 support, connection pooling fixes
+aiohttp>=3.9.0        # Async HTTP client for model discovery service
+
+# Performance Optimizations (NEW)
+uvloop>=0.19.0; sys_platform != "win32"  # 2-3x asyncio performance boost (Linux/macOS only)
+orjson>=3.10.0        # 2-5x JSON serialization performance
+
+# API Features
+slowapi>=0.1.9        # For rate limiting API requests
+anyio>=3.7.1          # Asynchronous networking library
+PyJWT>=2.8.0          # For JSON Web Tokens authentication
+pyasn1>=0.6.1         # Dependency of PyJWT
+psutil>=5.9.0         # System and process utilities for memory monitoring
+
+# OpenTelemetry (NEW)
+opentelemetry-api>=1.25.0
+opentelemetry-sdk>=1.25.0
+opentelemetry-instrumentation-fastapi>=0.46b0
+opentelemetry-instrumentation-httpx>=0.46b0
+
+# Template Engine (NEW)
+jinja2>=3.1.0
+
+# Testing
+pytest>=8.4.2         # Test framework
+pytest-asyncio>=0.21.0 # Async testing support
+numpy>=1.24.0         # Numerical computing for performance testing
+
+# Security Testing
+bandit>=1.7.0         # Python security linting and vulnerability detection
+safety>=3.0.0         # Dependency vulnerability scanning
+requests>=2.31.0      # HTTP library for security testing
+sqlparse>=0.4.0       # SQL parsing for injection testing
+bleach>=6.1.0         # HTML sanitization testing
+
+# Web UI (SECURITY UPDATED)
+Flask>=3.0.0          # Security updates, modern features
+Flask-Cors>=4.0.0     # Cross-origin resource sharing for Flask UI
+python-dotenv>=0.19   # Environment file management
+
+# Optional Dependencies (NEW)
+redis>=5.0.0          # Redis support for distributed caching (optional)
+
+# Caching
+cachetools>=5.3.0     # TTL cache implementation for model discovery caching
+
+# Semantic Caching (NEW)
+sentence-transformers>=2.2.0
+faiss-cpu>=1.7.0      # For CPU-based similarity search
+
+# Development Tools (NEW)
+black>=24.0.0         # Code formatting
+isort>=5.13.0         # Import sorting
+mypy>=1.9.0           # Type checking
+ruff>=0.5.0           # Fast linting
+
+# Protobuf update for compatibility
+protobuf>=5.0,<7.0

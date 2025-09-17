@@ -85,9 +85,7 @@ class CacheManager:
                 ImportError,
             ) as e:
                 # If config loading fails due to file issues, JSON parsing, or import errors, create minimal config
-                logger.warning(
-                    f"Config loading failed, using minimal config: {e}"
-                )
+                logger.warning(f"Config loading failed, using minimal config: {e}")
                 from types import SimpleNamespace
 
                 self.config = SimpleNamespace()
@@ -109,12 +107,8 @@ class CacheManager:
                     self.unified_cache = UnifiedCache(
                         max_size=getattr(cache_config, "max_size", 10000),
                         default_ttl=getattr(cache_config, "cache_ttl", 1800),
-                        max_memory_mb=getattr(
-                            cache_config, "max_memory_mb", 512
-                        ),
-                        enable_disk_cache=getattr(
-                            cache_config, "cache_persist", True
-                        ),
+                        max_memory_mb=getattr(cache_config, "max_memory_mb", 512),
+                        enable_disk_cache=getattr(cache_config, "cache_persist", True),
                         cache_dir=getattr(cache_config, "cache_dir", None),
                         enable_smart_ttl=True,
                         enable_predictive_warming=warming_enabled,
@@ -198,9 +192,7 @@ class CacheManager:
             return self.unified_cache._generate_key(provider_name, base_url)
         else:
             # Use legacy ModelCache key generation for backward compatibility
-            return self.legacy_cache._generate_cache_key(
-                provider_name, base_url
-            )
+            return self.legacy_cache._generate_cache_key(provider_name, base_url)
 
     async def get_models_with_cache(
         self, provider_config: ProviderConfig, force_refresh: bool = False
@@ -218,9 +210,7 @@ class CacheManager:
         if not self.config.settings.cache.cache_enabled:
             # Cache disabled, fetch directly
             logger.debug("Cache disabled, fetching models directly")
-            return await self.discovery_service.discover_models(
-                provider_config
-            )
+            return await self.discovery_service.discover_models(provider_config)
 
         cache_key = self.generate_cache_key(
             provider_config.name, provider_config.base_url
@@ -257,8 +247,7 @@ class CacheManager:
 
         # Fetch from provider
         logger.debug(
-            f"Cache miss/refresh for {provider_config.name}, "
-            f"fetching from provider"
+            f"Cache miss/refresh for {provider_config.name}, " "fetching from provider"
         )
         models = await self.discovery_service.discover_models(provider_config)
 
@@ -269,9 +258,7 @@ class CacheManager:
                 key=cache_key, value=models, category="model_discovery"
             )
             if not success:
-                logger.warning(
-                    f"Failed to cache models for {provider_config.name}"
-                )
+                logger.warning(f"Failed to cache models for {provider_config.name}")
         else:
             # Use legacy ModelCache API
             self.legacy_cache.set_models(
@@ -390,15 +377,11 @@ class CacheManager:
                 results["errors"].append(
                     {"provider": config.name, "error": str(result)}
                 )
-                logger.error(
-                    f"Cache warming failed for {config.name}: {result}"
-                )
+                logger.error(f"Cache warming failed for {config.name}: {result}")
             else:
                 provider_result["models"] = len(result)
                 results["total_models"] += len(result)
-                logger.info(
-                    f"Cache warmed for {config.name}: {len(result)} models"
-                )
+                logger.info(f"Cache warmed for {config.name}: {len(result)} models")
 
             results["providers"].append(provider_result)
 
@@ -418,9 +401,7 @@ class CacheManager:
     ) -> List[ModelInfo]:
         """Warm cache for a single provider (legacy method)."""
         try:
-            models = await self.discovery_service.discover_models(
-                provider_config
-            )
+            models = await self.discovery_service.discover_models(provider_config)
 
             if self.use_unified_cache:
                 # Use unified cache API
@@ -431,9 +412,7 @@ class CacheManager:
                     key=cache_key, value=models, category="model_discovery"
                 )
                 if not success:
-                    logger.warning(
-                        f"Failed to cache models for {provider_config.name}"
-                    )
+                    logger.warning(f"Failed to cache models for {provider_config.name}")
             else:
                 # Use legacy cache API
                 self.legacy_cache.set_models(
@@ -442,17 +421,12 @@ class CacheManager:
 
             return models
         except Exception as e:
-            logger.error(
-                f"Failed to warm cache for {provider_config.name}: {e}"
-            )
+            logger.error(f"Failed to warm cache for {provider_config.name}: {e}")
             raise
 
     def start_background_refresh(self) -> None:
         """Start background cache refresh thread."""
-        if (
-            self._refresh_thread is not None
-            and self._refresh_thread.is_alive()
-        ):
+        if self._refresh_thread is not None and self._refresh_thread.is_alive():
             logger.warning("Background refresh already running")
             return
 
@@ -467,9 +441,7 @@ class CacheManager:
             daemon=True,
         )
         self._refresh_thread.start()
-        logger.info(
-            f"Started background cache refresh every {self.refresh_interval}s"
-        )
+        logger.info(f"Started background cache refresh every {self.refresh_interval}s")
 
     def stop_background_refresh(self) -> None:
         """Stop background cache refresh thread."""
@@ -519,12 +491,10 @@ class CacheManager:
                         refreshed = sum(
                             1 for r in results if not isinstance(r, Exception)
                         )
-                        errors = sum(
-                            1 for r in results if isinstance(r, Exception)
-                        )
+                        errors = sum(1 for r in results if isinstance(r, Exception))
 
                         logger.info(
-                            f"Background refresh completed: "
+                            "Background refresh completed: "
                             f"{refreshed} refreshed, {errors} errors"
                         )
 
@@ -543,21 +513,15 @@ class CacheManager:
             discovery_config = ProviderConfig(
                 name=provider_config.name,
                 base_url=str(provider_config.base_url),
-                api_key=os.getenv(
-                    f"PROXY_API_{provider_config.api_key_env}", ""
-                ),
+                api_key=os.getenv(f"PROXY_API_{provider_config.api_key_env}", ""),
                 timeout=provider_config.timeout,
                 max_retries=provider_config.max_retries,
             )
 
-            await self.get_models_with_cache(
-                discovery_config, force_refresh=True
-            )
+            await self.get_models_with_cache(discovery_config, force_refresh=True)
 
         except Exception as e:
-            logger.error(
-                f"Background refresh failed for {provider_config.name}: {e}"
-            )
+            logger.error(f"Background refresh failed for {provider_config.name}: {e}")
             raise
 
     def invalidate_provider(self, provider_name: str, base_url: str) -> bool:
@@ -607,7 +571,7 @@ class CacheManager:
             # Get unified cache stats (handle async properly)
             try:
                 # Try to get current event loop
-                loop = asyncio.get_running_loop()
+                asyncio.get_running_loop()
                 # If we're in an async context, we need to handle this differently
                 # For now, return basic stats
                 stats = {
@@ -623,19 +587,17 @@ class CacheManager:
             # Add warmer stats if available
             if self.cache_warmer:
                 try:
-                    loop = asyncio.get_running_loop()
+                    asyncio.get_running_loop()
                     # In async context, skip detailed stats for now
                     stats["warming_stats"] = {"available": True}
                 except RuntimeError:
-                    warmer_stats = asyncio.run(
-                        self.cache_warmer.get_warming_stats()
-                    )
+                    warmer_stats = asyncio.run(self.cache_warmer.get_warming_stats())
                     stats["warming_stats"] = warmer_stats
 
             # Add monitor stats if available
             if self.cache_monitor:
                 try:
-                    loop = asyncio.get_running_loop()
+                    asyncio.get_running_loop()
                     # In async context, skip detailed stats for now
                     stats["monitor_stats"] = {"available": True}
                 except RuntimeError:
@@ -644,9 +606,7 @@ class CacheManager:
                     )
                     stats["monitor_stats"] = {
                         "health": monitor_report.get("summary_stats", {}),
-                        "active_alerts": len(
-                            monitor_report.get("active_alerts", [])
-                        ),
+                        "active_alerts": len(monitor_report.get("active_alerts", [])),
                         "consistency_issues": len(
                             monitor_report.get("consistency_issues", [])
                         ),
@@ -661,8 +621,7 @@ class CacheManager:
                 "warming_enabled": self.warming_enabled,
                 "refresh_interval": self.refresh_interval,
                 "background_refresh_running": (
-                    self._refresh_thread is not None
-                    and self._refresh_thread.is_alive()
+                    self._refresh_thread is not None and self._refresh_thread.is_alive()
                 ),
                 "warming_complete": self._warming_complete,
                 "use_unified_cache": self.use_unified_cache,

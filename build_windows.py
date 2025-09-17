@@ -44,7 +44,7 @@ def create_version_info(config: Dict[str, Any]) -> str:
     while len(version_parts) < 4:
         version_parts.append("0")
 
-    version_info = f"""# UTF-8
+    version_info = """# UTF-8
 #
 # For more details about fixed file info 'ffi' see:
 # http://msdn.microsoft.com/en-us/library/ms646997.aspx
@@ -169,7 +169,7 @@ def build_executable():
         "--hidden-import=uvicorn.protocols.http.httptools_impl",
         "--hidden-import=uvicorn.protocols.websockets.auto",
         "--hidden-import=uvicorn.lifespan.on",
-        "--hidden-import=uvicorn.lifespan.off",
+        "--hidden-import=uvicorn.lifespan.of",
         "--hidden-import=fastapi",
         "--hidden-import=fastapi.routing",
         "--hidden-import=fastapi.applications",
@@ -342,7 +342,7 @@ def create_nsis_script() -> str:
     """Create NSIS installer script"""
     config = load_build_config()
 
-    script = f"""!include "MUI2.nsh"
+    script = """!include "MUI2.nsh"
 
 Name "{config['app_name']}"
 OutFile "{config['app_name'].replace(' ', '_')}_installer.exe"

@@ -144,7 +144,7 @@ async def main():
             print(f"{endpoint}:")
             print(f"  Requests made: {stats['total_requests']}")
             print(f"  Rate limit hits: {stats['rate_limit_hits']}")
-            print(".1f")
+            print(".1")
             if stats["first_rate_limit_at"] is not None:
                 print(
                     f"  First rate limit at request: {stats['first_rate_limit_at'] + 1}"

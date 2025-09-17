@@ -35,12 +35,8 @@ class APIException(Exception):
 class ValidationError(APIException):
     """Exception raised for request validation failures."""
 
-    def __init__(
-        self, message: str, field: str = None, value: str = None, **kwargs
-    ):
-        super().__init__(
-            message, status_code=400, code="validation_error", **kwargs
-        )
+    def __init__(self, message: str, field: str = None, value: str = None, **kwargs):
+        super().__init__(message, status_code=400, code="validation_error", **kwargs)
         self.field = field
         self.value = value
 
@@ -57,9 +53,7 @@ class ModelNotFoundError(APIException):
         message = f"Model '{model_name}' not found"
         if provider:
             message += f" for provider '{provider}'"
-        super().__init__(
-            message, status_code=404, code="model_not_found", **kwargs
-        )
+        super().__init__(message, status_code=404, code="model_not_found", **kwargs)
         self.model_name = model_name
         self.provider = provider
 
@@ -100,9 +94,7 @@ class QuotaExceededError(APIException):
             message += f" (limit: {limit})"
         if reset_time:
             message += f". Resets at {reset_time}"
-        super().__init__(
-            message, status_code=429, code="quota_exceeded", **kwargs
-        )
+        super().__init__(message, status_code=429, code="quota_exceeded", **kwargs)
         self.quota_type = quota_type
         self.limit = limit
         self.reset_time = reset_time
@@ -131,9 +123,7 @@ class ConfigurationError(APIException):
     """Exception raised for configuration-related errors."""
 
     def __init__(self, message: str, config_key: str = None, **kwargs):
-        super().__init__(
-            message, status_code=500, code="configuration_error", **kwargs
-        )
+        super().__init__(message, status_code=500, code="configuration_error", **kwargs)
         self.config_key = config_key
 
 
@@ -141,9 +131,7 @@ class StreamingError(APIException):
     """Exception raised for streaming-related errors."""
 
     def __init__(self, message: str, stream_id: str = None, **kwargs):
-        super().__init__(
-            message, status_code=500, code="streaming_error", **kwargs
-        )
+        super().__init__(message, status_code=500, code="streaming_error", **kwargs)
         self.stream_id = stream_id
 
 
@@ -154,9 +142,7 @@ class TimeoutError(APIException):
         message = f"Operation '{operation}' timed out"
         if timeout_seconds:
             message += f" after {timeout_seconds} seconds"
-        super().__init__(
-            message, status_code=504, code="timeout_error", **kwargs
-        )
+        super().__init__(message, status_code=504, code="timeout_error", **kwargs)
         self.operation = operation
         self.timeout_seconds = timeout_seconds
 
@@ -165,12 +151,8 @@ class PayloadTooLargeError(APIException):
     """Exception raised when request payload is too large."""
 
     def __init__(self, actual_size: int, max_size: int, **kwargs):
-        message = (
-            f"Payload too large: {actual_size} bytes (max: {max_size} bytes)"
-        )
-        super().__init__(
-            message, status_code=413, code="payload_too_large", **kwargs
-        )
+        message = f"Payload too large: {actual_size} bytes (max: {max_size} bytes)"
+        super().__init__(message, status_code=413, code="payload_too_large", **kwargs)
         self.actual_size = actual_size
         self.max_size = max_size
 

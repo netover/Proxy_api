@@ -167,7 +167,7 @@ class CircuitBreakerPool:
             self._pool_metrics["tripped_breakers"] += 1
             raise
 
-        except Exception as e:
+        except Exception:
             # Record failed execution
             execution_time = time.time() - start_time
             await self._record_execution(provider_name, False, execution_time)
@@ -229,9 +229,7 @@ class CircuitBreakerPool:
         except Exception as e:
             logger.warning(f"Failed to adapt timeout for {provider_name}: {e}")
 
-    async def _adapt_adaptive_timeout(
-        self, provider_breaker: ProviderCircuitBreaker
-    ):
+    async def _adapt_adaptive_timeout(self, provider_breaker: ProviderCircuitBreaker):
         """Adaptive timeout based on recent performance"""
         config = provider_breaker.adaptive_config
         history = provider_breaker.request_history[-20:]  # Last 20 requests
@@ -247,15 +245,13 @@ class CircuitBreakerPool:
             # Very fast responses - can reduce timeout
             new_timeout = max(
                 config.min_timeout,
-                provider_breaker.current_timeout
-                * (1 - config.adaptation_factor),
+                provider_breaker.current_timeout * (1 - config.adaptation_factor),
             )
         elif recent_avg > config.base_timeout * 1.5:
             # Slow responses - increase timeout
             new_timeout = min(
                 config.max_timeout,
-                provider_breaker.current_timeout
-                * (1 + config.adaptation_factor),
+                provider_breaker.current_timeout * (1 + config.adaptation_factor),
             )
         else:
             # Stable performance - slight adjustment toward base
@@ -286,9 +282,7 @@ class CircuitBreakerPool:
 
         provider_breaker.current_timeout = new_timeout
 
-    async def _adapt_quantile_timeout(
-        self, provider_breaker: ProviderCircuitBreaker
-    ):
+    async def _adapt_quantile_timeout(self, provider_breaker: ProviderCircuitBreaker):
         """Quantile-based timeout adaptation"""
         config = provider_breaker.adaptive_config
         history = sorted(provider_breaker.request_history)
@@ -307,9 +301,7 @@ class CircuitBreakerPool:
 
         provider_breaker.current_timeout = new_timeout
 
-    async def _adapt_predictive_timeout(
-        self, provider_breaker: ProviderCircuitBreaker
-    ):
+    async def _adapt_predictive_timeout(self, provider_breaker: ProviderCircuitBreaker):
         """Predictive timeout based on trend analysis"""
         # This would implement more sophisticated prediction
         # For now, fall back to adaptive strategy
@@ -361,9 +353,7 @@ class CircuitBreakerPool:
             try:
                 await self.adapt_provider_timeout(provider_name)
             except Exception as e:
-                logger.warning(
-                    f"Failed to adapt timeout for {provider_name}: {e}"
-                )
+                logger.warning(f"Failed to adapt timeout for {provider_name}: {e}")
 
     def get_pool_metrics(self) -> Dict[str, Any]:
         """Get comprehensive pool metrics"""

@@ -103,7 +103,7 @@ MODELS_BY_PROVIDER = {
     "groq": ["llama3-8b-8192", "llama3-70b-8192", "mixtral-8x7b-32768"],
     "cohere": ["command-r-plus", "command-r", "aaya-23"],
     "ollama": ["llama3", "mistral", "phi3", "gemma:7b"],
-    "together": ["meta-llama/Llama-3-70b-chat-hf", "mistralai/Mixtral-8x7B-Instruct-v0.1", "microsoft/DialoGPT-medium"],
+    "together": ["meta-llama/Llama-3-70b-chat-h", "mistralai/Mixtral-8x7B-Instruct-v0.1", "microsoft/DialoGPT-medium"],
     "voyage": ["voyage-2", "voyage-lite-02-instruct"],
     "elevenlabs": ["eleven_turbo_v2_5", "eleven_multilingual_v2"],
 }

@@ -165,7 +165,7 @@ async def demo_cache_performance():
     final_hit_rate = final_stats["hit_rate"]
 
     print(f"Overall Cache Hit Rate: {final_hit_rate:.1%}")
-    print(f"Target Hit Rate: 90%")
+    print("Target Hit Rate: 90%")
     print(f"Status: {'PASSED' if final_hit_rate >= 0.9 else 'FAILED'}")
 
     print("\nCache Statistics:")

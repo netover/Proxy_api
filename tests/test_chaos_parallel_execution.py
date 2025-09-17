@@ -7,8 +7,7 @@ import asyncio
 import time
 import pytest
 import random
-from typing import Dict, Any, List
-from unittest.mock import AsyncMock, MagicMock
+from typing import Dict, Any
 
 from src.core.parallel_fallback import (
     parallel_fallback_engine,
@@ -34,16 +33,12 @@ class ChaoticProvider:
         self.latency_variation = latency_variation
         self.call_count = 0
 
-    async def execute_request(
-        self, request_data: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def execute_request(self, request_data: Dict[str, Any]) -> Dict[str, Any]:
         self.call_count += 1
 
         # Simulate random failures
         if random.random() < self.failure_rate:
-            await asyncio.sleep(
-                random.uniform(0.01, 0.1)
-            )  # Brief delay before failure
+            await asyncio.sleep(random.uniform(0.01, 0.1))  # Brief delay before failure
             raise Exception(f"Chaotic failure in {self.name}")
 
         # Simulate variable latency
@@ -72,9 +67,7 @@ class TestChaosEngineering:
     async def test_high_failure_rate_resilience(self):
         """Test system resilience with high provider failure rates"""
         providers = {
-            "reliable": ChaoticProvider(
-                "reliable", failure_rate=0.05
-            ),  # 5% failure
+            "reliable": ChaoticProvider("reliable", failure_rate=0.05),  # 5% failure
             "unreliable": ChaoticProvider(
                 "unreliable", failure_rate=0.80
             ),  # 80% failure
@@ -86,9 +79,7 @@ class TestChaosEngineering:
         with self._mock_provider_factory(providers):
             with self._mock_provider_discovery(list(providers.keys())):
 
-                request_data = {
-                    "messages": [{"role": "user", "content": "Chaos test"}]
-                }
+                request_data = {"messages": [{"role": "user", "content": "Chaos test"}]}
 
                 results = []
                 for i in range(20):  # Test many requests
@@ -110,8 +101,7 @@ class TestChaosEngineering:
 
                 # Check that all providers were attempted
                 provider_calls = {
-                    name: provider.call_count
-                    for name, provider in providers.items()
+                    name: provider.call_count for name, provider in providers.items()
                 }
                 assert all(calls > 0 for calls in provider_calls.values())
 
@@ -205,32 +195,24 @@ class TestChaosEngineering:
                 assert len(successful_results) > 5  # Most should succeed
 
                 # Should use both providers
-                used_providers = set(
-                    r.provider_name for r in successful_results
-                )
+                used_providers = set(r.provider_name for r in successful_results)
                 assert len(used_providers) >= 1
 
     @pytest.mark.asyncio
     async def test_load_shedding_under_high_load(self):
         """Test load shedding behavior under extreme load"""
         providers = {
-            "fast": ChaoticProvider(
-                "fast", failure_rate=0.0, latency_variation=0.05
-            ),
+            "fast": ChaoticProvider("fast", failure_rate=0.0, latency_variation=0.05),
             "medium": ChaoticProvider(
                 "medium", failure_rate=0.0, latency_variation=0.1
             ),
-            "slow": ChaoticProvider(
-                "slow", failure_rate=0.0, latency_variation=0.2
-            ),
+            "slow": ChaoticProvider("slow", failure_rate=0.0, latency_variation=0.2),
         }
 
         with self._mock_provider_factory(providers):
             with self._mock_provider_discovery(list(providers.keys())):
 
-                request_data = {
-                    "messages": [{"role": "user", "content": "Load test"}]
-                }
+                request_data = {"messages": [{"role": "user", "content": "Load test"}]}
 
                 # Simulate high concurrent load
                 tasks = []
@@ -250,14 +232,10 @@ class TestChaosEngineering:
 
                 # Analyze results
                 successful_results = [
-                    r
-                    for r in results
-                    if isinstance(r, dict) and r.get("success")
+                    r for r in results if isinstance(r, dict) and r.get("success")
                 ]
                 failed_results = [
-                    r
-                    for r in results
-                    if isinstance(r, dict) and not r.get("success")
+                    r for r in results if isinstance(r, dict) and not r.get("success")
                 ]
 
                 success_rate = len(successful_results) / len(results)
@@ -269,14 +247,10 @@ class TestChaosEngineering:
                 provider_usage = {}
                 for result in successful_results:
                     provider = result.get("provider_name")
-                    provider_usage[provider] = (
-                        provider_usage.get(provider, 0) + 1
-                    )
+                    provider_usage[provider] = provider_usage.get(provider, 0) + 1
 
                 # Should distribute load across providers
-                assert (
-                    len(provider_usage) >= 2
-                )  # Should use multiple providers
+                assert len(provider_usage) >= 2  # Should use multiple providers
 
     @pytest.mark.asyncio
     async def test_adaptive_timeout_under_varying_conditions(self):
@@ -311,9 +285,7 @@ class TestChaosEngineering:
             await circuit_breaker_pool.adapt_provider_timeout(provider_name)
 
         # Check that timeout has adapted
-        final_timeout = circuit_breaker_pool.get_provider_timeout(
-            provider_name
-        )
+        final_timeout = circuit_breaker_pool.get_provider_timeout(provider_name)
 
         # Should be different from base timeout due to adaptation
         assert final_timeout != 30.0  # Base timeout
@@ -344,20 +316,14 @@ class TestChaosEngineering:
             metrics = provider_discovery.get_provider_metrics(provider)
 
             # Should have collected metrics
-            assert (
-                metrics.total_requests >= 90
-            )  # Roughly 100 requests per provider
-            assert (
-                metrics.error_rate < 0.5
-            )  # Should detect the failure pattern
+            assert metrics.total_requests >= 90  # Roughly 100 requests per provider
+            assert metrics.error_rate < 0.5  # Should detect the failure pattern
 
         # Should still be able to select healthy providers
         healthy_providers = provider_discovery.get_healthy_providers_for_model(
             "gpt-3.5-turbo"
         )
-        assert (
-            len(healthy_providers) >= 1
-        )  # At least one should be considered healthy
+        assert len(healthy_providers) >= 1  # At least one should be considered healthy
 
     def _mock_provider_factory(self, providers):
         """Helper to mock provider factory"""

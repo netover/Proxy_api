@@ -124,9 +124,7 @@ class LoadBalancer:
         exclude_providers = exclude_providers or []
 
         # Get healthy providers for the model
-        candidate_providers = (
-            provider_discovery.get_healthy_providers_for_model(model)
-        )
+        candidate_providers = provider_discovery.get_healthy_providers_for_model(model)
 
         # Filter out excluded providers
         available_providers = [
@@ -157,9 +155,7 @@ class LoadBalancer:
                 return self._select_adaptive(model, available_providers)
 
         except Exception as e:
-            logger.error(
-                f"Provider selection failed: {e}, using first available"
-            )
+            logger.error(f"Provider selection failed: {e}, using first available")
             return available_providers[0] if available_providers else None
 
     def _select_round_robin(self, model: str, providers: List[str]) -> str:
@@ -167,16 +163,13 @@ class LoadBalancer:
         model_key = f"rr_{model}"
         current_index = self._round_robin_index[model_key]
         selected_provider = providers[current_index % len(providers)]
-        self._round_robin_index[model_key] = (current_index + 1) % len(
-            providers
-        )
+        self._round_robin_index[model_key] = (current_index + 1) % len(providers)
         return selected_provider
 
     def _select_least_connections(self, providers: List[str]) -> str:
         """Select provider with least active connections"""
         provider_loads = [
-            (self._get_provider_metric(p).active_connections, p)
-            for p in providers
+            (self._get_provider_metric(p).active_connections, p) for p in providers
         ]
         return min(provider_loads)[1]
 
@@ -186,9 +179,7 @@ class LoadBalancer:
         for provider in providers:
             metrics = self._get_provider_metric(provider)
             # Weight by performance score and inverse of active connections
-            weight = metrics.performance_score / max(
-                metrics.active_connections + 1, 1
-            )
+            weight = metrics.performance_score / max(metrics.active_connections + 1, 1)
             weights.append(weight)
 
         # Normalize weights
@@ -211,8 +202,7 @@ class LoadBalancer:
     def _select_least_latency(self, providers: List[str]) -> str:
         """Select provider with lowest recent latency"""
         provider_latencies = [
-            (self._get_provider_metric(p).recent_latency_ms, p)
-            for p in providers
+            (self._get_provider_metric(p).recent_latency_ms, p) for p in providers
         ]
         return min(provider_latencies)[1]
 
@@ -256,9 +246,7 @@ class LoadBalancer:
             cost_factor = min(cost_per_token / 0.01, 2.0)  # Cap at 2x penalty
             score *= 1.0 / cost_factor
 
-            scored_providers.append(
-                ProviderScore(-score, provider, {"score": score})
-            )
+            scored_providers.append(ProviderScore(-score, provider, {"score": score}))
 
         # Use priority queue to get the best
         heapq.heapify(scored_providers)
@@ -349,31 +337,26 @@ class LoadBalancer:
 
     def get_optimal_provider_count(self, model: str) -> int:
         """Determine optimal number of providers for parallel execution"""
-        available_providers = (
-            provider_discovery.get_healthy_providers_for_model(model)
-        )
+        available_providers = provider_discovery.get_healthy_providers_for_model(model)
 
         if len(available_providers) <= 2:
             return len(available_providers)  # Use all available
 
         # Analyze performance diversity
         performance_scores = [
-            self._get_provider_metric(p).performance_score
-            for p in available_providers
+            self._get_provider_metric(p).performance_score for p in available_providers
         ]
 
         # Calculate coefficient of variation
         if performance_scores:
             mean_score = sum(performance_scores) / len(performance_scores)
-            variance = sum(
-                (s - mean_score) ** 2 for s in performance_scores
-            ) / len(performance_scores)
+            variance = sum((s - mean_score) ** 2 for s in performance_scores) / len(
+                performance_scores
+            )
             cv = math.sqrt(variance) / max(mean_score, 0.1)
 
             # Higher variation suggests more providers for diversity
-            optimal_count = min(
-                len(available_providers), max(2, int(3 + cv * 2))
-            )
+            optimal_count = min(len(available_providers), max(2, int(3 + cv * 2)))
             return optimal_count
 
         return min(len(available_providers), 3)  # Default to 3
@@ -385,9 +368,7 @@ class LoadBalancer:
         Prioritize providers for parallel execution
         Returns providers in order of preference for parallel requests
         """
-        available_providers = (
-            provider_discovery.get_healthy_providers_for_model(model)
-        )
+        available_providers = provider_discovery.get_healthy_providers_for_model(model)
 
         if len(available_providers) <= max_providers:
             return available_providers
@@ -396,16 +377,14 @@ class LoadBalancer:
         scored_providers = []
         for provider in available_providers:
             metrics = self._get_provider_metric(provider)
-            health = provider_discovery.get_provider_health(provider)
+            provider_discovery.get_provider_health(provider)
 
             # Parallel score considers performance, load, and diversity
             base_score = metrics.performance_score
             load_penalty = metrics.active_connections / max(
                 metrics.active_connections + 1, 1
             )
-            diversity_bonus = (
-                1.0  # Could be enhanced with provider diversity logic
-            )
+            diversity_bonus = 1.0  # Could be enhanced with provider diversity logic
 
             final_score = base_score * (1 - load_penalty) * diversity_bonus
             scored_providers.append((final_score, provider))
@@ -419,9 +398,7 @@ class LoadBalancer:
         if self._load_update_task and not self._load_update_task.done():
             return
 
-        self._load_update_task = asyncio.create_task(
-            self._load_monitoring_loop()
-        )
+        self._load_update_task = asyncio.create_task(self._load_monitoring_loop())
         logger.info("Started load balancer monitoring")
 
     async def stop_load_monitoring(self):
@@ -466,7 +443,7 @@ class LoadBalancer:
 
     async def _cleanup_stale_requests(self):
         """Clean up stale request tracking"""
-        current_time = time.time()
+        time.time()
         stale_threshold = 300  # 5 minutes
 
         for provider_name in list(self._active_requests.keys()):
@@ -478,16 +455,12 @@ class LoadBalancer:
             if len(request_ids) > 1000:
                 # Remove oldest requests (simplified cleanup)
                 sorted_requests = sorted(request_ids)
-                stale_requests = set(
-                    sorted_requests[: len(sorted_requests) // 2]
-                )
+                stale_requests = set(sorted_requests[: len(sorted_requests) // 2])
 
             for request_id in stale_requests:
                 self._active_requests[provider_name].discard(request_id)
                 metrics = self._get_provider_metric(provider_name)
-                metrics.active_connections = len(
-                    self._active_requests[provider_name]
-                )
+                metrics.active_connections = len(self._active_requests[provider_name])
 
     def get_performance_report(self) -> Dict[str, Any]:
         """Generate comprehensive performance report"""

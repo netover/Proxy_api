@@ -60,9 +60,7 @@ async def reload_configuration(request: Request) -> ConfigReloadResponse:
         # Update app state if available
         if hasattr(request.app.state, "config"):
             request.app.state.config = new_config
-            request.app.state.condensation_config = (
-                new_config.settings.condensation
-            )
+            request.app.state.condensation_config = new_config.settings.condensation
 
         # Update config mtime for dynamic reload tracking
         if hasattr(request.app.state, "config_mtime"):
@@ -83,9 +81,7 @@ async def reload_configuration(request: Request) -> ConfigReloadResponse:
             success=True,
             message="Configuration reloaded successfully",
             reload_time_ms=round(reload_time, 2),
-            config_version=getattr(
-                new_config.settings, "app_version", "unknown"
-            ),
+            config_version=getattr(new_config.settings, "app_version", "unknown"),
             changes_detected=changes_detected,
         )
 
@@ -121,8 +117,7 @@ async def get_config_status(request: Request) -> ConfigStatusResponse:
 
         # Check if file watching is enabled
         file_watching_enabled = (
-            hasattr(config_loader, "observer")
-            and config_loader.observer is not None
+            hasattr(config_loader, "observer") and config_loader.observer is not None
         )
 
         return ConfigStatusResponse(

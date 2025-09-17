@@ -5,10 +5,7 @@ Comprehensive tests for HTTP client utilities and external service calls
 import pytest
 import asyncio
 import threading
-import time
-import json
 from unittest.mock import AsyncMock, MagicMock, patch
-from typing import Dict, Any
 
 import httpx
 from src.core.http_client import (
@@ -20,7 +17,6 @@ from src.core.http_client_v2 import (
     get_advanced_http_client,
     AdvancedHTTPClient,
 )
-from src.core.exceptions import APIConnectionError, TimeoutError
 
 
 class TestOptimizedHTTPClient:
@@ -97,9 +93,7 @@ class TestOptimizedHTTPClient:
         with patch.object(
             http_client._client, "request", return_value=mock_response
         ) as mock_request:
-            response = await http_client.request(
-                "GET", "https://api.example.com/test"
-            )
+            response = await http_client.request("GET", "https://api.example.com/test")
 
             assert response == mock_response
             mock_request.assert_called_once_with(
@@ -112,9 +106,7 @@ class TestOptimizedHTTPClient:
             )
 
     @pytest.mark.asyncio
-    async def test_request_with_all_parameters(
-        self, http_client, mock_response
-    ):
+    async def test_request_with_all_parameters(self, http_client, mock_response):
         """Test request with all parameters"""
         await http_client.initialize()
 
@@ -143,9 +135,7 @@ class TestOptimizedHTTPClient:
             )
 
     @pytest.mark.asyncio
-    async def test_request_auto_initialization(
-        self, http_client, mock_response
-    ):
+    async def test_request_auto_initialization(self, http_client, mock_response):
         """Test that request auto-initializes client"""
         # Don't call initialize first
         with patch("httpx.AsyncClient") as mock_client_class:
@@ -153,9 +143,7 @@ class TestOptimizedHTTPClient:
             mock_client_instance.request.return_value = mock_response
             mock_client_class.return_value = mock_client_instance
 
-            response = await http_client.request(
-                "GET", "https://api.example.com/test"
-            )
+            response = await http_client.request("GET", "https://api.example.com/test")
 
             assert response == mock_response
             assert http_client._client is not None
@@ -185,9 +173,7 @@ class TestOptimizedHTTPClient:
                 mock_response,
             ]
 
-            response = await http_client.request(
-                "GET", "https://api.example.com/test"
-            )
+            response = await http_client.request("GET", "https://api.example.com/test")
 
             assert response == mock_response
             assert mock_request.call_count == 3  # Initial + 2 retries
@@ -206,9 +192,7 @@ class TestOptimizedHTTPClient:
                 mock_response,
             ]
 
-            response = await http_client.request(
-                "GET", "https://api.example.com/test"
-            )
+            response = await http_client.request("GET", "https://api.example.com/test")
 
             assert response == mock_response
             assert mock_request.call_count == 2
@@ -224,9 +208,7 @@ class TestOptimizedHTTPClient:
             side_effect=httpx.ConnectError("Connection failed"),
         ):
             with pytest.raises(httpx.ConnectError):
-                await http_client.request(
-                    "GET", "https://api.example.com/test"
-                )
+                await http_client.request("GET", "https://api.example.com/test")
 
     @pytest.mark.asyncio
     async def test_non_retryable_error(self, http_client):
@@ -243,9 +225,7 @@ class TestOptimizedHTTPClient:
             ),
         ):
             with pytest.raises(httpx.HTTPStatusError):
-                await http_client.request(
-                    "GET", "https://api.example.com/test"
-                )
+                await http_client.request("GET", "https://api.example.com/test")
 
     @pytest.mark.asyncio
     async def test_exponential_backoff_delays(self, http_client):
@@ -263,15 +243,11 @@ class TestOptimizedHTTPClient:
                     mock_response,
                 ]
 
-                await http_client.request(
-                    "GET", "https://api.example.com/test"
-                )
+                await http_client.request("GET", "https://api.example.com/test")
 
                 # Check backoff delays: 0.1, 0.2
                 expected_delays = [0.1, 0.2]
-                actual_delays = [
-                    call[0][0] for call in mock_sleep.call_args_list
-                ]
+                actual_delays = [call[0][0] for call in mock_sleep.call_args_list]
                 assert actual_delays == expected_delays
 
     @pytest.mark.asyncio
@@ -279,9 +255,7 @@ class TestOptimizedHTTPClient:
         """Test metrics collection"""
         await http_client.initialize()
 
-        with patch.object(
-            http_client._client, "request", return_value=mock_response
-        ):
+        with patch.object(http_client._client, "request", return_value=mock_response):
             await http_client.request("GET", "https://api.example.com/test")
 
             metrics = http_client.get_metrics()
@@ -301,20 +275,14 @@ class TestOptimizedHTTPClient:
             side_effect=httpx.ConnectError("Connection failed"),
         ):
             with pytest.raises(httpx.ConnectError):
-                await http_client.request(
-                    "GET", "https://api.example.com/test"
-                )
+                await http_client.request("GET", "https://api.example.com/test")
 
             metrics = http_client.get_metrics()
-            assert (
-                metrics["requests_total"] == 0
-            )  # Failed before making request
+            assert metrics["requests_total"] == 0  # Failed before making request
             assert metrics["errors_total"] >= 1  # At least one error recorded
 
     @pytest.mark.asyncio
-    async def test_circuit_breaker_integration(
-        self, http_client, mock_response
-    ):
+    async def test_circuit_breaker_integration(self, http_client, mock_response):
         """Test circuit breaker integration"""
         mock_circuit_breaker = AsyncMock()
         mock_circuit_breaker.execute.return_value = mock_response
@@ -322,9 +290,7 @@ class TestOptimizedHTTPClient:
 
         await http_client.initialize()
 
-        response = await http_client.request(
-            "GET", "https://api.example.com/test"
-        )
+        response = await http_client.request("GET", "https://api.example.com/test")
 
         assert response == mock_response
         mock_circuit_breaker.execute.assert_called_once()
@@ -334,13 +300,9 @@ class TestOptimizedHTTPClient:
         """Test request logging"""
         await http_client.initialize()
 
-        with patch.object(
-            http_client._client, "request", return_value=mock_response
-        ):
+        with patch.object(http_client._client, "request", return_value=mock_response):
             with patch("src.core.http_client.logger") as mock_logger:
-                await http_client.request(
-                    "GET", "https://api.example.com/test"
-                )
+                await http_client.request("GET", "https://api.example.com/test")
 
                 # Check success logging
                 mock_logger.info.assert_called()
@@ -361,16 +323,12 @@ class TestOptimizedHTTPClient:
         ):
             with patch("src.core.http_client.logger") as mock_logger:
                 with pytest.raises(httpx.ConnectError):
-                    await http_client.request(
-                        "GET", "https://api.example.com/test"
-                    )
+                    await http_client.request("GET", "https://api.example.com/test")
 
                 # Check error logging
                 mock_logger.error.assert_called()
                 call_args = mock_logger.error.call_args
-                assert (
-                    "HTTP request failed after all retries" in call_args[0][0]
-                )
+                assert "HTTP request failed after all retries" in call_args[0][0]
 
     @pytest.mark.asyncio
     async def test_retry_logging(self, http_client):
@@ -387,9 +345,7 @@ class TestOptimizedHTTPClient:
                     mock_response,
                 ]
 
-                await http_client.request(
-                    "GET", "https://api.example.com/test"
-                )
+                await http_client.request("GET", "https://api.example.com/test")
 
                 # Check retry logging
                 mock_logger.warning.assert_called()
@@ -464,9 +420,7 @@ class TestHTTPClientTimeoutScenarios:
             side_effect=httpx.ConnectTimeout("Connect timeout"),
         ):
             with pytest.raises(httpx.ConnectTimeout):
-                await timeout_client.request(
-                    "GET", "https://api.example.com/test"
-                )
+                await timeout_client.request("GET", "https://api.example.com/test")
 
     @pytest.mark.asyncio
     async def test_read_timeout(self, timeout_client):
@@ -479,9 +433,7 @@ class TestHTTPClientTimeoutScenarios:
             side_effect=httpx.ReadTimeout("Read timeout"),
         ):
             with pytest.raises(httpx.ReadTimeout):
-                await timeout_client.request(
-                    "GET", "https://api.example.com/test"
-                )
+                await timeout_client.request("GET", "https://api.example.com/test")
 
     @pytest.mark.asyncio
     async def test_timeout_with_retry(self, timeout_client):
@@ -511,9 +463,7 @@ class TestHTTPClientErrorScenarios:
     @pytest.fixture
     def error_client(self):
         """Create client for error testing"""
-        return OptimizedHTTPClient(
-            retry_attempts=0
-        )  # No retries for cleaner tests
+        return OptimizedHTTPClient(retry_attempts=0)  # No retries for cleaner tests
 
     @pytest.mark.asyncio
     async def test_4xx_errors_not_retried(self, error_client):
@@ -526,13 +476,9 @@ class TestHTTPClientErrorScenarios:
             "400 Bad Request", response=response, request=MagicMock()
         )
 
-        with patch.object(
-            error_client._client, "request", return_value=response
-        ):
+        with patch.object(error_client._client, "request", return_value=response):
             with pytest.raises(httpx.HTTPStatusError):
-                await error_client.request(
-                    "GET", "https://api.example.com/test"
-                )
+                await error_client.request("GET", "https://api.example.com/test")
 
     @pytest.mark.asyncio
     async def test_5xx_errors_retried(self, error_client):
@@ -552,9 +498,7 @@ class TestHTTPClientErrorScenarios:
         with patch.object(error_client._client, "request") as mock_request:
             mock_request.side_effect = [response, mock_success_response]
 
-            result = await error_client.request(
-                "GET", "https://api.example.com/test"
-            )
+            result = await error_client.request("GET", "https://api.example.com/test")
 
             assert result == mock_success_response
             assert mock_request.call_count == 2
@@ -573,9 +517,7 @@ class TestHTTPClientErrorScenarios:
                 mock_response,
             ]
 
-            result = await error_client.request(
-                "GET", "https://api.example.com/test"
-            )
+            result = await error_client.request("GET", "https://api.example.com/test")
 
             assert result == mock_response
             assert mock_request.call_count == 2
@@ -591,13 +533,9 @@ class TestHTTPClientErrorScenarios:
 
         ssl_error = SSLError("SSL certificate verify failed")
 
-        with patch.object(
-            error_client._client, "request", side_effect=ssl_error
-        ):
+        with patch.object(error_client._client, "request", side_effect=ssl_error):
             with pytest.raises(SSLError) as exc_info:
-                await error_client.request(
-                    "GET", "https://api.example.com/test"
-                )
+                await error_client.request("GET", "https://api.example.com/test")
 
             assert "SSL certificate verify failed" in str(exc_info.value)
 
@@ -632,12 +570,8 @@ class TestHTTPClientMetrics:
         with patch.object(
             metrics_client._client, "request", return_value=mock_response
         ):
-            await metrics_client.request(
-                "GET", "https://api.example.com/test1"
-            )
-            await metrics_client.request(
-                "GET", "https://api.example.com/test2"
-            )
+            await metrics_client.request("GET", "https://api.example.com/test1")
+            await metrics_client.request("GET", "https://api.example.com/test2")
 
             metrics = metrics_client.get_metrics()
 
@@ -658,26 +592,18 @@ class TestHTTPClientMetrics:
         with patch.object(metrics_client._client, "request") as mock_request:
             # Success
             mock_request.return_value = mock_response
-            await metrics_client.request(
-                "GET", "https://api.example.com/success"
-            )
+            await metrics_client.request("GET", "https://api.example.com/success")
 
             # Failure
             mock_request.side_effect = httpx.ConnectError("Connection failed")
             with pytest.raises(httpx.ConnectError):
-                await metrics_client.request(
-                    "GET", "https://api.example.com/failure"
-                )
+                await metrics_client.request("GET", "https://api.example.com/failure")
 
             metrics = metrics_client.get_metrics()
 
-            assert (
-                metrics["requests_total"] == 1
-            )  # Only successful request counted
+            assert metrics["requests_total"] == 1  # Only successful request counted
             assert metrics["errors_total"] >= 1  # At least one error recorded
-            assert (
-                metrics["error_rate"] == 1.0
-            )  # 1 error out of 1 total request
+            assert metrics["error_rate"] == 1.0  # 1 error out of 1 total request
 
     @pytest.mark.asyncio
     async def test_connection_pool_metrics(self, metrics_client):
@@ -689,9 +615,7 @@ class TestHTTPClientMetrics:
 
             # Verify connection pool metrics are sent to collector
             mock_collector.update_connection_pool_metrics.assert_called_once()
-            call_args = (
-                mock_collector.update_connection_pool_metrics.call_args[0][0]
-            )
+            call_args = mock_collector.update_connection_pool_metrics.call_args[0][0]
 
             assert "max_keepalive_connections" in call_args
             assert "max_connections" in call_args

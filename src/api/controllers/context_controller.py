@@ -8,7 +8,6 @@ from slowapi.util import get_remote_address
 
 from src.core.exceptions import ServiceUnavailableError
 from src.core.logging import ContextualLogger
-from src.core.unified_config import get_config
 from src.core.metrics import metrics_collector
 
 logger = ContextualLogger(__name__)
@@ -39,21 +38,15 @@ async def condense_context_via_service(
             return result["summary"]
     except httpx.RequestError as e:
         logger.error(f"Failed to call context service: {e}")
-        raise ServiceUnavailableError(
-            "Context condensation service is unavailable"
-        )
+        raise ServiceUnavailableError("Context condensation service is unavailable")
     except httpx.HTTPStatusError as e:
         logger.error(
             f"Context service error: {e.response.status_code} - {e.response.text}"
         )
-        raise ServiceUnavailableError(
-            "Context condensation service returned an error"
-        )
+        raise ServiceUnavailableError("Context condensation service returned an error")
 
 
-async def background_condense(
-    request_id: str, request: Request, chunks: List[str]
-):
+async def background_condense(request_id: str, request: Request, chunks: List[str]):
     """Background task to compute full context summary and store in smart cache"""
     try:
         start_time = time.time()
@@ -76,9 +69,7 @@ async def background_condense(
             request.app.state.summary_cache[request_id] = cache_data
 
         metrics_collector.record_summary(False, latency)
-        logger.info(
-            "Background summary stored", extra={"request_id": request_id}
-        )
+        logger.info("Background summary stored", extra={"request_id": request_id})
 
     except Exception as e:
         logger.error(

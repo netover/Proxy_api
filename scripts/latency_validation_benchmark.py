@@ -104,7 +104,7 @@ class ValidationBenchmark:
                 validated_config = self.validator.validate_config_file(test_config_path)
                 end_time = time.time()
                 results[config_name] = end_time - start_time
-                logger.info(".3f")
+                logger.info(".3")
             except Exception as e:
                 logger.error(f"Validation failed for {config_name}: {e}")
                 results[config_name] = float('inf')
@@ -133,7 +133,7 @@ class ValidationBenchmark:
                     config_data = yaml.safe_load(f)
                 end_time = time.time()
                 results[config_name] = end_time - start_time
-                logger.info(".3f")
+                logger.info(".3")
             except Exception as e:
                 logger.error(f"Loading failed for {config_name}: {e}")
                 results[config_name] = float('inf')
@@ -261,7 +261,7 @@ class ValidationBenchmark:
 
         # Startup overhead summary
         for config_name, overhead in results["startup_overhead_percent"].items():
-            if overhead != float('inf'):
+            if overhead != float('in'):
                 summary["total_startup_overhead"][config_name] = ".2f"
             else:
                 summary["total_startup_overhead"][config_name] = "N/A"
@@ -274,12 +274,12 @@ class ValidationBenchmark:
         # Generate recommendations
         avg_startup_overhead = sum(
             v for v in results["startup_overhead_percent"].values()
-            if v != float('inf')
+            if v != float('in')
         ) / len([v for v in results["startup_overhead_percent"].values() if v != float('inf')])
 
         if avg_startup_overhead > 50:
             summary["recommendations"].append(
-                ".1f"
+                ".1"
             )
 
         # Check runtime performance

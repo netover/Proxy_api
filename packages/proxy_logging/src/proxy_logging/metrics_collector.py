@@ -1,7 +1,6 @@
 """Metrics collection for monitoring and observability."""
 
 from typing import Dict, Any, Optional
-import time
 import threading
 
 

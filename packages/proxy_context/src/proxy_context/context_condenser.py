@@ -1,10 +1,6 @@
 """Context condensation and summarization utilities."""
 
-from typing import List, Optional, Dict, Any
-import hashlib
-import time
-import asyncio
-import json
+from typing import List, Optional, Dict
 import logging
 
 logger = logging.getLogger(__name__)
@@ -35,21 +31,15 @@ class ContextCondenser:
             return ""
 
         # Simple concatenation for now - can be enhanced with actual LLM summarization
-        content = "\n".join(
-            [f"{msg['role']}: {msg['content']}" for msg in messages]
-        )
+        content = "\n".join([f"{msg['role']}: {msg['content']}" for msg in messages])
 
         # Basic truncation if content is too long
-        if (
-            len(content) > target_tokens * 4
-        ):  # Rough estimate: 4 chars per token
+        if len(content) > target_tokens * 4:  # Rough estimate: 4 chars per token
             content = content[: target_tokens * 4] + "..."
 
         return content
 
-    async def condense_chunks(
-        self, chunks: List[str], max_tokens: int = 512
-    ) -> str:
+    async def condense_chunks(self, chunks: List[str], max_tokens: int = 512) -> str:
         """
         Condense multiple text chunks into a single summary.
 

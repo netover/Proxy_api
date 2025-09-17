@@ -123,9 +123,7 @@ class ChaosMonkey:
                         request=None,
                         response=httpx.Response(
                             status_code=fault_config.error_code or 500,
-                            content=json.dumps(
-                                {"error": "Chaos injection error"}
-                            ),
+                            content=json.dumps({"error": "Chaos injection error"}),
                         ),
                     )
                     span.set_attribute("fault.error_thrown", True)
@@ -144,9 +142,7 @@ class ChaosMonkey:
                         request=None,
                         response=httpx.Response(
                             status_code=429,
-                            content=json.dumps(
-                                {"error": "Rate limit exceeded"}
-                            ),
+                            content=json.dumps({"error": "Rate limit exceeded"}),
                         ),
                     )
                     span.set_attribute("fault.rate_limit_thrown", True)
@@ -157,9 +153,7 @@ class ChaosMonkey:
 
                 elif fault_config.fault_type == FaultType.MEMORY_PRESSURE:
                     # Simulate memory pressure without actually consuming memory
-                    await asyncio.sleep(
-                        min(fault_config.duration_ms / 1000.0, 0.1)
-                    )
+                    await asyncio.sleep(min(fault_config.duration_ms / 1000.0, 0.1))
                     span.set_attribute("fault.memory_pressure_simulated", True)
 
                 return None
@@ -189,9 +183,7 @@ class ChaosMonkey:
         try:
             # Check for applicable faults
             applicable_faults = [
-                fault
-                for fault in self.active_faults
-                if self.should_inject_fault(fault)
+                fault for fault in self.active_faults if self.should_inject_fault(fault)
             ]
 
             if applicable_faults:
@@ -232,9 +224,7 @@ class ChaosMonkey:
             "active_faults": len(self.active_faults),
             "fault_types": fault_types,
             "severities": severities,
-            "recent_injections": self.injection_history[
-                -10:
-            ],  # Last 10 injections
+            "recent_injections": self.injection_history[-10:],  # Last 10 injections
         }
 
     def reset(self) -> None:
@@ -263,9 +253,7 @@ class NetworkSimulator:
         "network.simulate_jitter",
         attributes={"operation": "network_simulation"},
     )
-    async def simulate_jitter(
-        base_delay_ms: int, jitter_percent: float = 0.2
-    ) -> None:
+    async def simulate_jitter(base_delay_ms: int, jitter_percent: float = 0.2) -> None:
         """Simulate network jitter."""
         jitter = base_delay_ms * jitter_percent
         jittered_delay = base_delay_ms + random.uniform(-jitter, jitter)

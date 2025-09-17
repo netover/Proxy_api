@@ -4,7 +4,6 @@ Unit tests for Configuration Compatibility Layer
 
 import json
 import tempfile
-import warnings
 from pathlib import Path
 from unittest.mock import patch
 
@@ -30,9 +29,7 @@ class TestLegacyFormatDetector:
         detector = LegacyFormatDetector()
 
         # Test with legacy format
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".json", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             json.dump({"openai": "gpt-3.5-turbo", "anthropic": "claude-3"}, f)
             legacy_path = Path(f.name)
 
@@ -42,9 +39,7 @@ class TestLegacyFormatDetector:
             legacy_path.unlink()
 
         # Test with new format
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".json", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             json.dump(
                 {
                     "openai": {
@@ -71,14 +66,10 @@ class TestLegacyFormatDetector:
             "host": "127.0.0.1",
             "port": 8000,
             "api_keys": "key1,key2",
-            "providers": [
-                {"name": "openai", "base_url": "https://api.openai.com/v1"}
-            ],
+            "providers": [{"name": "openai", "base_url": "https://api.openai.com/v1"}],
         }
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.safe_dump(legacy_config, f)
             legacy_path = Path(f.name)
 
@@ -102,9 +93,7 @@ def old_function():
     pass
 """
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".py", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
             f.write(legacy_content)
             legacy_path = Path(f.name)
 
@@ -124,15 +113,11 @@ class TestLegacyConfigMigrator:
         # Create legacy format
         legacy_data = {"openai": "gpt-3.5-turbo", "anthropic": "claude-3"}
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".json", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             json.dump(legacy_data, f)
             legacy_path = Path(f.name)
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".json", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             f.write("{}")  # Empty new file
             new_path = Path(f.name)
 
@@ -167,20 +152,14 @@ class TestLegacyConfigMigrator:
             "host": "127.0.0.1",
             "port": 8000,
             "api_keys": "key1,key2",
-            "providers": [
-                {"name": "openai", "base_url": "https://api.openai.com/v1"}
-            ],
+            "providers": [{"name": "openai", "base_url": "https://api.openai.com/v1"}],
         }
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.safe_dump(legacy_data, f)
             legacy_path = Path(f.name)
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write("")  # Empty new file
             new_path = Path(f.name)
 

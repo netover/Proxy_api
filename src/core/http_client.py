@@ -258,9 +258,7 @@ class OptimizedHTTPClient:
             "errors_total": self.error_count,
             "avg_response_time_ms": round(avg_response_time * 1000, 2),
             "error_rate": (
-                self.error_count / self.request_count
-                if self.request_count > 0
-                else 0
+                self.error_count / self.request_count if self.request_count > 0 else 0
             ),
             "max_connections": self.max_connections,
             "active_connections": (
@@ -276,9 +274,7 @@ class OptimizedHTTPClient:
             "max_connections": self.max_connections,
             "active_connections": metrics["active_connections"],
             "available_connections": (
-                getattr(self._client, "_pool", {}).get(
-                    "available_connections", 0
-                )
+                getattr(self._client, "_pool", {}).get("available_connections", 0)
                 if self._client
                 else 0
             ),

@@ -9,7 +9,7 @@ import asyncio
 import gc
 import logging
 from collections import OrderedDict
-from typing import Any, Optional
+from typing import Any, Optional, Dict
 
 logger = logging.getLogger(__name__)
 
@@ -72,9 +72,7 @@ class SmartContextManager:
         if not self.contexts:
             return
         oldest_key, _ = self.contexts.popitem(last=False)
-        logger.info(
-            f"Evicted oldest context '{oldest_key}' due to size limit."
-        )
+        logger.info(f"Evicted oldest context '{oldest_key}' due to size limit.")
 
     async def _trigger_gc(self):
         """
@@ -107,21 +105,21 @@ class SmartContextManager:
 _memory_manager: Optional[SmartContextManager] = None
 
 
-def get_memory_manager() -> SmartContextManager:
+async def get_memory_manager(config: Dict[str, Any] = None) -> SmartContextManager:
     """
     Gets the global singleton instance of the SmartContextManager.
     This function is intended to be the primary access point for the memory manager.
     """
     global _memory_manager
     if _memory_manager is None:
-        # In a real application, max_size might come from a configuration file.
-        _memory_manager = SmartContextManager(max_size=1000)
+        if config:
+            # Note: The current SmartContextManager doesn't use the full config.
+            # This is a pragmatic fix to allow startup. A future refactor should
+            # align the MemoryManager with the config settings.
+             _memory_manager = SmartContextManager(max_size=1000)
+        else:
+            _memory_manager = SmartContextManager(max_size=1000)
     return _memory_manager
-
-
-async def initialize_memory_manager() -> SmartContextManager:
-    """Initializes and returns the global memory manager instance."""
-    return get_memory_manager()
 
 
 async def shutdown_memory_manager():
@@ -131,5 +129,6 @@ async def shutdown_memory_manager():
     global _memory_manager
     if _memory_manager:
         logger.info("Shutting down memory manager and clearing contexts.")
-        await _memory_manager.clear()
+        # .clear() is synchronous
+        _memory_manager.clear()
         _memory_manager = None

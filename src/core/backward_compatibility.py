@@ -175,15 +175,11 @@ class LegacySmartCache:
 
         return result
 
-    async def set(
-        self, key: str, value: Any, ttl: Optional[int] = None
-    ) -> bool:
+    async def set(self, key: str, value: Any, ttl: Optional[int] = None) -> bool:
         """Set value in cache (legacy async interface)"""
         if ttl is None:
             ttl = self.default_ttl
-        return await self._cache_manager.set(
-            key, value, ttl=ttl, category="responses"
-        )
+        return await self._cache_manager.set(key, value, ttl=ttl, category="responses")
 
     async def delete(self, key: str) -> bool:
         """Delete key from cache (legacy async interface)"""
@@ -208,9 +204,7 @@ class LegacySmartCache:
             "misses": self.misses,
             "total_requests": self.total_requests,
             "hit_rate": (
-                self.hits / self.total_requests
-                if self.total_requests > 0
-                else 0
+                self.hits / self.total_requests if self.total_requests > 0 else 0
             ),
             "evictions": stats.get("evictions", 0),
             "default_ttl": self.default_ttl,
@@ -224,15 +218,11 @@ class LegacySmartCache:
         """Stop cache (legacy async interface)"""
         # Don't actually stop the consolidated cache manager
 
-    async def get_or_set(
-        self, key: str, getter_func, ttl: Optional[int] = None
-    ) -> Any:
+    async def get_or_set(self, key: str, getter_func, ttl: Optional[int] = None) -> Any:
         """Get or set value (legacy async interface)"""
         if ttl is None:
             ttl = self.default_ttl
-        return await self._cache_manager.get_or_set(
-            key, getter_func, ttl, "responses"
-        )
+        return await self._cache_manager.get_or_set(key, getter_func, ttl, "responses")
 
 
 class LegacyCacheManager:
@@ -293,9 +283,7 @@ class LegacyCacheManager:
         self, provider_config, force_refresh: bool = False
     ) -> List[Dict[str, Any]]:
         """Get models with caching (legacy async interface)"""
-        key = self.generate_cache_key(
-            provider_config.name, provider_config.base_url
-        )
+        key = self.generate_cache_key(provider_config.name, provider_config.base_url)
 
         if not force_refresh:
             cached = await self._cache_manager.get(key, category="models")
@@ -304,9 +292,7 @@ class LegacyCacheManager:
 
         # Fetch from provider (would need discovery service)
         if hasattr(self, "discovery_service") and self.discovery_service:
-            models = await self.discovery_service.discover_models(
-                provider_config
-            )
+            models = await self.discovery_service.discover_models(provider_config)
 
             # Cache the results
             await self._cache_manager.set(key, models, category="models")
@@ -432,9 +418,7 @@ def enable_backward_compatibility():
         import src.core.smart_cache as smart_cache_module
 
         smart_cache_module.SmartCache = LegacySmartCache
-        smart_cache_module.get_response_cache = (
-            lambda: get_legacy_smart_cache()
-        )
+        smart_cache_module.get_response_cache = lambda: get_legacy_smart_cache()
         smart_cache_module.get_summary_cache = lambda: get_legacy_smart_cache()
         smart_cache_module.initialize_caches = lambda: None  # No-op
         smart_cache_module.shutdown_caches = lambda: None  # No-op

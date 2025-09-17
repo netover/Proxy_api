@@ -219,9 +219,7 @@ CONFIG_SCHEMA = {
                     },
                     "custom_headers": {
                         "type": "object",
-                        "patternProperties": {
-                            "^[a-zA-Z0-9_-]+$": {"type": "string"}
-                        },
+                        "patternProperties": {"^[a-zA-Z0-9_-]+$": {"type": "string"}},
                         "additionalProperties": False,
                     },
                 },
@@ -452,9 +450,7 @@ class ConfigValidator:
                     + "\n".join(error_messages)
                 )
 
-                logger.error(
-                    "Configuration validation failed", errors=len(errors)
-                )
+                logger.error("Configuration validation failed", errors=len(errors))
                 raise ValueError(error_summary)
 
             logger.info("Configuration validation successful")
@@ -494,13 +490,9 @@ class ConfigValidator:
             return config_data
 
         except yaml.YAMLError as e:
-            raise ValueError(
-                f"Invalid YAML in configuration file {config_path}: {e}"
-            )
+            raise ValueError(f"Invalid YAML in configuration file {config_path}: {e}")
         except Exception as e:
-            raise ValueError(
-                f"Failed to load configuration from {config_path}: {e}"
-            )
+            raise ValueError(f"Failed to load configuration from {config_path}: {e}")
 
     def get_schema_summary(self) -> Dict[str, Any]:
         """Get summary of schema requirements for documentation"""
@@ -536,29 +528,21 @@ def validate_config_at_startup(config_path: Path) -> Dict[str, Any]:
         SystemExit: If validation fails (fast failure)
     """
     try:
-        logger.info(
-            "Validating configuration at startup", config_path=str(config_path)
-        )
+        logger.info("Validating configuration at startup", config_path=str(config_path))
         config_data = config_validator.validate_config_file(config_path)
         logger.info("Configuration validation passed")
         return config_data
 
     except ValueError as e:
-        logger.error(
-            "Configuration validation failed at startup", error=str(e)
-        )
-        print(f"\n❌ CONFIGURATION ERROR:")
+        logger.error("Configuration validation failed at startup", error=str(e))
+        print("\n❌ CONFIGURATION ERROR:")
         print(f"{e}")
-        print(
-            "\n🔧 Please fix the configuration file and restart the application.\n"
-        )
+        print("\n🔧 Please fix the configuration file and restart the application.\n")
         exit(1)
 
     except Exception as e:
-        logger.error(
-            "Unexpected error during configuration validation", error=str(e)
-        )
-        print(f"\n❌ UNEXPECTED CONFIGURATION ERROR:")
+        logger.error("Unexpected error during configuration validation", error=str(e))
+        print("\n❌ UNEXPECTED CONFIGURATION ERROR:")
         print(f"{e}")
         print("\n🔧 Please check the configuration file and try again.\n")
         exit(1)

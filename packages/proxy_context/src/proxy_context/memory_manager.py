@@ -9,7 +9,6 @@ import psutil
 import threading
 import time
 from typing import Dict, Any, List, Optional, Callable
-from collections import defaultdict
 from dataclasses import dataclass
 import logging
 
@@ -199,9 +198,7 @@ class MemoryManager:
         # Aggressive garbage collection
         for generation in range(3):
             collected = gc.collect(generation)
-            logger.info(
-                f"Emergency GC generation {generation}: {collected} objects"
-            )
+            logger.info(f"Emergency GC generation {generation}: {collected} objects")
 
         # Clear any cached objects
         gc.collect()
@@ -242,21 +239,11 @@ class MemoryManager:
     def _get_object_snapshot(self) -> Dict[str, int]:
         """Get snapshot of object counts"""
         return {
-            "dict": len(
-                [obj for obj in gc.get_objects() if isinstance(obj, dict)]
-            ),
-            "list": len(
-                [obj for obj in gc.get_objects() if isinstance(obj, list)]
-            ),
-            "tuple": len(
-                [obj for obj in gc.get_objects() if isinstance(obj, tuple)]
-            ),
-            "str": len(
-                [obj for obj in gc.get_objects() if isinstance(obj, str)]
-            ),
-            "function": len(
-                [obj for obj in gc.get_objects() if callable(obj)]
-            ),
+            "dict": len([obj for obj in gc.get_objects() if isinstance(obj, dict)]),
+            "list": len([obj for obj in gc.get_objects() if isinstance(obj, list)]),
+            "tuple": len([obj for obj in gc.get_objects() if isinstance(obj, tuple)]),
+            "str": len([obj for obj in gc.get_objects() if isinstance(obj, str)]),
+            "function": len([obj for obj in gc.get_objects() if callable(obj)]),
             "total": len(gc.get_objects()),
         }
 
@@ -274,14 +261,12 @@ class MemoryManager:
             # Check if all counts are increasing
             if all(counts[i] < counts[i + 1] for i in range(len(counts) - 1)):
                 growth_rate = (
-                    (counts[-1] - counts[0]) / counts[0]
-                    if counts[0] > 0
-                    else 0
+                    (counts[-1] - counts[0]) / counts[0] if counts[0] > 0 else 0
                 )
 
                 if growth_rate > 0.1:  # 10% growth
                     logger.warning(
-                        f"Potential memory leak detected",
+                        "Potential memory leak detected",
                         extra={
                             "object_type": obj_type,
                             "growth_rate": round(growth_rate, 3),
@@ -315,15 +300,11 @@ class MemoryManager:
         memory_info = process.memory_info()
 
         return MemoryStats(
-            total_memory_mb=round(
-                psutil.virtual_memory().total / (1024 * 1024), 2
-            ),
+            total_memory_mb=round(psutil.virtual_memory().total / (1024 * 1024), 2),
             available_memory_mb=round(
                 psutil.virtual_memory().available / (1024 * 1024), 2
             ),
-            used_memory_mb=round(
-                psutil.virtual_memory().used / (1024 * 1024), 2
-            ),
+            used_memory_mb=round(psutil.virtual_memory().used / (1024 * 1024), 2),
             memory_percent=round(psutil.virtual_memory().percent, 2),
             process_memory_mb=round(memory_info.rss / (1024 * 1024), 2),
             gc_collections=dict(gc.get_stats()),
@@ -389,12 +370,8 @@ def get_memory_stats() -> MemoryStats:
     memory_info = process.memory_info()
 
     return MemoryStats(
-        total_memory_mb=round(
-            psutil.virtual_memory().total / (1024 * 1024), 2
-        ),
-        available_memory_mb=round(
-            psutil.virtual_memory().available / (1024 * 1024), 2
-        ),
+        total_memory_mb=round(psutil.virtual_memory().total / (1024 * 1024), 2),
+        available_memory_mb=round(psutil.virtual_memory().available / (1024 * 1024), 2),
         used_memory_mb=round(psutil.virtual_memory().used / (1024 * 1024), 2),
         memory_percent=round(psutil.virtual_memory().percent, 2),
         process_memory_mb=round(memory_info.rss / (1024 * 1024), 2),

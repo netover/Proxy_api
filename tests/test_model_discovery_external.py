@@ -4,9 +4,7 @@ Comprehensive tests for model discovery external service calls
 
 import pytest
 import asyncio
-import json
-from unittest.mock import AsyncMock, MagicMock, patch
-from typing import List, Dict, Any
+from unittest.mock import AsyncMock, patch
 
 import aiohttp
 from src.core.model_discovery import ModelDiscoveryService, ProviderConfig
@@ -88,21 +86,15 @@ class TestModelDiscoveryExternalCalls:
         ):
             with patch("aiohttp.ClientSession") as mock_session_class:
                 mock_session = AsyncMock()
-                mock_session_class.return_value.__aenter__.return_value = (
-                    mock_session
-                )
+                mock_session_class.return_value.__aenter__.return_value = mock_session
 
                 # Mock successful response
                 mock_response = AsyncMock()
                 mock_response.status = 200
                 mock_response.json.return_value = mock_model_data
-                mock_session.get.return_value.__aenter__.return_value = (
-                    mock_response
-                )
+                mock_session.get.return_value.__aenter__.return_value = mock_response
 
-                models = await discovery_service.discover_models(
-                    provider_config
-                )
+                models = await discovery_service.discover_models(provider_config)
 
                 assert len(models) == 2
                 assert models[0].id == "gpt-4"
@@ -111,18 +103,9 @@ class TestModelDiscoveryExternalCalls:
                 # Verify HTTP call
                 mock_session.get.assert_called_once()
                 call_args = mock_session.get.call_args
-                assert (
-                    call_args[0][0]
-                    == "https://api.test-provider.com/v1/models"
-                )
-                assert (
-                    call_args[1]["headers"]["Authorization"]
-                    == "Bearer test-api-key"
-                )
-                assert (
-                    call_args[1]["headers"]["OpenAI-Organization"]
-                    == "test-org"
-                )
+                assert call_args[0][0] == "https://api.test-provider.com/v1/models"
+                assert call_args[1]["headers"]["Authorization"] == "Bearer test-api-key"
+                assert call_args[1]["headers"]["OpenAI-Organization"] == "test-org"
 
                 # Verify cache was set
                 mock_cache.set.assert_called_once()
@@ -172,16 +155,12 @@ class TestModelDiscoveryExternalCalls:
         ):
             with patch("aiohttp.ClientSession") as mock_session_class:
                 mock_session = AsyncMock()
-                mock_session_class.return_value.__aenter__.return_value = (
-                    mock_session
-                )
+                mock_session_class.return_value.__aenter__.return_value = mock_session
 
                 # Mock 401 response
                 mock_response = AsyncMock()
                 mock_response.status = 401
-                mock_session.get.return_value.__aenter__.return_value = (
-                    mock_response
-                )
+                mock_session.get.return_value.__aenter__.return_value = mock_response
 
                 with pytest.raises(ProviderError) as exc_info:
                     await discovery_service.discover_models(provider_config)
@@ -200,16 +179,12 @@ class TestModelDiscoveryExternalCalls:
         ):
             with patch("aiohttp.ClientSession") as mock_session_class:
                 mock_session = AsyncMock()
-                mock_session_class.return_value.__aenter__.return_value = (
-                    mock_session
-                )
+                mock_session_class.return_value.__aenter__.return_value = mock_session
 
                 # Mock 403 response
                 mock_response = AsyncMock()
                 mock_response.status = 403
-                mock_session.get.return_value.__aenter__.return_value = (
-                    mock_response
-                )
+                mock_session.get.return_value.__aenter__.return_value = mock_response
 
                 with pytest.raises(ProviderError) as exc_info:
                     await discovery_service.discover_models(provider_config)
@@ -227,9 +202,7 @@ class TestModelDiscoveryExternalCalls:
         ):
             with patch("aiohttp.ClientSession") as mock_session_class:
                 mock_session = AsyncMock()
-                mock_session_class.return_value.__aenter__.return_value = (
-                    mock_session
-                )
+                mock_session_class.return_value.__aenter__.return_value = mock_session
 
                 # Mock rate limit then success
                 mock_rate_limit_response = AsyncMock()
@@ -245,9 +218,7 @@ class TestModelDiscoveryExternalCalls:
                 ]
 
                 with patch("asyncio.sleep") as mock_sleep:
-                    models = await discovery_service.discover_models(
-                        provider_config
-                    )
+                    models = await discovery_service.discover_models(provider_config)
 
                     assert len(models) == 2
                     # Should have waited for retry
@@ -264,16 +235,12 @@ class TestModelDiscoveryExternalCalls:
         ):
             with patch("aiohttp.ClientSession") as mock_session_class:
                 mock_session = AsyncMock()
-                mock_session_class.return_value.__aenter__.return_value = (
-                    mock_session
-                )
+                mock_session_class.return_value.__aenter__.return_value = mock_session
 
                 # Mock persistent rate limit
                 mock_response = AsyncMock()
                 mock_response.status = 429
-                mock_session.get.return_value.__aenter__.return_value = (
-                    mock_response
-                )
+                mock_session.get.return_value.__aenter__.return_value = mock_response
 
                 with pytest.raises(ProviderError) as exc_info:
                     await discovery_service.discover_models(provider_config)
@@ -291,9 +258,7 @@ class TestModelDiscoveryExternalCalls:
         ):
             with patch("aiohttp.ClientSession") as mock_session_class:
                 mock_session = AsyncMock()
-                mock_session_class.return_value.__aenter__.return_value = (
-                    mock_session
-                )
+                mock_session_class.return_value.__aenter__.return_value = mock_session
 
                 mock_success_response = AsyncMock()
                 mock_success_response.status = 200
@@ -307,9 +272,7 @@ class TestModelDiscoveryExternalCalls:
                 ]
 
                 with patch("asyncio.sleep") as mock_sleep:
-                    models = await discovery_service.discover_models(
-                        provider_config
-                    )
+                    models = await discovery_service.discover_models(provider_config)
 
                     assert len(models) == 2
                     # Should have waited twice
@@ -328,9 +291,7 @@ class TestModelDiscoveryExternalCalls:
         ):
             with patch("aiohttp.ClientSession") as mock_session_class:
                 mock_session = AsyncMock()
-                mock_session_class.return_value.__aenter__.return_value = (
-                    mock_session
-                )
+                mock_session_class.return_value.__aenter__.return_value = mock_session
 
                 # Persistent network error
                 mock_session.get.side_effect = aiohttp.ClientError(
@@ -340,9 +301,7 @@ class TestModelDiscoveryExternalCalls:
                 with pytest.raises(ProviderError) as exc_info:
                     await discovery_service.discover_models(provider_config)
 
-                assert "Failed to connect to test_provider" in str(
-                    exc_info.value
-                )
+                assert "Failed to connect to test_provider" in str(exc_info.value)
 
     @pytest.mark.asyncio
     async def test_model_discovery_timeout_error(
@@ -355,21 +314,15 @@ class TestModelDiscoveryExternalCalls:
         ):
             with patch("aiohttp.ClientSession") as mock_session_class:
                 mock_session = AsyncMock()
-                mock_session_class.return_value.__aenter__.return_value = (
-                    mock_session
-                )
+                mock_session_class.return_value.__aenter__.return_value = mock_session
 
                 # Timeout error
-                mock_session.get.side_effect = asyncio.TimeoutError(
-                    "Request timed out"
-                )
+                mock_session.get.side_effect = asyncio.TimeoutError("Request timed out")
 
                 with pytest.raises(ProviderError) as exc_info:
                     await discovery_service.discover_models(provider_config)
 
-                assert "Timeout connecting to test_provider" in str(
-                    exc_info.value
-                )
+                assert "Timeout connecting to test_provider" in str(exc_info.value)
                 assert "30s" in str(exc_info.value)
 
     @pytest.mark.asyncio
@@ -383,9 +336,7 @@ class TestModelDiscoveryExternalCalls:
         ):
             with patch("aiohttp.ClientSession") as mock_session_class:
                 mock_session = AsyncMock()
-                mock_session_class.return_value.__aenter__.return_value = (
-                    mock_session
-                )
+                mock_session_class.return_value.__aenter__.return_value = mock_session
 
                 # Mock response with invalid format
                 mock_response = AsyncMock()
@@ -393,9 +344,7 @@ class TestModelDiscoveryExternalCalls:
                 mock_response.json.return_value = {
                     "invalid": "format"
                 }  # Missing 'data' key
-                mock_session.get.return_value.__aenter__.return_value = (
-                    mock_response
-                )
+                mock_session.get.return_value.__aenter__.return_value = mock_response
 
                 with pytest.raises(ValidationError) as exc_info:
                     await discovery_service.discover_models(provider_config)
@@ -413,9 +362,7 @@ class TestModelDiscoveryExternalCalls:
         ):
             with patch("aiohttp.ClientSession") as mock_session_class:
                 mock_session = AsyncMock()
-                mock_session_class.return_value.__aenter__.return_value = (
-                    mock_session
-                )
+                mock_session_class.return_value.__aenter__.return_value = mock_session
 
                 # Mock response with invalid model data
                 mock_response = AsyncMock()
@@ -437,13 +384,9 @@ class TestModelDiscoveryExternalCalls:
                         },
                     ]
                 }
-                mock_session.get.return_value.__aenter__.return_value = (
-                    mock_response
-                )
+                mock_session.get.return_value.__aenter__.return_value = mock_response
 
-                models = await discovery_service.discover_models(
-                    provider_config
-                )
+                models = await discovery_service.discover_models(provider_config)
 
                 # Should skip invalid model and return valid ones
                 assert len(models) == 2
@@ -461,21 +404,15 @@ class TestModelDiscoveryExternalCalls:
         ):
             with patch("aiohttp.ClientSession") as mock_session_class:
                 mock_session = AsyncMock()
-                mock_session_class.return_value.__aenter__.return_value = (
-                    mock_session
-                )
+                mock_session_class.return_value.__aenter__.return_value = mock_session
 
                 # Mock response with empty data
                 mock_response = AsyncMock()
                 mock_response.status = 200
                 mock_response.json.return_value = {"data": []}
-                mock_session.get.return_value.__aenter__.return_value = (
-                    mock_response
-                )
+                mock_session.get.return_value.__aenter__.return_value = mock_response
 
-                models = await discovery_service.discover_models(
-                    provider_config
-                )
+                models = await discovery_service.discover_models(provider_config)
 
                 assert len(models) == 0
                 # Should still cache empty result
@@ -492,16 +429,12 @@ class TestModelDiscoveryExternalCalls:
         ):
             with patch("aiohttp.ClientSession") as mock_session_class:
                 mock_session = AsyncMock()
-                mock_session_class.return_value.__aenter__.return_value = (
-                    mock_session
-                )
+                mock_session_class.return_value.__aenter__.return_value = mock_session
 
                 mock_response = AsyncMock()
                 mock_response.status = 200
                 mock_response.json.return_value = mock_model_data
-                mock_session.get.return_value.__aenter__.return_value = (
-                    mock_response
-                )
+                mock_session.get.return_value.__aenter__.return_value = mock_response
 
                 is_valid = await discovery_service.validate_model(
                     provider_config, "gpt-4"
@@ -520,16 +453,12 @@ class TestModelDiscoveryExternalCalls:
         ):
             with patch("aiohttp.ClientSession") as mock_session_class:
                 mock_session = AsyncMock()
-                mock_session_class.return_value.__aenter__.return_value = (
-                    mock_session
-                )
+                mock_session_class.return_value.__aenter__.return_value = mock_session
 
                 mock_response = AsyncMock()
                 mock_response.status = 200
                 mock_response.json.return_value = mock_model_data
-                mock_session.get.return_value.__aenter__.return_value = (
-                    mock_response
-                )
+                mock_session.get.return_value.__aenter__.return_value = mock_response
 
                 is_valid = await discovery_service.validate_model(
                     provider_config, "non-existent-model"
@@ -548,15 +477,11 @@ class TestModelDiscoveryExternalCalls:
         ):
             with patch("aiohttp.ClientSession") as mock_session_class:
                 mock_session = AsyncMock()
-                mock_session_class.return_value.__aenter__.return_value = (
-                    mock_session
-                )
+                mock_session_class.return_value.__aenter__.return_value = mock_session
 
                 mock_response = AsyncMock()
                 mock_response.status = 500
-                mock_session.get.return_value.__aenter__.return_value = (
-                    mock_response
-                )
+                mock_session.get.return_value.__aenter__.return_value = mock_response
 
                 is_valid = await discovery_service.validate_model(
                     provider_config, "gpt-4"
@@ -575,16 +500,12 @@ class TestModelDiscoveryExternalCalls:
         ):
             with patch("aiohttp.ClientSession") as mock_session_class:
                 mock_session = AsyncMock()
-                mock_session_class.return_value.__aenter__.return_value = (
-                    mock_session
-                )
+                mock_session_class.return_value.__aenter__.return_value = mock_session
 
                 mock_response = AsyncMock()
                 mock_response.status = 200
                 mock_response.json.return_value = mock_model_data
-                mock_session.get.return_value.__aenter__.return_value = (
-                    mock_response
-                )
+                mock_session.get.return_value.__aenter__.return_value = mock_response
 
                 model_info = await discovery_service.get_model_info(
                     provider_config, "gpt-4"
@@ -605,16 +526,12 @@ class TestModelDiscoveryExternalCalls:
         ):
             with patch("aiohttp.ClientSession") as mock_session_class:
                 mock_session = AsyncMock()
-                mock_session_class.return_value.__aenter__.return_value = (
-                    mock_session
-                )
+                mock_session_class.return_value.__aenter__.return_value = mock_session
 
                 mock_response = AsyncMock()
                 mock_response.status = 200
                 mock_response.json.return_value = mock_model_data
-                mock_session.get.return_value.__aenter__.return_value = (
-                    mock_response
-                )
+                mock_session.get.return_value.__aenter__.return_value = mock_response
 
                 model_info = await discovery_service.get_model_info(
                     provider_config, "non-existent"
@@ -631,9 +548,7 @@ class TestModelDiscoveryExternalCalls:
             "src.core.model_discovery.get_unified_cache",
             return_value=mock_cache,
         ):
-            result = await discovery_service.invalidate_model_cache(
-                provider_config
-            )
+            result = await discovery_service.invalidate_model_cache(provider_config)
 
             assert result is True
             mock_cache.delete.assert_called_once()
@@ -649,9 +564,7 @@ class TestModelDiscoveryExternalCalls:
             "src.core.model_discovery.get_unified_cache",
             return_value=mock_cache,
         ):
-            result = await discovery_service.invalidate_model_cache(
-                provider_config
-            )
+            result = await discovery_service.invalidate_model_cache(provider_config)
 
             assert result is False
 
@@ -698,16 +611,12 @@ class TestModelDiscoveryExternalCalls:
         ):
             with patch("aiohttp.ClientSession") as mock_session_class:
                 mock_session = AsyncMock()
-                mock_session_class.return_value.__aenter__.return_value = (
-                    mock_session
-                )
+                mock_session_class.return_value.__aenter__.return_value = mock_session
 
                 mock_response = AsyncMock()
                 mock_response.status = 200
                 mock_response.json.return_value = mock_model_data
-                mock_session.get.return_value.__aenter__.return_value = (
-                    mock_response
-                )
+                mock_session.get.return_value.__aenter__.return_value = mock_response
 
                 await discovery_service.discover_models(config)
 
@@ -745,9 +654,7 @@ class TestModelDiscoveryIntegrationScenarios:
         return ModelDiscoveryService()
 
     @pytest.mark.asyncio
-    async def test_multiple_providers_different_responses(
-        self, discovery_service
-    ):
+    async def test_multiple_providers_different_responses(self, discovery_service):
         """Test handling multiple providers with different response formats"""
         providers = [
             ProviderConfig("provider1", "https://api1.com", "key1"),
@@ -796,13 +703,9 @@ class TestModelDiscoveryIntegrationScenarios:
         with patch("aiohttp.ClientSession") as mock_session_class:
             mock_session = AsyncMock()
             mock_session.get.side_effect = mock_get
-            mock_session_class.return_value.__aenter__.return_value = (
-                mock_session
-            )
+            mock_session_class.return_value.__aenter__.return_value = mock_session
 
-            with patch(
-                "src.core.model_discovery.get_unified_cache"
-            ) as mock_cache_func:
+            with patch("src.core.model_discovery.get_unified_cache") as mock_cache_func:
                 mock_cache = AsyncMock()
                 mock_cache.get.return_value = None
                 mock_cache.set.return_value = True
@@ -843,23 +746,16 @@ class TestModelDiscoveryIntegrationScenarios:
         with patch("aiohttp.ClientSession") as mock_session_class:
             mock_session = AsyncMock()
             mock_session.get.side_effect = mock_get
-            mock_session_class.return_value.__aenter__.return_value = (
-                mock_session
-            )
+            mock_session_class.return_value.__aenter__.return_value = mock_session
 
-            with patch(
-                "src.core.model_discovery.get_unified_cache"
-            ) as mock_cache_func:
+            with patch("src.core.model_discovery.get_unified_cache") as mock_cache_func:
                 mock_cache = AsyncMock()
                 mock_cache.get.return_value = None
                 mock_cache.set.return_value = True
                 mock_cache_func.return_value = mock_cache
 
                 # Make concurrent calls
-                tasks = [
-                    discovery_service.discover_models(provider)
-                    for _ in range(5)
-                ]
+                tasks = [discovery_service.discover_models(provider) for _ in range(5)]
 
                 results = await asyncio.gather(*tasks)
 

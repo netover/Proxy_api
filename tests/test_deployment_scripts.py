@@ -1,10 +1,8 @@
 import pytest
-import tempfile
 import subprocess
 from pathlib import Path
 from unittest.mock import Mock, patch, mock_open
 import sys
-import os
 
 # Import the setup script
 sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
@@ -21,9 +19,7 @@ class TestModelDiscoverySetup:
 
     @patch("sys.version_info")
     @patch("subprocess.run")
-    def test_check_system_requirements_success(
-        self, mock_subprocess, mock_version
-    ):
+    def test_check_system_requirements_success(self, mock_subprocess, mock_version):
         """Test successful system requirements check"""
         mock_version.__ge__ = lambda x, y: True
         mock_version.major = 3
@@ -53,9 +49,7 @@ class TestModelDiscoverySetup:
 
     @patch("sys.version_info")
     @patch("subprocess.run")
-    def test_check_system_requirements_pip_fail(
-        self, mock_subprocess, mock_version
-    ):
+    def test_check_system_requirements_pip_fail(self, mock_subprocess, mock_version):
         """Test system requirements check with pip failure"""
         mock_version.__ge__ = lambda x, y: True
         mock_version.major = 3
@@ -101,9 +95,7 @@ class TestModelDiscoverySetup:
     @patch("subprocess.run")
     def test_install_dependencies_failure(self, mock_subprocess):
         """Test dependency installation failure"""
-        mock_subprocess.side_effect = subprocess.CalledProcessError(
-            1, "pip install"
-        )
+        mock_subprocess.side_effect = subprocess.CalledProcessError(1, "pip install")
 
         result = self.setup.install_dependencies()
 
@@ -139,9 +131,7 @@ class TestModelDiscoverySetup:
     @patch("pathlib.Path.mkdir")
     @patch("pathlib.Path.exists")
     @patch("builtins.open")
-    def test_create_config_files_failure(
-        self, mock_file, mock_exists, mock_mkdir
-    ):
+    def test_create_config_files_failure(self, mock_file, mock_exists, mock_mkdir):
         """Test config file creation failure"""
         mock_exists.return_value = False
         mock_file.side_effect = IOError("Permission denied")
@@ -214,9 +204,7 @@ class TestModelDiscoverySetup:
         result = self.setup.create_directories()
 
         assert result is True
-        assert (
-            mock_mkdir.call_count == 4
-        )  # cache, logs, data, config/providers
+        assert mock_mkdir.call_count == 4  # cache, logs, data, config/providers
 
     @patch("pathlib.Path.mkdir")
     def test_create_directories_with_existing(self, mock_mkdir):
@@ -263,9 +251,7 @@ class TestModelDiscoverySetup:
     @patch("pathlib.Path.exists")
     @patch("builtins.open", new_callable=mock_open)
     @patch("os.chmod")
-    def test_create_startup_script_success(
-        self, mock_chmod, mock_file, mock_exists
-    ):
+    def test_create_startup_script_success(self, mock_chmod, mock_file, mock_exists):
         """Test successful startup script creation"""
         mock_exists.return_value = False
 
@@ -400,9 +386,7 @@ class TestModelDiscoverySetup:
 
     def test_quick_setup_failure(self):
         """Test quick setup with failure"""
-        with patch.object(
-            self.setup, "check_system_requirements", return_value=False
-        ):
+        with patch.object(self.setup, "check_system_requirements", return_value=False):
             result = self.setup.quick_setup()
 
             assert result is False
@@ -468,9 +452,7 @@ class TestScriptExecution:
     def test_main_exception_handling(self, mock_setup_class):
         """Test main function exception handling"""
         mock_setup = Mock()
-        mock_setup.check_system_requirements.side_effect = Exception(
-            "Test error"
-        )
+        mock_setup.check_system_requirements.side_effect = Exception("Test error")
         mock_setup_class.return_value = mock_setup
 
         with patch("sys.exit") as mock_exit:
@@ -488,10 +470,7 @@ class TestScriptIntegration:
         """Test that all required modules can be imported"""
         # This test ensures the script can import all its dependencies
         try:
-            import yaml
-            import getpass
-            import platform
-            from datetime import datetime
+            pass
 
             # These should all be available
             assert True

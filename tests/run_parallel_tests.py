@@ -35,9 +35,7 @@ async def run_test_suite():
         print("=" * 50)
 
         # Check if targets were achieved
-        targets = benchmark_report.get("summary", {}).get(
-            "targets_achieved", []
-        )
+        targets = benchmark_report.get("summary", {}).get("targets_achieved", [])
         if targets:
             print(f"✅ TARGETS ACHIEVED: {len(targets)}")
             for target in targets:
@@ -49,13 +47,9 @@ async def run_test_suite():
         # Performance summary
         summary = benchmark_report.get("summary", {})
         print("\n📈 PERFORMANCE SUMMARY:")
-        print(
-            f"Overall Success Rate: {summary.get('overall_success_rate', 0):.1f}%"
-        )
+        print(f"Overall Success Rate: {summary.get('overall_success_rate', 0):.1f}%")
         print(f"Best P95 Latency: {summary.get('best_p95_latency', 0):.1f}ms")
-        print(
-            f"Best Throughput: {summary.get('best_throughput', 0):.1f} req/s"
-        )
+        print(f"Best Throughput: {summary.get('best_throughput', 0):.1f} req/s")
 
         # Recommendations
         recommendations = benchmark_report.get("recommendations", [])

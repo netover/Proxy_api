@@ -6,10 +6,9 @@ Prevents cascading failures when providers become unresponsive
 import time
 import asyncio
 from enum import Enum
-from typing import Dict, Any, Callable, Awaitable, Optional, Union, Tuple, Type
+from typing import Dict, Any, Callable, Awaitable, Optional, Tuple, Type
 from dataclasses import dataclass
 from .logging import ContextualLogger
-import logging
 
 logger = ContextualLogger(__name__)
 
@@ -162,8 +161,7 @@ class ProductionCircuitBreaker:
                 # Check if recovery timeout has elapsed
                 if (
                     self.last_failure_time
-                    and (time.time() - self.last_failure_time)
-                    >= self.recovery_timeout
+                    and (time.time() - self.last_failure_time) >= self.recovery_timeout
                 ):
                     await self._change_state(CircuitState.HALF_OPEN)
                     return True
@@ -293,9 +291,7 @@ class ProductionCircuitBreaker:
             "failed_requests": self.metrics.failed_requests,
             "rejected_requests": self.metrics.rejected_requests,
             "state_changes": self.metrics.state_changes,
-            "total_downtime_seconds": round(
-                self.metrics.total_downtime_seconds, 2
-            ),
+            "total_downtime_seconds": round(self.metrics.total_downtime_seconds, 2),
             "last_failure_time": self.last_failure_time,
             "last_success_time": self.last_success_time,
             "adaptive_thresholds": self.adaptive_thresholds,
@@ -388,10 +384,7 @@ def get_all_circuit_breakers() -> Dict[str, ProductionCircuitBreaker]:
 
 def get_circuit_breaker_metrics() -> Dict[str, Dict[str, Any]]:
     """Get metrics for all circuit breakers"""
-    return {
-        name: breaker.get_metrics()
-        for name, breaker in _circuit_breakers.items()
-    }
+    return {name: breaker.get_metrics() for name, breaker in _circuit_breakers.items()}
 
 
 async def reset_all_circuit_breakers():

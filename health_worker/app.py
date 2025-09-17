@@ -201,7 +201,7 @@ class PerformanceMiddleware(BaseHTTPMiddleware):
         response = await call_next(request)
         process_time = time.monotonic() - start_time
         logger.info(
-            f"Request completed",
+            "Request completed",
             extra={
                 'method': request.method,
                 'url': str(request.url),
@@ -690,7 +690,7 @@ async def clear_health_cache():
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint for the health worker itself"""
+    """Health check endpoint for the health worker itsel"""
     # Check if shared client is available
     client_healthy = shared_client is not None
 
@@ -701,7 +701,7 @@ async def health_check():
     overall_status = "healthy" if client_healthy and scheduler_healthy else "unhealthy"
 
     logger.info(
-        f"Health check performed",
+        "Health check performed",
         extra={
             'overall_status': overall_status,
             'client_healthy': client_healthy,

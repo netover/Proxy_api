@@ -52,9 +52,7 @@ class ErrorResponse:
 
     def to_json_response(self) -> JSONResponse:
         """Convert to FastAPI JSONResponse."""
-        return JSONResponse(
-            status_code=self.status_code, content=self.to_dict()
-        )
+        return JSONResponse(status_code=self.status_code, content=self.to_dict())
 
 
 class ValidationErrorResponse(ErrorResponse):
@@ -251,9 +249,7 @@ class PayloadTooLargeErrorResponse(ErrorResponse):
 class UnsupportedMediaTypeErrorResponse(ErrorResponse):
     """Error response for unsupported media type."""
 
-    def __init__(
-        self, content_type: str, supported_types: List[str] = None, **kwargs
-    ):
+    def __init__(self, content_type: str, supported_types: List[str] = None, **kwargs):
         message = f"Unsupported media type: {content_type}"
         details = {"content_type": content_type}
         if supported_types:
@@ -272,9 +268,7 @@ class UnsupportedMediaTypeErrorResponse(ErrorResponse):
 class MethodNotAllowedErrorResponse(ErrorResponse):
     """Error response for method not allowed."""
 
-    def __init__(
-        self, method: str, allowed_methods: List[str] = None, **kwargs
-    ):
+    def __init__(self, method: str, allowed_methods: List[str] = None, **kwargs):
         message = f"Method {method} not allowed"
         details = {"method": method}
         if allowed_methods:
@@ -321,9 +315,7 @@ def create_error_response_from_exception(
         APINotFoundError: NotFoundErrorResponse,
         ProviderUnavailableError: ServiceUnavailableErrorResponse,
         APIUnavailableError: ServiceUnavailableErrorResponse,
-        QuotaExceededError: lambda msg, **kwargs: RateLimitErrorResponse(
-            msg, **kwargs
-        ),
+        QuotaExceededError: lambda msg, **kwargs: RateLimitErrorResponse(msg, **kwargs),
         UnsupportedOperationError: lambda msg, **kwargs: InternalServerErrorResponse(
             msg, **kwargs
         ),
@@ -341,9 +333,7 @@ def create_error_response_from_exception(
         APIRateLimitError: RateLimitErrorResponse,
     }
 
-    response_class = exception_mapping.get(
-        type(exc), InternalServerErrorResponse
-    )
+    response_class = exception_mapping.get(type(exc), InternalServerErrorResponse)
 
     # Create response instance
     if hasattr(exc, "field"):
@@ -370,9 +360,7 @@ def create_error_response_from_exception(
 
 
 # Utility functions for common error responses
-def bad_request(
-    message: str, request_id: str = None
-) -> BadRequestErrorResponse:
+def bad_request(message: str, request_id: str = None) -> BadRequestErrorResponse:
     """Create bad request error response."""
     return BadRequestErrorResponse(message, request_id=request_id)
 

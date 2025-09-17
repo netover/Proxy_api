@@ -6,9 +6,8 @@ Provides toggle mechanisms for switching between cache implementations with grad
 import os
 import json
 import hashlib
-import random
 import logging
-from typing import Dict, Any, Optional, Union, Callable
+from typing import Dict, Any, Optional
 from dataclasses import dataclass, field
 from pathlib import Path
 import threading
@@ -104,9 +103,7 @@ class FeatureFlagManager:
         self._load_from_config()
         self._load_from_env()
 
-        logger.info(
-            f"FeatureFlagManager initialized with {len(self._flags)} flags"
-        )
+        logger.info(f"FeatureFlagManager initialized with {len(self._flags)} flags")
 
     def _load_from_config(self):
         """Load flags from configuration file"""
@@ -159,9 +156,7 @@ class FeatureFlagManager:
                         )
                     else:
                         self._flags[flag_name].enabled = enabled
-                        self._flags[flag_name].rollout_percentage = (
-                            rollout_percentage
-                        )
+                        self._flags[flag_name].rollout_percentage = rollout_percentage
                         if description:
                             self._flags[flag_name].description = description
 
@@ -207,9 +202,7 @@ class FeatureFlagManager:
 
     def enable_flag(self, name: str, rollout_percentage: int = 100):
         """Enable a feature flag"""
-        self.set_flag(
-            name, enabled=True, rollout_percentage=rollout_percentage
-        )
+        self.set_flag(name, enabled=True, rollout_percentage=rollout_percentage)
 
     def disable_flag(self, name: str):
         """Disable a feature flag"""
@@ -245,21 +238,15 @@ class FeatureFlagManager:
         self._load_from_config()
         self._load_from_env()
         self._last_reload = (
-            os.path.getmtime(self.config_file)
-            if self.config_file.exists()
-            else 0
+            os.path.getmtime(self.config_file) if self.config_file.exists() else 0
         )
 
     def get_stats(self) -> Dict[str, Any]:
         """Get feature flag statistics"""
         with self._lock:
-            enabled_flags = [
-                flag for flag in self._flags.values() if flag.enabled
-            ]
+            enabled_flags = [flag for flag in self._flags.values() if flag.enabled]
             enabled_count = len(enabled_flags)
-            total_rollout = sum(
-                flag.rollout_percentage for flag in enabled_flags
-            )
+            total_rollout = sum(flag.rollout_percentage for flag in enabled_flags)
 
             return {
                 "total_flags": len(self._flags),

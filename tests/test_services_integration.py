@@ -1,5 +1,4 @@
 import pytest
-import asyncio
 from unittest.mock import Mock, AsyncMock, patch
 from fastapi.testclient import TestClient
 import httpx
@@ -106,8 +105,8 @@ class TestServiceIntegration:
         """Test main proxy health when services are unavailable"""
         with patch("httpx.AsyncClient") as mock_client:
             # Mock connection errors
-            mock_client.return_value.__aenter__.return_value.get.side_effect = httpx.RequestError(
-                "Connection failed"
+            mock_client.return_value.__aenter__.return_value.get.side_effect = (
+                httpx.RequestError("Connection failed")
             )
 
             response = client.get("/health")
@@ -157,9 +156,7 @@ class TestServiceIntegration:
                 mock_response
             )
 
-            with pytest.raises(
-                Exception
-            ):  # Should raise ServiceUnavailableError
+            with pytest.raises(Exception):  # Should raise ServiceUnavailableError
                 await condense_context_via_service(["test"], 100)
 
     @pytest.mark.asyncio

@@ -62,26 +62,14 @@ class DynamicOpenAIProvider(DynamicProvider):
             self.logger.error(f"{request_type} failed: {e}")
             raise
 
-    async def create_completion(
-        self, request: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def create_completion(self, request: Dict[str, Any]) -> Dict[str, Any]:
         """Create a chat completion using OpenAI's API"""
-        return await self._make_request(
-            "chat/completions", request, "Chat completion"
-        )
+        return await self._make_request("chat/completions", request, "Chat completion")
 
-    async def create_text_completion(
-        self, request: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def create_text_completion(self, request: Dict[str, Any]) -> Dict[str, Any]:
         """Create a text completion using OpenAI's API"""
-        return await self._make_request(
-            "completions", request, "Text completion"
-        )
+        return await self._make_request("completions", request, "Text completion")
 
-    async def create_embeddings(
-        self, request: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def create_embeddings(self, request: Dict[str, Any]) -> Dict[str, Any]:
         """Create embeddings using OpenAI's API"""
-        return await self._make_request(
-            "embeddings", request, "Embeddings creation"
-        )
+        return await self._make_request("embeddings", request, "Embeddings creation")

@@ -4,7 +4,6 @@ Prevents cascading failures when providers become unresponsive by using a distri
 state store in Redis, ensuring consistency across multiple instances.
 """
 
-import asyncio
 import json
 import time
 from enum import Enum
@@ -98,9 +97,7 @@ class DistributedCircuitBreaker:
                 "timestamp": time.time(),
             }
             await self.redis.set(self.key, json.dumps(new_state))
-            logger.info(
-                f"Circuit breaker '{self.name}' moved to HALF-OPEN state."
-            )
+            logger.info(f"Circuit breaker '{self.name}' moved to HALF-OPEN state.")
             return new_state
 
         return state
@@ -108,9 +105,7 @@ class DistributedCircuitBreaker:
     async def _record_success(self):
         """Records a successful call, resetting the circuit if it was HALF_OPEN."""
         await self.redis.delete(self.key)
-        logger.info(
-            f"Circuit breaker '{self.name}' reset to CLOSED after success."
-        )
+        logger.info(f"Circuit breaker '{self.name}' reset to CLOSED after success.")
 
     async def _record_failure(self):
         """
@@ -163,9 +158,7 @@ class DistributedCircuitBreaker:
                     )
                     continue
 
-    async def call(
-        self, func: Callable[..., Awaitable[Any]], *args, **kwargs
-    ) -> Any:
+    async def call(self, func: Callable[..., Awaitable[Any]], *args, **kwargs) -> Any:
         """
         Executes the given function with circuit breaker protection.
 

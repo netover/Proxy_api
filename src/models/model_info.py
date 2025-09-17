@@ -131,7 +131,7 @@ class ModelInfo:
     def __repr__(self) -> str:
         """Detailed string representation for debugging."""
         return (
-            f"ModelInfo("
+            "ModelInfo("
             f"id='{self.id}', "
             f"object='{self.object}', "
             f"created={self.created}, "
@@ -139,5 +139,5 @@ class ModelInfo:
             f"permissions={len(self.permissions)} items, "
             f"root={self.root}, "
             f"parent={self.parent}"
-            f")"
+            ")"
         )

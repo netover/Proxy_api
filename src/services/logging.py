@@ -66,21 +66,21 @@ def build_prompt_from_record(record: Dict[str, Any]) -> str:
         Formatted prompt string
     """
     timestamp = record.get("timestamp", "Unknown")
-    level = record.get("level", "UNKNOWN")
-    logger_name = record.get("logger", "Unknown")
-    message = record.get("message", "")
-    module = record.get("module", "Unknown")
-    function = record.get("function", "Unknown")
-    line = record.get("line", "Unknown")
+    record.get("level", "UNKNOWN")
+    record.get("logger", "Unknown")
+    record.get("message", "")
+    record.get("module", "Unknown")
+    record.get("function", "Unknown")
+    record.get("line", "Unknown")
 
     # Format timestamp
     try:
         dt = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
         formatted_time = dt.strftime("%Y-%m-%d %H:%M:%S UTC")
-    except:
-        formatted_time = timestamp
+    except (ValueError, TypeError, AttributeError) as e:
+        logger.warning(f"Could not parse timestamp '{timestamp}': {e}")
 
-    prompt = f"""Log Entry Analysis:
+    prompt = """Log Entry Analysis:
 Time: {formatted_time}
 Level: {level}
 Logger: {logger_name}
@@ -227,11 +227,7 @@ def filter_successful_records(
                 continue
 
         # INFO level often indicates successful operations
-        if (
-            level == "INFO"
-            and "error" not in message
-            and "fail" not in message
-        ):
+        if level == "INFO" and "error" not in message and "fail" not in message:
             successful_records.append(record)
 
     return successful_records

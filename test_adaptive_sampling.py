@@ -164,9 +164,9 @@ async def test_adaptive_sampling():
     telemetry_time = time.time() - start_time
 
     overhead_percent = ((telemetry_time - baseline_time) / baseline_time) * 100
-    print(".2f")
-    print(".2f")
-    print(".2f")
+    print(".2")
+    print(".2")
+    print(".2")
 
     # Validate overhead target
     if overhead_percent < 2.0:

@@ -30,13 +30,9 @@ async def perform_parallel_health_checks(request: Request) -> Dict[str, Any]:
     ) -> Dict[str, Any]:
         """Check individual provider health"""
         try:
-            provider_instance = await provider_factory.get_provider(
-                provider.name
-            )
+            provider_instance = await provider_factory.get_provider(provider.name)
             if not provider_instance:
-                provider_instance = await provider_factory.create_provider(
-                    provider
-                )
+                provider_instance = await provider_factory.create_provider(provider)
 
             if not provider_instance:
                 return {
@@ -52,9 +48,7 @@ async def perform_parallel_health_checks(request: Request) -> Dict[str, Any]:
 
             return {
                 "name": provider.name,
-                "status": (
-                    "healthy" if result.get("healthy", False) else "unhealthy"
-                ),
+                "status": ("healthy" if result.get("healthy", False) else "unhealthy"),
                 "response_time": response_time,
                 "details": result,
             }
@@ -125,9 +119,7 @@ async def health_check(request: Request):
     provider_info = await app_state.provider_factory.get_all_provider_info()
 
     # Provider health summary
-    healthy_count = sum(
-        1 for p in provider_info if p.status == ProviderStatus.HEALTHY
-    )
+    healthy_count = sum(1 for p in provider_info if p.status == ProviderStatus.HEALTHY)
     total_count = len(provider_info)
     overall_status = "healthy" if healthy_count > 0 else "unhealthy"
 
@@ -146,9 +138,7 @@ async def health_check(request: Request):
     # Provider health impact
     if total_count > 0:
         provider_health_ratio = healthy_count / total_count
-        health_score -= (
-            1 - provider_health_ratio
-        ) * 40  # 40% weight for providers
+        health_score -= (1 - provider_health_ratio) * 40  # 40% weight for providers
 
     # System resource impact
     cpu_percent = system_health.get("cpu_percent", 0)
@@ -206,9 +196,7 @@ async def health_check(request: Request):
                 1 for p in provider_info if p.status == ProviderStatus.DEGRADED
             ),
             "unhealthy": sum(
-                1
-                for p in provider_info
-                if p.status == ProviderStatus.UNHEALTHY
+                1 for p in provider_info if p.status == ProviderStatus.UNHEALTHY
             ),
             "disabled": sum(
                 1 for p in provider_info if p.status == ProviderStatus.DISABLED
@@ -230,9 +218,7 @@ async def health_check(request: Request):
         },
         "performance": {
             "total_requests": system_metrics.get("total_requests", 0),
-            "successful_requests": system_metrics.get(
-                "successful_requests", 0
-            ),
+            "successful_requests": system_metrics.get("successful_requests", 0),
             "failed_requests": system_metrics.get("failed_requests", 0),
             "overall_success_rate": round(
                 system_metrics.get("overall_success_rate", 0) * 100, 1
@@ -242,9 +228,7 @@ async def health_check(request: Request):
                 1,
             ),
             "avg_response_time": round(
-                system_metrics.get("providers", {}).get(
-                    "avg_response_time", 0
-                ),
+                system_metrics.get("providers", {}).get("avg_response_time", 0),
                 3,
             ),
         },

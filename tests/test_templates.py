@@ -67,9 +67,7 @@ class TestTemplateManager:
             "system_message": "test system",
         }
 
-        is_valid = self.manager.validate_template_variables(
-            "prompt_chat.j2", context
-        )
+        is_valid = self.manager.validate_template_variables("prompt_chat.j2", context)
         assert is_valid is True
 
     def test_template_validation_missing_variables(self):
@@ -77,9 +75,7 @@ class TestTemplateManager:
         context = {"messages": [{"role": "user", "content": "test"}]}
 
         # Should still be valid as system_message is optional
-        is_valid = self.manager.validate_template_variables(
-            "prompt_chat.j2", context
-        )
+        is_valid = self.manager.validate_template_variables("prompt_chat.j2", context)
         assert is_valid is True
 
     def test_empty_context_handling(self):
@@ -130,9 +126,7 @@ class TestTemplateManager:
         }
 
         with_examples = self.manager.render_text_prompt(context_with_examples)
-        without_examples = self.manager.render_text_prompt(
-            context_without_examples
-        )
+        without_examples = self.manager.render_text_prompt(context_without_examples)
 
         assert "Examples:" in with_examples
         assert "Examples:" not in without_examples
@@ -140,9 +134,7 @@ class TestTemplateManager:
     def test_template_performance(self):
         """Test template rendering performance."""
         context = {
-            "messages": [
-                {"role": "user", "content": "Performance test message"}
-            ]
+            "messages": [{"role": "user", "content": "Performance test message"}]
         }
 
         import time
@@ -171,14 +163,10 @@ class TestTemplateManager:
 
     def test_template_reload(self):
         """Test template reloading."""
-        original_templates = self.manager.get_template_stats()[
-            "available_templates"
-        ]
+        original_templates = self.manager.get_template_stats()["available_templates"]
 
         self.manager.reload_templates()
-        new_templates = self.manager.get_template_stats()[
-            "available_templates"
-        ]
+        new_templates = self.manager.get_template_stats()["available_templates"]
 
         assert original_templates == new_templates
 
@@ -199,9 +187,7 @@ class TestTemplateManager:
         """Test template security with user input."""
         # Test with potentially malicious content
         malicious_context = {
-            "messages": [
-                {"role": "user", "content": "<script>alert('xss')</script>"}
-            ]
+            "messages": [{"role": "user", "content": "<script>alert('xss')</script>"}]
         }
 
         result = self.manager.render_chat_prompt(malicious_context)
@@ -247,7 +233,7 @@ class TestTemplateBenchmarks:
 
         # First render (cold cache)
         start_time = time.time()
-        first_result = self.manager.render_text_prompt(context)
+        self.manager.render_text_prompt(context)
         first_duration = time.time() - start_time
 
         # Subsequent renders (warm cache)

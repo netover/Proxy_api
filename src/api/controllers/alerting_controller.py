@@ -35,16 +35,12 @@ class AlertRuleCreate(BaseModel):
     """Model for creating alert rules"""
 
     name: str = Field(..., description="Unique name for the alert rule")
-    description: str = Field(
-        ..., description="Description of what this alert monitors"
-    )
+    description: str = Field(..., description="Description of what this alert monitors")
     metric_path: str = Field(
         ...,
         description="Dot-separated path to metric (e.g., 'system_health.cpu_percent')",
     )
-    condition: str = Field(
-        ..., description="Comparison operator: >, <, >=, <=, ==, !="
-    )
+    condition: str = Field(..., description="Comparison operator: >, <, >=, <=, ==, !=")
     threshold: float = Field(..., description="Threshold value for the alert")
     severity: str = Field(
         ..., description="Alert severity: info, warning, error, critical"
@@ -53,12 +49,8 @@ class AlertRuleCreate(BaseModel):
     cooldown_minutes: int = Field(
         5, description="Minimum time between alerts in minutes"
     )
-    channels: List[str] = Field(
-        ["log"], description="Notification channels to use"
-    )
-    custom_message: Optional[str] = Field(
-        None, description="Custom alert message"
-    )
+    channels: List[str] = Field(["log"], description="Notification channels to use")
+    custom_message: Optional[str] = Field(None, description="Custom alert message")
 
 
 class AlertRuleUpdate(BaseModel):
@@ -119,9 +111,7 @@ async def get_active_alerts(
 
     except Exception as e:
         logger.error("Failed to get active alerts", error=str(e))
-        raise HTTPException(
-            status_code=500, detail="Failed to retrieve alerts"
-        )
+        raise HTTPException(status_code=500, detail="Failed to retrieve alerts")
 
 
 @router.get("/alerts/{alert_id}")
@@ -154,12 +144,8 @@ async def acknowledge_alert(
         alert_manager.acknowledge_alert(alert_id, acknowledged_by)
         return {"message": "Alert acknowledged successfully"}
     except Exception as e:
-        logger.error(
-            "Failed to acknowledge alert", alert_id=alert_id, error=str(e)
-        )
-        raise HTTPException(
-            status_code=500, detail="Failed to acknowledge alert"
-        )
+        logger.error("Failed to acknowledge alert", alert_id=alert_id, error=str(e))
+        raise HTTPException(status_code=500, detail="Failed to acknowledge alert")
 
 
 @router.get("/rules")
@@ -191,9 +177,7 @@ async def get_alert_rules(
 
     except Exception as e:
         logger.error("Failed to get alert rules", error=str(e))
-        raise HTTPException(
-            status_code=500, detail="Failed to retrieve alert rules"
-        )
+        raise HTTPException(status_code=500, detail="Failed to retrieve alert rules")
 
 
 @router.post("/rules")
@@ -262,9 +246,7 @@ async def create_alert_rule(
             rule_name=rule_data.name,
             error=str(e),
         )
-        raise HTTPException(
-            status_code=500, detail="Failed to create alert rule"
-        )
+        raise HTTPException(status_code=500, detail="Failed to create alert rule")
 
 
 @router.get("/rules/{rule_name}")
@@ -296,9 +278,7 @@ async def update_alert_rule(
     try:
         # Get existing rule
         rules = alert_manager.get_alert_rules()
-        existing_rule = next(
-            (r for r in rules if r["name"] == rule_name), None
-        )
+        existing_rule = next((r for r in rules if r["name"] == rule_name), None)
 
         if not existing_rule:
             raise HTTPException(status_code=404, detail="Alert rule not found")
@@ -308,9 +288,7 @@ async def update_alert_rule(
 
         if "severity" in updates:
             try:
-                updates["severity"] = AlertSeverity(
-                    updates["severity"].lower()
-                )
+                updates["severity"] = AlertSeverity(updates["severity"].lower())
             except ValueError:
                 raise HTTPException(
                     status_code=400,
@@ -340,17 +318,11 @@ async def update_alert_rule(
         # Create updated rule
         updated_rule = AlertRule(
             name=rule_name,
-            description=updates.get(
-                "description", existing_rule["description"]
-            ),
-            metric_path=updates.get(
-                "metric_path", existing_rule["metric_path"]
-            ),
+            description=updates.get("description", existing_rule["description"]),
+            metric_path=updates.get("metric_path", existing_rule["metric_path"]),
             condition=updates.get("condition", existing_rule["condition"]),
             threshold=updates.get("threshold", existing_rule["threshold"]),
-            severity=updates.get(
-                "severity", AlertSeverity(existing_rule["severity"])
-            ),
+            severity=updates.get("severity", AlertSeverity(existing_rule["severity"])),
             enabled=updates.get("enabled", existing_rule["enabled"]),
             cooldown_minutes=updates.get(
                 "cooldown_minutes", existing_rule["cooldown_minutes"]
@@ -372,12 +344,8 @@ async def update_alert_rule(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(
-            "Failed to update alert rule", rule_name=rule_name, error=str(e)
-        )
-        raise HTTPException(
-            status_code=500, detail="Failed to update alert rule"
-        )
+        logger.error("Failed to update alert rule", rule_name=rule_name, error=str(e))
+        raise HTTPException(status_code=500, detail="Failed to update alert rule")
 
 
 @router.delete("/rules/{rule_name}")
@@ -401,18 +369,12 @@ async def delete_alert_rule(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(
-            "Failed to delete alert rule", rule_name=rule_name, error=str(e)
-        )
-        raise HTTPException(
-            status_code=500, detail="Failed to delete alert rule"
-        )
+        logger.error("Failed to delete alert rule", rule_name=rule_name, error=str(e))
+        raise HTTPException(status_code=500, detail="Failed to delete alert rule")
 
 
 @router.get("/config")
-async def get_alerting_config(
-    request: Request, _: bool = Depends(verify_api_key)
-):
+async def get_alerting_config(request: Request, _: bool = Depends(verify_api_key)):
     """Get alerting configuration"""
     logger.info("Getting alerting configuration")
 
@@ -423,16 +385,10 @@ async def get_alerting_config(
         # Remove sensitive information
         if "notifications" in config:
             notifications = config["notifications"]
-            if (
-                "email" in notifications
-                and "password" in notifications["email"]
-            ):
+            if "email" in notifications and "password" in notifications["email"]:
                 notifications["email"] = {**notifications["email"]}
                 notifications["email"]["password"] = "***"
-            if (
-                "webhook" in notifications
-                and "auth_token" in notifications["webhook"]
-            ):
+            if "webhook" in notifications and "auth_token" in notifications["webhook"]:
                 notifications["webhook"] = {**notifications["webhook"]}
                 notifications["webhook"]["auth_token"] = "***"
 
@@ -440,9 +396,7 @@ async def get_alerting_config(
 
     except Exception as e:
         logger.error("Failed to get alerting configuration", error=str(e))
-        raise HTTPException(
-            status_code=500, detail="Failed to retrieve configuration"
-        )
+        raise HTTPException(status_code=500, detail="Failed to retrieve configuration")
 
 
 @router.post("/config")
@@ -471,9 +425,7 @@ async def update_alerting_config(
 
     except Exception as e:
         logger.error("Failed to update alerting configuration", error=str(e))
-        raise HTTPException(
-            status_code=500, detail="Failed to update configuration"
-        )
+        raise HTTPException(status_code=500, detail="Failed to update configuration")
 
 
 @router.post("/test-notification")
@@ -517,9 +469,7 @@ async def test_notification(
 
             success = results.get(channel.lower(), False)
             if success:
-                return {
-                    "message": f"Test notification sent successfully via {channel}"
-                }
+                return {"message": f"Test notification sent successfully via {channel}"}
             else:
                 raise HTTPException(
                     status_code=500,
@@ -533,9 +483,7 @@ async def test_notification(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(
-            "Failed to test notification", channel=channel, error=str(e)
-        )
+        logger.error("Failed to test notification", channel=channel, error=str(e))
         raise HTTPException(
             status_code=500, detail=f"Failed to test {channel} notification"
         )

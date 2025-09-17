@@ -110,7 +110,7 @@ def build_executable():
         "--hidden-import=uvicorn.protocols.websockets.auto",
         "--hidden-import=uvicorn.lifespan",
         "--hidden-import=uvicorn.lifespan.on",
-        "--hidden-import=uvicorn.lifespan.off",
+        "--hidden-import=uvicorn.lifespan.of",
         "--hidden-import=uvicorn.main",
         "--hidden-import=uvicorn.config",
         "--hidden-import=uvicorn.supervisors",
@@ -289,7 +289,7 @@ def build_executable():
             if copy_config_with_permissions():
                 # Make executable
                 os.chmod(exe_path, 0o755)
-                print(f"🔧 Executable permissions set to 755")
+                print("🔧 Executable permissions set to 755")
                 return True
             else:
                 print("⚠️  Executable built but config file copy failed")

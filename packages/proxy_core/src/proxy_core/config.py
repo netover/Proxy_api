@@ -1,7 +1,7 @@
 """Configuration management for proxy_core package."""
 
-from typing import List, Optional, Dict, Any
-from .models import ProviderConfig, ProviderType
+from typing import Optional, Dict, Any
+from .models import ProviderConfig
 
 
 class ConfigManager:

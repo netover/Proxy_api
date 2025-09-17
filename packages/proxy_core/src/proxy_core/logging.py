@@ -1,7 +1,7 @@
 """Logging utilities for proxy_core package."""
 
 import logging
-from typing import Any, Dict, Optional
+from typing import Any
 
 
 class ContextualLogger:

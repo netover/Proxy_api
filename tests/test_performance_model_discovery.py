@@ -8,18 +8,14 @@ memory usage, and concurrent access patterns.
 
 import asyncio
 import gc
-import json
-import os
 import tempfile
 import time
 import tracemalloc
 from concurrent.futures import ThreadPoolExecutor
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import patch
 import pytest
-import aiohttp
 import psutil
 from fastapi.testclient import TestClient
-import numpy as np
 
 from src.core.model_discovery import ModelDiscoveryService
 from src.core.cache_manager import CacheManager
@@ -98,9 +94,7 @@ class TestModelDiscoveryPerformance:
             for i in range(1000)  # 1000 models
         ]
 
-        with patch(
-            "src.providers.openai.OpenAIDiscovery.get_models"
-        ) as mock_openai:
+        with patch("src.providers.openai.OpenAIDiscovery.get_models") as mock_openai:
             mock_openai.return_value = large_model_list
 
             # Measure performance
@@ -114,9 +108,7 @@ class TestModelDiscoveryPerformance:
             metrics = self.measure_memory_usage(run_discovery)
 
             # Assert performance thresholds
-            assert (
-                metrics["execution_time"] < 5.0
-            )  # Should complete within 5 seconds
+            assert metrics["execution_time"] < 5.0  # Should complete within 5 seconds
             assert (
                 metrics["memory_increase_mb"] < 100
             )  # Should use less than 100MB additional memory
@@ -179,9 +171,7 @@ class TestModelDiscoveryPerformance:
             metrics = self.measure_memory_usage(run_discovery)
 
             # Assert performance thresholds
-            assert (
-                metrics["execution_time"] < 10.0
-            )  # Should complete within 10 seconds
+            assert metrics["execution_time"] < 10.0  # Should complete within 10 seconds
             assert (
                 metrics["memory_increase_mb"] < 200
             )  # Should use less than 200MB additional memory
@@ -212,9 +202,7 @@ class TestModelDiscoveryPerformance:
             )
         ]
 
-        with patch(
-            "src.providers.openai.OpenAIDiscovery.get_models"
-        ) as mock_openai:
+        with patch("src.providers.openai.OpenAIDiscovery.get_models") as mock_openai:
             mock_openai.return_value = test_models
 
             # First call - populate cache
@@ -240,9 +228,7 @@ class TestModelDiscoveryPerformance:
             metrics = self.measure_memory_usage(run_cache_reads)
 
             # Cache reads should be very fast
-            assert (
-                metrics["execution_time"] < 1.0
-            )  # Should complete within 1 second
+            assert metrics["execution_time"] < 1.0  # Should complete within 1 second
             assert mock_openai.call_count == 1  # Should only hit API once
 
             print(
@@ -267,9 +253,7 @@ class TestModelDiscoveryPerformance:
             for i in range(100)
         ]
 
-        with patch(
-            "src.providers.openai.OpenAIDiscovery.get_models"
-        ) as mock_openai:
+        with patch("src.providers.openai.OpenAIDiscovery.get_models") as mock_openai:
             mock_openai.return_value = test_models
 
             def run_concurrent_access():
@@ -319,9 +303,7 @@ class TestModelDiscoveryPerformance:
             for i in range(5000)  # 5000 models
         ]
 
-        with patch(
-            "src.providers.openai.OpenAIDiscovery.get_models"
-        ) as mock_openai:
+        with patch("src.providers.openai.OpenAIDiscovery.get_models") as mock_openai:
             mock_openai.return_value = huge_model_list
 
             def run_large_discovery():
@@ -360,9 +342,7 @@ class TestModelDiscoveryPerformance:
         # API should respond quickly
         assert metrics["execution_time"] < 5.0  # 100 calls in 5 seconds
 
-        print(
-            f"API performance - 100 calls in {metrics['execution_time']:.2f}s"
-        )
+        print(f"API performance - 100 calls in {metrics['execution_time']:.2f}s")
 
     def test_cache_memory_efficiency(self, temp_cache_dir):
         """Test cache memory efficiency over time."""
@@ -398,15 +378,11 @@ class TestModelDiscoveryPerformance:
         # Cache should be memory efficient
         assert metrics["memory_increase_mb"] < 100
 
-        print(
-            f"Cache efficiency - Memory: {metrics['memory_increase_mb']:.2f}MB"
-        )
+        print(f"Cache efficiency - Memory: {metrics['memory_increase_mb']:.2f}MB")
 
     def test_provider_timeout_handling(self, discovery_service):
         """Test timeout handling performance."""
-        with patch(
-            "src.providers.openai.OpenAIDiscovery.get_models"
-        ) as mock_openai:
+        with patch("src.providers.openai.OpenAIDiscovery.get_models") as mock_openai:
             # Simulate slow provider response
             async def slow_response():
                 await asyncio.sleep(5)  # Simulate slow API
@@ -426,9 +402,7 @@ class TestModelDiscoveryPerformance:
             end_time = time.time()
 
             # Should timeout quickly
-            assert (
-                end_time - start_time < 2.0
-            )  # Should timeout within 2 seconds
+            assert end_time - start_time < 2.0  # Should timeout within 2 seconds
             assert result == []  # Should return empty on timeout
 
     @pytest.mark.benchmark
@@ -477,8 +451,7 @@ class TestModelDiscoveryPerformance:
                     "models": config["models"],
                     "execution_time": metrics["execution_time"],
                     "memory_mb": metrics["memory_increase_mb"],
-                    "models_per_second": config["models"]
-                    / metrics["execution_time"],
+                    "models_per_second": config["models"] / metrics["execution_time"],
                 }
 
         # Print benchmark results

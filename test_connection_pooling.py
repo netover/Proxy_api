@@ -57,7 +57,7 @@ async def test_connection_reuse():
         await asyncio.sleep(0.1)
 
     total_time = time.time() - start_time
-    print(".2f")
+    print(".2")
     print()
 
     # Get metrics

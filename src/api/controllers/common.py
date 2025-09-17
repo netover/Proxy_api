@@ -57,9 +57,7 @@ class RequestRouter:
 
         # Get providers for the model
         model = request_data.get("model", "")
-        providers = await app_state.provider_factory.get_providers_for_model(
-            model
-        )
+        providers = await app_state.provider_factory.get_providers_for_model(model)
 
         if not providers:
             logger.error("No providers available for model", model=model)
@@ -73,13 +71,9 @@ class RequestRouter:
         config = app_state.config_manager.load_config()
         forced_provider = config.get_forced_provider()
 
-        if forced_provider and forced_provider.name in [
-            p.name for p in providers
-        ]:
+        if forced_provider and forced_provider.name in [p.name for p in providers]:
             # Use forced provider exclusively
-            providers = [
-                p for p in providers if p.name == forced_provider.name
-            ]
+            providers = [p for p in providers if p.name == forced_provider.name]
             logger.info(f"Using forced provider: {forced_provider.name}")
 
         # Track attempts for metrics
@@ -94,9 +88,7 @@ class RequestRouter:
                     f"Attempting {operation} with provider {provider.name} (attempt {i+1}/{len(providers)})"
                 )
 
-                circuit_breaker = get_circuit_breaker(
-                    f"provider_{provider.name}"
-                )
+                circuit_breaker = get_circuit_breaker(f"provider_{provider.name}")
 
                 # Choose the appropriate method based on operation
                 if operation == "chat_completion":
@@ -115,9 +107,7 @@ class RequestRouter:
                     if hasattr(request_data, "dict")
                     else request_data
                 )
-                result = await circuit_breaker.execute(
-                    lambda: method(req_dict)
-                )
+                result = await circuit_breaker.execute(lambda: method(req_dict))
 
                 attempt_time = time.time() - attempt_start
 
@@ -211,10 +201,7 @@ class RequestRouter:
                 ):
                     if not req_dict.get("stream", False):
                         request_id = str(uuid.uuid4())
-                        chunks = [
-                            m["content"]
-                            for m in req_dict.get("messages", [])
-                        ]
+                        chunks = [m["content"] for m in req_dict.get("messages", [])]
                         background_tasks.add_task(
                             safe_background_task(background_condense),
                             request_id,
@@ -233,7 +220,7 @@ class RequestRouter:
                         )
                     # Truncate for streaming
                     req_dict["messages"] = req_dict["messages"][
-                        -len(req_dict["messages"]) // 2:
+                        -len(req_dict["messages"]) // 2 :
                     ]
                     req_dict["stream"] = False
                     # Re-attempt with the same provider
@@ -260,8 +247,7 @@ class RequestRouter:
 
         # Determine appropriate error response
         if all(
-            attempt["error"] == "operation_not_supported"
-            for attempt in attempt_info
+            attempt["error"] == "operation_not_supported" for attempt in attempt_info
         ):
             raise NotImplementedError(
                 f"The {operation} operation is not supported by any provider for model '{model}'",

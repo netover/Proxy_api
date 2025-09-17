@@ -9,15 +9,10 @@ This test suite specifically targets:
 - Recovery from memory pressure conditions
 """
 
-import asyncio
 import gc
-import os
 import psutil
 import threading
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime, timedelta
-from typing import Dict, List, Any
 import pytest
 
 from src.core.model_cache import ModelCache
@@ -43,9 +38,7 @@ class TestCacheCapacityLimits:
                     owned_by="test",
                 )
             ]
-            cache.set_models(
-                f"provider-{i}", f"https://provider-{i}.com", models
-            )
+            cache.set_models(f"provider-{i}", f"https://provider-{i}.com", models)
 
         assert cache.get_stats()["size"] == 5
 
@@ -58,9 +51,7 @@ class TestCacheCapacityLimits:
                 owned_by="test",
             )
         ]
-        cache.set_models(
-            "provider-overflow", "https://provider-overflow.com", models
-        )
+        cache.set_models("provider-overflow", "https://provider-overflow.com", models)
 
         # Cache should still be at max_size (oldest entry evicted)
         stats = cache.get_stats()
@@ -79,15 +70,9 @@ class TestCacheCapacityLimits:
         from src.core.smart_cache import CacheEntry
 
         # Create cache entries manually for testing
-        entry1 = CacheEntry(
-            key="key1", value="value1", timestamp=time.time(), ttl=300
-        )
-        entry2 = CacheEntry(
-            key="key2", value="value2", timestamp=time.time(), ttl=300
-        )
-        entry3 = CacheEntry(
-            key="key3", value="value3", timestamp=time.time(), ttl=300
-        )
+        entry1 = CacheEntry(key="key1", value="value1", timestamp=time.time(), ttl=300)
+        entry2 = CacheEntry(key="key2", value="value2", timestamp=time.time(), ttl=300)
+        entry3 = CacheEntry(key="key3", value="value3", timestamp=time.time(), ttl=300)
 
         cache._cache["key1"] = entry1
         cache._cache["key2"] = entry2
@@ -97,9 +82,7 @@ class TestCacheCapacityLimits:
         cache._cache.move_to_end("key1")
 
         # Add new entry - should evict least recently used (key2)
-        entry4 = CacheEntry(
-            key="key4", value="value4", timestamp=time.time(), ttl=300
-        )
+        entry4 = CacheEntry(key="key4", value="value4", timestamp=time.time(), ttl=300)
         cache._cache["key4"] = entry4
         cache._cache.move_to_end("key4")
 
@@ -297,18 +280,14 @@ class TestLRUEvictionUnderCompetition:
 
         # Verify cache performance under burst
         total_requests = results["hits"] + results["misses"]
-        hit_rate = (
-            results["hits"] / total_requests if total_requests > 0 else 0
-        )
+        hit_rate = results["hits"] / total_requests if total_requests > 0 else 0
 
         print(f"Burst traffic hit rate: {hit_rate:.2%}")
         # With burst traffic and many unique keys, hit rate will be lower
         # Just verify we have some hits and cache is working
         assert results["hits"] > 0
         assert results["misses"] > 0
-        assert (
-            total_requests == 3 * burst_size
-        )  # 3 threads * burst_size requests each
+        assert total_requests == 3 * burst_size  # 3 threads * burst_size requests each
 
 
 class TestMemoryPressureScenarios:
@@ -316,9 +295,7 @@ class TestMemoryPressureScenarios:
 
     def test_memory_pressure_detection(self):
         """Test detection of memory pressure conditions."""
-        cache = SmartCache(
-            max_size=100, max_memory_mb=1
-        )  # Very low memory limit
+        cache = SmartCache(max_size=100, max_memory_mb=1)  # Very low memory limit
 
         # Fill cache with large entries using proper CacheEntry objects
         from src.core.smart_cache import CacheEntry
@@ -336,9 +313,7 @@ class TestMemoryPressureScenarios:
             cache._cache[f"large-{i}"] = entry
 
         # Check memory usage by calculating manually
-        total_memory_bytes = sum(
-            entry.size_bytes for entry in cache._cache.values()
-        )
+        total_memory_bytes = sum(entry.size_bytes for entry in cache._cache.values())
         memory_mb = total_memory_bytes / (1024 * 1024)
 
         # Should have significant memory usage
@@ -364,9 +339,7 @@ class TestMemoryPressureScenarios:
                     owned_by="test",
                 )
             ]
-            cache.set_models(
-                f"provider-{i}", f"https://provider-{i}.com", models
-            )
+            cache.set_models(f"provider-{i}", f"https://provider-{i}.com", models)
 
         # Measure access time under memory pressure
         start_time = time.time()
@@ -381,9 +354,7 @@ class TestMemoryPressureScenarios:
         access_time = time.time() - start_time
         avg_access_time = access_time / 100
 
-        print(
-            f"Average access time under memory pressure: {avg_access_time:.4f}s"
-        )
+        print(f"Average access time under memory pressure: {avg_access_time:.4f}s")
         assert avg_access_time < 0.01  # Should still be reasonably fast
 
     def test_memory_pressure_recovery(self):
@@ -400,9 +371,7 @@ class TestMemoryPressureScenarios:
                     owned_by="test",
                 )
             ]
-            cache.set_models(
-                f"provider-{i}", f"https://provider-{i}.com", models
-            )
+            cache.set_models(f"provider-{i}", f"https://provider-{i}.com", models)
 
         initial_size = cache.get_stats()["size"]
         assert initial_size == 20  # Should be at max_size
@@ -421,9 +390,7 @@ class TestMemoryPressureScenarios:
                     owned_by="test",
                 )
             ]
-            cache.set_models(
-                f"provider-{i}", f"https://provider-{i}.com", models
-            )
+            cache.set_models(f"provider-{i}", f"https://provider-{i}.com", models)
 
         final_size = cache.get_stats()["size"]
         assert final_size == 20  # Should maintain max_size
@@ -536,9 +503,7 @@ class TestCachePerformanceBenchmarks:
                     owned_by="test",
                 )
             ]
-            cache.set_models(
-                f"provider-{i}", f"https://provider-{i}.com", models
-            )
+            cache.set_models(f"provider-{i}", f"https://provider-{i}.com", models)
 
         # Force garbage collection to get accurate memory reading
         gc.collect()
@@ -567,15 +532,11 @@ class TestCachePerformanceBenchmarks:
                     owned_by="test",
                 )
             ]
-            cache.set_models(
-                f"provider-{i}", f"https://provider-{i}.com", models
-            )
+            cache.set_models(f"provider-{i}", f"https://provider-{i}.com", models)
 
             # Measure access time
             start = time.time()
-            cached = cache.get_models(
-                f"provider-{i}", f"https://provider-{i}.com"
-            )
+            cached = cache.get_models(f"provider-{i}", f"https://provider-{i}.com")
             end = time.time()
 
             if cached:
@@ -583,12 +544,8 @@ class TestCachePerformanceBenchmarks:
 
         if access_times:
             avg_access_time = sum(access_times) / len(access_times)
-            print(
-                f"Average access time with evictions: {avg_access_time:.6f}s"
-            )
-            assert (
-                avg_access_time < 0.001
-            )  # Should be very fast even with evictions
+            print(f"Average access time with evictions: {avg_access_time:.6f}s")
+            assert avg_access_time < 0.001  # Should be very fast even with evictions
 
 
 if __name__ == "__main__":

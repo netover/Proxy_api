@@ -75,9 +75,7 @@ class AsyncLRUCache:
                     for key in keys:
                         value = await self.redis_client.get(key)
                         if value:
-                            cache_key = key.decode("utf-8").replace(
-                                "cache:", ""
-                            )
+                            cache_key = key.decode("utf-8").replace("cache:", "")
                             data = json.loads(value.decode("utf-8"))
                             self.cache[cache_key] = tuple(data)
                     logger.info(f"Loaded {len(self.cache)} items from Redis")
@@ -95,16 +93,12 @@ class AsyncLRUCache:
                         f"Loaded {len(self.cache)} items from {self.persist_file}"
                     )
             except FileNotFoundError:
-                logger.info(
-                    f"No persistent cache file found: {self.persist_file}"
-                )
+                logger.info(f"No persistent cache file found: {self.persist_file}")
             except json.JSONDecodeError as e:
                 logger.error(f"Failed to parse cache file: {e}")
                 # Handle corrupted cache file
                 try:
-                    os.rename(
-                        self.persist_file, f"{self.persist_file}.corrupted"
-                    )
+                    os.rename(self.persist_file, f"{self.persist_file}.corrupted")
                     logger.info(
                         f"Renamed corrupted cache file to {self.persist_file}.corrupted"
                     )
@@ -136,12 +130,8 @@ class AsyncLRUCache:
                 return
             try:
                 with open(self.persist_file, "w", encoding="utf-8") as f:
-                    json.dump(
-                        dict(self.cache), f, ensure_ascii=False, default=str
-                    )
-                logger.debug(
-                    f"Saved {len(self.cache)} items to {self.persist_file}"
-                )
+                    json.dump(dict(self.cache), f, ensure_ascii=False, default=str)
+                logger.debug(f"Saved {len(self.cache)} items to {self.persist_file}")
             except Exception as e:
                 logger.error(f"Failed to save persistent cache: {e}")
 
@@ -188,18 +178,14 @@ class AsyncLRUCache:
         """Shutdown cache and save to file/Redis if persistence enabled"""
         # Cancel all pending background tasks
         if self._background_tasks:
-            logger.info(
-                f"Cancelling {len(self._background_tasks)} background tasks"
-            )
+            logger.info(f"Cancelling {len(self._background_tasks)} background tasks")
             for task in list(self._background_tasks):
                 if not task.done():
                     task.cancel()
 
             # Wait for tasks to complete or be cancelled
             if self._background_tasks:
-                await asyncio.gather(
-                    *self._background_tasks, return_exceptions=True
-                )
+                await asyncio.gather(*self._background_tasks, return_exceptions=True)
             logger.info("All background tasks cancelled")
 
         # Final save
@@ -247,9 +233,7 @@ async def condense_context(
         not hasattr(request.app.state, "lru_cache")
         or request.app.state.lru_cache is None
     ):
-        persist_file = (
-            "cache.json" if condensation_config.cache_persist else None
-        )
+        persist_file = "cache.json" if condensation_config.cache_persist else None
         request.app.state.lru_cache = AsyncLRUCache(
             maxsize=condensation_config.cache_size, persist_file=persist_file
         )
@@ -294,9 +278,7 @@ async def condense_context(
         )
 
     # Prepare providers for parallel or sequential
-    enabled_providers = [
-        p for p in request.app.state.config.providers if p.enabled
-    ]
+    enabled_providers = [p for p in request.app.state.config.providers if p.enabled]
     sorted_providers = sorted(enabled_providers, key=lambda p: p.priority)
     if not sorted_providers:
         raise ValueError("No enabled providers available for condensation")
@@ -326,9 +308,7 @@ async def condense_context(
             # Copy request_body for each
             body_copy = request_body.copy()
             body_copy["model"] = cfg.models[0]
-            task = asyncio.create_task(
-                call_provider_with_timeout(prov, cfg, body_copy)
-            )
+            task = asyncio.create_task(call_provider_with_timeout(prov, cfg, body_copy))
             tasks.append((task, cfg))
         # Wait for first completed
         done, pending = await asyncio.wait(
@@ -339,9 +319,7 @@ async def condense_context(
                 if t == task:
                     if not task.exception():
                         resp = task.result()
-                        logger.info(
-                            f"Parallel success with provider: {cfg.name}"
-                        )
+                        logger.info(f"Parallel success with provider: {cfg.name}")
                     else:
                         logger.error(
                             f"Parallel task failed for {cfg.name}: {task.exception()}"
@@ -406,12 +384,12 @@ async def condense_context(
                                     next_cfg = sorted_providers[next_idx]
                                     if next_cfg.enabled:
                                         top_cfg = next_cfg
-                                        provider = await provider_factory.create_provider(
-                                            top_cfg
+                                        provider = (
+                                            await provider_factory.create_provider(
+                                                top_cfg
+                                            )
                                         )
-                                        request_body["model"] = top_cfg.models[
-                                            0
-                                        ]
+                                        request_body["model"] = top_cfg.models[0]
                                         logger.info(
                                             f"Applied secondary provider fallback: {top_cfg.name}"
                                         )

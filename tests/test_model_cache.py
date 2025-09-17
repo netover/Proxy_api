@@ -1,15 +1,10 @@
 """Comprehensive tests for model discovery caching layer."""
 
-import asyncio
-import json
-import os
 import tempfile
 import threading
 import time
-from datetime import datetime, timedelta
 from pathlib import Path
-from typing import List
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -60,9 +55,7 @@ class TestModelCache:
 
         key1 = cache._generate_cache_key("openai", "https://api.openai.com")
         key2 = cache._generate_cache_key("openai", "https://api.openai.com")
-        key3 = cache._generate_cache_key(
-            "anthropic", "https://api.anthropic.com"
-        )
+        key3 = cache._generate_cache_key("anthropic", "https://api.anthropic.com")
 
         assert key1 == key2
         assert key1 != key3
@@ -190,9 +183,7 @@ class TestModelCache:
         cache.set_models("openai", "https://api.openai.com", models)
 
         # Verify cache file exists
-        cache_key = cache._generate_cache_key(
-            "openai", "https://api.openai.com"
-        )
+        cache_key = cache._generate_cache_key("openai", "https://api.openai.com")
         cache_file = cache._get_cache_file_path(cache_key)
         assert cache_file.exists()
 
@@ -242,12 +233,8 @@ class TestModelCache:
 
         def worker(thread_id):
             provider_name = f"provider-{thread_id}"
-            cache.set_models(
-                provider_name, f"https://{provider_name}.com", models
-            )
-            cached = cache.get_models(
-                provider_name, f"https://{provider_name}.com"
-            )
+            cache.set_models(provider_name, f"https://{provider_name}.com", models)
+            cached = cache.get_models(provider_name, f"https://{provider_name}.com")
             assert cached is not None
             assert len(cached) == 100
 
@@ -406,9 +393,7 @@ class TestCacheManager:
         models = await manager.get_models_with_cache(provider_config)
 
         assert len(models) == 2
-        mock_discovery_service.discover_models.assert_called_once_with(
-            provider_config
-        )
+        mock_discovery_service.discover_models.assert_called_once_with(provider_config)
 
         # Verify cache was populated
         cached = cache.get_models("openai", "https://api.openai.com")
@@ -715,12 +700,8 @@ class TestIntegration:
         def concurrent_worker(worker_id):
             for i in range(10):
                 provider_name = f"provider-{worker_id}-{i}"
-                cache.set_models(
-                    provider_name, f"https://{provider_name}.com", models
-                )
-                cached = cache.get_models(
-                    provider_name, f"https://{provider_name}.com"
-                )
+                cache.set_models(provider_name, f"https://{provider_name}.com", models)
+                cached = cache.get_models(provider_name, f"https://{provider_name}.com")
                 assert cached is not None
                 assert len(cached) == 50
 

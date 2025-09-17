@@ -1,6 +1,6 @@
 """Data models for proxy_core package."""
 
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict
 from pydantic import BaseModel
 from enum import Enum
 

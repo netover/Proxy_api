@@ -4,7 +4,6 @@ Tests for chaos engineering framework and fault injection.
 
 import pytest
 import asyncio
-from unittest.mock import patch, AsyncMock
 import httpx
 
 from src.core.chaos_engineering import (
@@ -425,9 +424,7 @@ class TestPerformanceUnderChaos:
 
         # Run multiple times to trigger circuit breaker
         for _ in range(5):
-            result = await run_chaos_scenario(
-                scenario_config, failing_function
-            )
+            result = await run_chaos_scenario(scenario_config, failing_function)
             assert result["success"] is False
 
         # Should have multiple failures

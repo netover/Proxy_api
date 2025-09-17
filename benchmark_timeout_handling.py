@@ -100,7 +100,7 @@ async def benchmark_timeout_handling():
     ]
 
     num_requests_per_scenario = 5  # Fewer requests for timeout tests
-    print(f"Test Configuration:")
+    print("Test Configuration:")
     print(f"  Scenarios: {len(scenarios)}")
     print(f"  Requests per scenario: {num_requests_per_scenario}")
     print()
@@ -177,10 +177,10 @@ async def benchmark_timeout_handling():
         total_v2_timeouts / total_requests * 100 if total_requests > 0 else 0
     )
 
-    print(f"Overall Timeout Rate:")
+    print("Overall Timeout Rate:")
     print(f"  V1 (Optimized): {overall_v1_timeout_rate:.1f}%")
     print(f"  V2 (Advanced): {overall_v2_timeout_rate:.1f}%")
-    print(".1f")
+    print(".1")
     print()
 
     # Scenario breakdown
@@ -193,7 +193,7 @@ async def benchmark_timeout_handling():
 
         print(f"  {scenario_name}:")
         print(f"    Timeout: {config['timeout']}s")
-        print(".1f" ".1f" "+.1f")
+        print(".1" ".1" "+.1")
 
     # Timeout efficiency analysis
     print("\nTimeout Efficiency Analysis:")
@@ -212,9 +212,9 @@ async def benchmark_timeout_handling():
             expected_timeout = scenario["config"]["timeout"]
 
             print(f"  {scenario['config']['name']}:")
-            print(".2f")
-            print(".2f")
-            print(".2f")
+            print(".2")
+            print(".2")
+            print(".2")
 
             # Check if timeout detection is close to expected
             v1_accuracy = (
@@ -228,8 +228,8 @@ async def benchmark_timeout_handling():
                 * 100
             )
 
-            print(".1f")
-            print(".1f")
+            print(".1")
+            print(".1")
 
     # Detailed metrics
     print("\nDetailed Metrics by Scenario:")

@@ -4,12 +4,10 @@ Tests verify proper initialization of components, graceful shutdown handling,
 and error recovery during startup/shutdown phases.
 """
 
-import asyncio
 import pytest
 import time
-from unittest.mock import AsyncMock, MagicMock, patch, Mock
+from unittest.mock import AsyncMock, MagicMock, patch
 from fastapi import FastAPI
-from fastapi.testclient import TestClient
 
 # Import the lifespan function and app
 from main import lifespan, app
@@ -84,9 +82,7 @@ class TestLifespanInitialization:
                 mock_app_state.initialize.assert_called_once()
                 mock_config_manager.load_config.assert_called_once()
                 mock_telemetry.configure.assert_called_once()
-                mock_telemetry.instrument_fastapi.assert_called_once_with(
-                    mock_app
-                )
+                mock_telemetry.instrument_fastapi.assert_called_once_with(mock_app)
                 mock_telemetry.instrument_httpx.assert_called_once()
                 mock_get_http_client.assert_called_once()
                 mock_get_response_cache.assert_called_once()
@@ -115,9 +111,7 @@ class TestLifespanInitialization:
         """Test successful shutdown sequence with all components cleaned up"""
         with patch("main.app_state") as mock_app_state, patch(
             "main.config_manager"
-        ) as mock_config_manager, patch(
-            "main.telemetry"
-        ) as mock_telemetry, patch(
+        ) as mock_config_manager, patch("main.telemetry") as mock_telemetry, patch(
             "main.get_http_client"
         ) as mock_get_http_client, patch(
             "main.get_response_cache"
@@ -233,9 +227,7 @@ class TestLifespanInitialization:
         """Test error recovery during shutdown phase"""
         with patch("main.app_state") as mock_app_state, patch(
             "main.config_manager"
-        ) as mock_config_manager, patch(
-            "main.telemetry"
-        ) as mock_telemetry, patch(
+        ) as mock_config_manager, patch("main.telemetry") as mock_telemetry, patch(
             "main.get_http_client"
         ) as mock_get_http_client, patch(
             "main.get_response_cache"
@@ -313,9 +305,7 @@ class TestLifespanInitialization:
         """Test that all required components are properly initialized"""
         with patch("main.app_state") as mock_app_state, patch(
             "main.config_manager"
-        ) as mock_config_manager, patch(
-            "main.telemetry"
-        ) as mock_telemetry, patch(
+        ) as mock_config_manager, patch("main.telemetry") as mock_telemetry, patch(
             "main.get_http_client"
         ) as mock_get_http_client, patch(
             "main.get_response_cache"
@@ -481,9 +471,7 @@ class TestLifespanInitialization:
         """Test cache persistence initialization when enabled"""
         with patch("main.app_state") as mock_app_state, patch(
             "main.config_manager"
-        ) as mock_config_manager, patch(
-            "main.telemetry"
-        ) as mock_telemetry, patch(
+        ) as mock_config_manager, patch("main.telemetry") as mock_telemetry, patch(
             "main.get_http_client"
         ) as mock_get_http_client, patch(
             "main.get_response_cache"
@@ -541,9 +529,7 @@ class TestLifespanInitialization:
         """Test web UI thread is started during initialization"""
         with patch("main.app_state") as mock_app_state, patch(
             "main.config_manager"
-        ) as mock_config_manager, patch(
-            "main.telemetry"
-        ) as mock_telemetry, patch(
+        ) as mock_config_manager, patch("main.telemetry") as mock_telemetry, patch(
             "main.get_http_client"
         ) as mock_get_http_client, patch(
             "main.get_response_cache"
@@ -617,9 +603,7 @@ class TestLifespanIntegration:
         with patch("time.time", return_value=1234567890.0):
             with patch("main.app_state"), patch("main.config_manager"), patch(
                 "main.telemetry"
-            ), patch("main.get_http_client"), patch(
-                "main.get_response_cache"
-            ), patch(
+            ), patch("main.get_http_client"), patch("main.get_response_cache"), patch(
                 "main.get_summary_cache"
             ), patch(
                 "main.get_memory_manager"

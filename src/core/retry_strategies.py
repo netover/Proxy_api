@@ -62,9 +62,7 @@ class RetryHistory:
         self.consecutive_failures = 0
         self.last_success_time = time.time()
 
-    def record_failure(
-        self, error_type: ErrorType, error: Exception, delay: float
-    ):
+    def record_failure(self, error_type: ErrorType, error: Exception, delay: float):
         """Record a failed attempt"""
         self.failure_count += 1
         self.consecutive_failures += 1
@@ -92,9 +90,7 @@ class RetryHistory:
         )
         return successes / total if total > 0 else 1.0
 
-    def get_average_delay(
-        self, error_type: Optional[ErrorType] = None
-    ) -> float:
+    def get_average_delay(self, error_type: Optional[ErrorType] = None) -> float:
         """Get average delay for specific error type or all errors"""
         delays = []
         for attempt in self.attempts:
@@ -116,9 +112,7 @@ class ProviderRetryConfig:
     jitter_factor: Optional[float] = None
 
     # Error-type specific configurations
-    error_configs: Dict[ErrorType, Dict[str, Any]] = field(
-        default_factory=dict
-    )
+    error_configs: Dict[ErrorType, Dict[str, Any]] = field(default_factory=dict)
 
     # Strategy-specific overrides
     strategy_overrides: Dict[str, Dict[str, Any]] = field(default_factory=dict)
@@ -144,9 +138,7 @@ class RetryConfig:
     jitter_factor: float = 0.1
 
     # Provider-specific configurations
-    provider_configs: Dict[str, ProviderRetryConfig] = field(
-        default_factory=dict
-    )
+    provider_configs: Dict[str, ProviderRetryConfig] = field(default_factory=dict)
 
     def get_provider_config(self, provider_name: str) -> ProviderRetryConfig:
         """Get detailed configuration for specific provider"""
@@ -192,9 +184,7 @@ class RetryConfig:
 
         # Apply strategy-specific overrides
         if strategy_name:
-            strategy_override = provider_config.get_strategy_override(
-                strategy_name
-            )
+            strategy_override = provider_config.get_strategy_override(strategy_name)
             effective.update(strategy_override)
 
         return effective
@@ -216,13 +206,9 @@ class RetryStrategy(ABC):
         cache_key = (self.provider_name, error_type, self.__class__.__name__)
 
         if cache_key not in self._effective_config_cache:
-            strategy_name = self.__class__.__name__.replace(
-                "Strategy", ""
-            ).lower()
-            self._effective_config_cache[cache_key] = (
-                self.config.get_effective_config(
-                    self.provider_name, error_type, strategy_name
-                )
+            strategy_name = self.__class__.__name__.replace("Strategy", "").lower()
+            self._effective_config_cache[cache_key] = self.config.get_effective_config(
+                self.provider_name, error_type, strategy_name
             )
 
         return self._effective_config_cache[cache_key]
@@ -239,10 +225,7 @@ class RetryStrategy(ABC):
         """Classify error type for strategy selection"""
         if isinstance(error, RateLimitError):
             return ErrorType.RATE_LIMIT
-        elif (
-            isinstance(error, asyncio.TimeoutError)
-            or "timeout" in str(error).lower()
-        ):
+        elif isinstance(error, asyncio.TimeoutError) or "timeout" in str(error).lower():
             return ErrorType.TIMEOUT
         elif (
             isinstance(error, (ConnectionError, OSError))
@@ -251,9 +234,7 @@ class RetryStrategy(ABC):
             return ErrorType.CONNECTION
         elif isinstance(error, AuthenticationError):
             return ErrorType.AUTHENTICATION
-        elif hasattr(error, "response") and hasattr(
-            error.response, "status_code"
-        ):
+        elif hasattr(error, "response") and hasattr(error.response, "status_code"):
             status_code = error.response.status_code
             if 400 <= status_code < 500:
                 return ErrorType.CLIENT_ERROR
@@ -359,9 +340,7 @@ class ExponentialBackoffStrategy(RetryStrategy):
         if error_type == ErrorType.RATE_LIMIT:
             if hasattr(error, "retry_after") and error.retry_after:
                 base_delay = float(error.retry_after)
-            elif hasattr(error, "response") and hasattr(
-                error.response, "headers"
-            ):
+            elif hasattr(error, "response") and hasattr(error.response, "headers"):
                 # Check common retry-after headers
                 retry_after = error.response.headers.get(
                     "Retry-After"
@@ -370,9 +349,7 @@ class ExponentialBackoffStrategy(RetryStrategy):
                     try:
                         base_delay = float(retry_after)
                     except ValueError:
-                        base_delay = max(
-                            effective_config["base_delay"] * 2, 5.0
-                        )
+                        base_delay = max(effective_config["base_delay"] * 2, 5.0)
                 else:
                     base_delay = max(
                         effective_config["base_delay"] * 2, 5.0
@@ -383,9 +360,7 @@ class ExponentialBackoffStrategy(RetryStrategy):
             base_delay = effective_config["base_delay"]
 
         # Exponential backoff with capped exponent to prevent overflow
-        exponent = min(
-            attempt, 10
-        )  # Cap exponent to prevent extremely long delays
+        exponent = min(attempt, 10)  # Cap exponent to prevent extremely long delays
         delay = base_delay * (effective_config["backoff_factor"] ** exponent)
 
         # Adaptive delay based on success rate
@@ -401,10 +376,7 @@ class ExponentialBackoffStrategy(RetryStrategy):
             delay *= 0.8
 
         # Consider consecutive failures for rate limits
-        if (
-            error_type == ErrorType.RATE_LIMIT
-            and self.history.consecutive_failures > 2
-        ):
+        if error_type == ErrorType.RATE_LIMIT and self.history.consecutive_failures > 2:
             delay *= 1.3
 
         # Add jitter to prevent thundering herd
@@ -441,9 +413,7 @@ class ImmediateRetryStrategy(RetryStrategy):
     def _is_transient_error(self, error: Exception) -> bool:
         """Check if error is likely transient and suitable for immediate retry"""
         error_str = str(error).lower()
-        return any(
-            transient in error_str for transient in self.transient_errors
-        )
+        return any(transient in error_str for transient in self.transient_errors)
 
     async def should_retry(self, error: Exception, attempt: int) -> bool:
         """Retry immediately on transient errors with smart detection"""
@@ -495,9 +465,7 @@ class ImmediateRetryStrategy(RetryStrategy):
         ):
             # Progressive delay for immediate retries (0.05, 0.1, 0.2)
             immediate_delays = [0.05, 0.1, 0.2]
-            delay_index = min(
-                self.immediate_retry_count - 1, len(immediate_delays) - 1
-            )
+            delay_index = min(self.immediate_retry_count - 1, len(immediate_delays) - 1)
             return immediate_delays[delay_index]
         else:
             # Reset immediate retry count for non-immediate retries
@@ -526,9 +494,7 @@ class AdaptiveRetryStrategy(RetryStrategy):
 
     def __init__(self, config: RetryConfig, provider_name: str = ""):
         super().__init__(config, provider_name)
-        self.adaptation_window = (
-            15  # Increased window for better pattern recognition
-        )
+        self.adaptation_window = 15  # Increased window for better pattern recognition
         self.confidence_threshold = 0.7
         self.error_type_weights = {
             ErrorType.RATE_LIMIT: 1.2,
@@ -572,9 +538,7 @@ class AdaptiveRetryStrategy(RetryStrategy):
 
         recent_attempts = list(self.history.attempts)[-10:]
         error_count = sum(
-            1
-            for attempt in recent_attempts
-            if attempt.error_type == error_type
+            1 for attempt in recent_attempts if attempt.error_type == error_type
         )
 
         # Higher confidence if we have consistent patterns
@@ -592,9 +556,7 @@ class AdaptiveRetryStrategy(RetryStrategy):
             return False
 
         # Get weighted success rate and confidence
-        weighted_success_rate = self._calculate_weighted_success_rate(
-            error_type
-        )
+        weighted_success_rate = self._calculate_weighted_success_rate(error_type)
         confidence = self._get_error_pattern_confidence(error_type)
 
         # Adaptive thresholds based on confidence
@@ -603,9 +565,7 @@ class AdaptiveRetryStrategy(RetryStrategy):
 
         if error_type == ErrorType.RATE_LIMIT:
             # For rate limits, always retry but adapt attempt count
-            max_attempts = self._adapt_max_attempts(
-                weighted_success_rate, confidence
-            )
+            max_attempts = self._adapt_max_attempts(weighted_success_rate, confidence)
             return attempt < max_attempts
 
         if error_type in [ErrorType.CONNECTION, ErrorType.TIMEOUT]:
@@ -618,17 +578,15 @@ class AdaptiveRetryStrategy(RetryStrategy):
         if error_type == ErrorType.SERVER_ERROR:
             # For server errors, be more conservative
             effective_config = self.get_effective_config(error_type)
-            return (
-                weighted_success_rate > conservative_threshold
-                and attempt < min(3, effective_config["max_attempts"])
+            return weighted_success_rate > conservative_threshold and attempt < min(
+                3, effective_config["max_attempts"]
             )
 
         if error_type == ErrorType.UNKNOWN:
             # For unknown errors, use conservative approach
             effective_config = self.get_effective_config(error_type)
-            return (
-                weighted_success_rate > conservative_threshold
-                and attempt < min(2, effective_config["max_attempts"])
+            return weighted_success_rate > conservative_threshold and attempt < min(
+                2, effective_config["max_attempts"]
             )
 
         return False
@@ -637,9 +595,7 @@ class AdaptiveRetryStrategy(RetryStrategy):
         """Adaptive delay calculation with pattern-based adjustments"""
         error_type = self.classify_error(error)
         effective_config = self.get_effective_config(error_type)
-        weighted_success_rate = self._calculate_weighted_success_rate(
-            error_type
-        )
+        weighted_success_rate = self._calculate_weighted_success_rate(error_type)
         confidence = self._get_error_pattern_confidence(error_type)
 
         # Base delay calculation with error-type specific adjustments
@@ -678,9 +634,7 @@ class AdaptiveRetryStrategy(RetryStrategy):
 
         # Time-based adaptation (longer delays during peak hours if pattern suggests)
         current_hour = time.localtime().tm_hour
-        if (
-            9 <= current_hour <= 17 and weighted_success_rate < 0.5
-        ):  # Business hours
+        if 9 <= current_hour <= 17 and weighted_success_rate < 0.5:  # Business hours
             delay *= 1.1  # Slight increase during peak hours
 
         # Add jitter with confidence-based adjustment
@@ -693,9 +647,7 @@ class AdaptiveRetryStrategy(RetryStrategy):
 
         return min(delay, effective_config["max_delay"])
 
-    def _adapt_max_attempts(
-        self, success_rate: float, confidence: float
-    ) -> int:
+    def _adapt_max_attempts(self, success_rate: float, confidence: float) -> int:
         """Adapt maximum attempts based on success rate and confidence"""
         effective_config = self.get_effective_config()  # Get general config
         base_attempts = effective_config["max_attempts"]
@@ -715,16 +667,14 @@ class RetryStrategyRegistry:
 
     def __init__(self):
         self.strategies: Dict[str, Type[RetryStrategy]] = {
-            "exponential_backoff": ExponentialBackoffStrategy,
+            "exponential_backof": ExponentialBackoffStrategy,
             "immediate_retry": ImmediateRetryStrategy,
             "adaptive": AdaptiveRetryStrategy,
         }
         self.default_strategy = "adaptive"
         self.provider_strategies: Dict[str, str] = {}
 
-    def register_strategy(
-        self, name: str, strategy_class: Type[RetryStrategy]
-    ):
+    def register_strategy(self, name: str, strategy_class: Type[RetryStrategy]):
         """Register a new retry strategy"""
         self.strategies[name] = strategy_class
 
@@ -734,9 +684,7 @@ class RetryStrategyRegistry:
             raise ValueError(f"Unknown strategy: {strategy_name}")
         self.provider_strategies[provider_name] = strategy_name
 
-    def get_strategy(
-        self, provider_name: str, config: RetryConfig
-    ) -> RetryStrategy:
+    def get_strategy(self, provider_name: str, config: RetryConfig) -> RetryStrategy:
         """Get appropriate strategy for provider"""
         strategy_name = self.provider_strategies.get(
             provider_name, self.default_strategy
@@ -754,8 +702,6 @@ class RetryStrategyRegistry:
 retry_strategy_registry = RetryStrategyRegistry()
 
 
-def create_retry_strategy(
-    provider_name: str, config: RetryConfig
-) -> RetryStrategy:
+def create_retry_strategy(provider_name: str, config: RetryConfig) -> RetryStrategy:
     """Factory function for creating retry strategies"""
     return retry_strategy_registry.get_strategy(provider_name, config)

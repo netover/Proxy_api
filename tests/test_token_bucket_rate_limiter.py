@@ -10,7 +10,6 @@ from src.core.rate_limiter import (
     rate_limiter,
 )
 from fastapi import HTTPException
-from fastapi.testclient import TestClient
 
 
 class TestTokenBucket:

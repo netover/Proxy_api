@@ -1,5 +1,4 @@
 import pytest
-import asyncio
 import pytest_asyncio
 from src.utils.semantic_cache import SemanticCache
 from src.core.smart_cache import SmartCache
@@ -96,8 +95,7 @@ def test_empty_cache_search(semantic_cache):
 async def integrated_cache():
     """Fixture for a SmartCache instance with semantic caching enabled."""
     try:
-        from sentence_transformers import SentenceTransformer
-        import faiss
+        pass
 
         cache = SmartCache(enable_semantic_caching=True)
         await cache.start()
@@ -139,16 +137,12 @@ async def test_smart_cache_integration_semantic_hit(integrated_cache):
     original_query = "What is the currency of Japan?"
     response = "The currency is the Yen."
     hashed_key_1 = integrated_cache.generate_key(original_query)
-    await integrated_cache.set(
-        hashed_key_1, response, original_query=original_query
-    )
+    await integrated_cache.set(hashed_key_1, response, original_query=original_query)
 
     similar_query = "Tell me about Japan's currency"
     hashed_key_2 = integrated_cache.generate_key(similar_query)
 
-    result = await integrated_cache.get(
-        hashed_key_2, original_query=similar_query
-    )
+    result = await integrated_cache.get(hashed_key_2, original_query=similar_query)
 
     assert result is not None
     assert result == response

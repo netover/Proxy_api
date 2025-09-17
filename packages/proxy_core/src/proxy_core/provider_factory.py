@@ -4,8 +4,6 @@ import asyncio
 from typing import Dict, List, Type, Optional, Any
 from abc import ABC, abstractmethod
 import weakref
-from contextlib import asynccontextmanager
-import logging
 from dataclasses import dataclass
 from enum import Enum
 import time
@@ -92,7 +90,7 @@ class BaseProvider(ABC):
                     )
 
                     self.logger.info(
-                        f"HTTP client initialized",
+                        "HTTP client initialized",
                         timeout=self.config.timeout,
                         max_keepalive_connections=self.config.max_keepalive_connections,
                         max_connections=self.config.max_connections,
@@ -165,9 +163,7 @@ class BaseProvider(ABC):
                 self.name,
                 success=result.get("healthy", False),
                 response_time=response_time,
-                error_type=(
-                    None if result.get("healthy") else "health_check_failed"
-                ),
+                error_type=(None if result.get("healthy") else "health_check_failed"),
             )
 
             return {
@@ -206,32 +202,20 @@ class BaseProvider(ABC):
     @abstractmethod
     async def _perform_health_check(self) -> Dict[str, Any]:
         """Provider-specific health check implementation"""
-        pass
 
     @abstractmethod
-    async def create_completion(
-        self, request: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def create_completion(self, request: Dict[str, Any]) -> Dict[str, Any]:
         """Create chat completion"""
-        pass
 
     @abstractmethod
-    async def create_text_completion(
-        self, request: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def create_text_completion(self, request: Dict[str, Any]) -> Dict[str, Any]:
         """Create text completion"""
-        pass
 
     @abstractmethod
-    async def create_embeddings(
-        self, request: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def create_embeddings(self, request: Dict[str, Any]) -> Dict[str, Any]:
         """Create embeddings"""
-        pass
 
-    async def make_request(
-        self, method: str, url: str, **kwargs
-    ) -> httpx.Response:
+    async def make_request(self, method: str, url: str, **kwargs) -> httpx.Response:
         """Make HTTP request with comprehensive retry logic"""
         client = await self.client
         last_exception = None
@@ -257,12 +241,8 @@ class BaseProvider(ABC):
                 # Rate limiting - should retry
                 if response.status_code == 429:
                     if attempt < self.config.max_retries:
-                        retry_after = int(
-                            response.headers.get("Retry-After", 60)
-                        )
-                        self.logger.warning(
-                            f"Rate limited, waiting {retry_after}s"
-                        )
+                        retry_after = int(response.headers.get("Retry-After", 60))
+                        self.logger.warning(f"Rate limited, waiting {retry_after}s")
                         await asyncio.sleep(retry_after)
                         continue
 
@@ -280,17 +260,13 @@ class BaseProvider(ABC):
             except httpx.TimeoutException as e:
                 last_exception = e
                 if attempt < self.config.max_retries:
-                    self.logger.warning(
-                        f"Request timeout, attempt {attempt + 1}"
-                    )
+                    self.logger.warning(f"Request timeout, attempt {attempt + 1}")
                     continue
 
             except httpx.NetworkError as e:
                 last_exception = e
                 if attempt < self.config.max_retries:
-                    self.logger.warning(
-                        f"Network error, attempt {attempt + 1}: {e}"
-                    )
+                    self.logger.warning(f"Network error, attempt {attempt + 1}: {e}")
                     continue
 
             except httpx.HTTPStatusError as e:
@@ -357,9 +333,7 @@ class ProviderFactory:
         # Weak references to track all instances
         self._all_instances: weakref.WeakSet = weakref.WeakSet()
 
-    def _load_provider_class(
-        self, provider_type: ProviderType
-    ) -> Type[BaseProvider]:
+    def _load_provider_class(self, provider_type: ProviderType) -> Type[BaseProvider]:
         """Load provider class dynamically with caching"""
         if provider_type in self._provider_classes:
             return self._provider_classes[provider_type]
@@ -375,9 +349,7 @@ class ProviderFactory:
 
             # Validate that it's actually a BaseProvider subclass
             if not issubclass(provider_class, BaseProvider):
-                raise ValueError(
-                    f"{class_name} is not a BaseProvider subclass"
-                )
+                raise ValueError(f"{class_name} is not a BaseProvider subclass")
 
             # Cache the class
             self._provider_classes[provider_type] = provider_class
@@ -446,14 +418,10 @@ class ProviderFactory:
                 self._providers[config.name] = provider
 
             except Exception as e:
-                logger.error(
-                    f"Failed to initialize provider {config.name}: {e}"
-                )
+                logger.error(f"Failed to initialize provider {config.name}: {e}")
                 failed_providers.append((config.name, str(e)))
 
-        logger.info(
-            f"Initialized {len(successful_providers)} providers successfully"
-        )
+        logger.info(f"Initialized {len(successful_providers)} providers successfully")
 
         if failed_providers:
             logger.warning(
@@ -471,9 +439,7 @@ class ProviderFactory:
         if self._health_check_task and not self._health_check_task.done():
             return  # Already running
 
-        self._health_check_task = asyncio.create_task(
-            self._health_check_loop()
-        )
+        self._health_check_task = asyncio.create_task(self._health_check_loop())
         logger.info("Started health monitoring for providers")
 
     async def _health_check_loop(self) -> None:
@@ -485,15 +451,11 @@ class ProviderFactory:
                     try:
                         await provider.health_check()
                     except Exception as e:
-                        logger.error(
-                            f"Health check failed for {provider.name}: {e}"
-                        )
+                        logger.error(f"Health check failed for {provider.name}: {e}")
 
                 # Wait for next check or shutdown
                 try:
-                    await asyncio.wait_for(
-                        self._shutdown_event.wait(), timeout=60.0
-                    )
+                    await asyncio.wait_for(self._shutdown_event.wait(), timeout=60.0)
                     break  # Shutdown requested
                 except asyncio.TimeoutError:
                     continue  # Continue health checks
@@ -578,9 +540,7 @@ class ProviderFactory:
 
         try:
             models = await provider.list_models()
-            logger.info(
-                f"Discovered {len(models)} models from {provider_name}"
-            )
+            logger.info(f"Discovered {len(models)} models from {provider_name}")
             return models
         except Exception as e:
             logger.error(f"Failed to discover models for {provider_name}: {e}")
@@ -614,13 +574,9 @@ class ProviderFactory:
         try:
             model_info = await provider.retrieve_model(model_id)
             if model_info:
-                logger.info(
-                    f"Retrieved model '{model_id}' from {provider_name}"
-                )
+                logger.info(f"Retrieved model '{model_id}' from {provider_name}")
             else:
-                logger.warning(
-                    f"Model '{model_id}' not found in {provider_name}"
-                )
+                logger.warning(f"Model '{model_id}' not found in {provider_name}")
             return model_info
         except Exception as e:
             logger.error(

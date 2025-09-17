@@ -2,10 +2,8 @@
 Test suite for advanced retry strategies
 """
 
-import asyncio
 import pytest
-from unittest.mock import Mock, AsyncMock
-import time
+from unittest.mock import AsyncMock
 
 from src.core.retry_strategies import (
     RetryConfig,
@@ -119,9 +117,7 @@ class TestRetryStrategies:
         strategy = ExponentialBackoffStrategy(self.config, "test_provider")
 
         # Mock function that always fails
-        mock_func = AsyncMock(
-            side_effect=APIConnectionError("Connection failed")
-        )
+        mock_func = AsyncMock(side_effect=APIConnectionError("Connection failed"))
 
         with pytest.raises(APIConnectionError):
             await strategy.execute_with_retry(mock_func)

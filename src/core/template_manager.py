@@ -36,9 +36,7 @@ class TemplateManager:
             cache_size=1000,
         )
         self._validate_templates()
-        logger.info(
-            f"Template manager initialized with directory: {self.template_dir}"
-        )
+        logger.info(f"Template manager initialized with directory: {self.template_dir}")
 
     def _validate_templates(self) -> None:
         """Validate all templates on initialization."""

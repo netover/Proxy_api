@@ -9,17 +9,13 @@ This module contains tests for all model management endpoints including:
 """
 
 import pytest
-import asyncio
-import json
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock, MagicMock
 from fastapi.testclient import TestClient
 from fastapi import FastAPI
-from datetime import datetime
 
 from src.api.model_endpoints import router as model_router
 from src.models.requests import ModelSelectionRequest, ModelInfoExtended
 from src.models.model_info import ModelInfo
-from src.core.exceptions import NotFoundError, InvalidRequestError
 
 
 class TestModelEndpoints:
@@ -114,16 +110,12 @@ class TestModelEndpoints:
         mock_provider = MagicMock()
         mock_provider.name = "openai"
         mock_provider.status = ProviderStatus.HEALTHY
-        mock_provider_factory.get_all_provider_info.return_value = [
-            mock_provider
-        ]
+        mock_provider_factory.get_all_provider_info.return_value = [mock_provider]
 
         # Mock models
         mock_models = [
             ModelInfo(id="gpt-4", created=1677649200, owned_by="openai"),
-            ModelInfo(
-                id="gpt-3.5-turbo", created=1677649200, owned_by="openai"
-            ),
+            ModelInfo(id="gpt-3.5-turbo", created=1677649200, owned_by="openai"),
         ]
         mock_model_discovery.discover_models.return_value = mock_models
 
@@ -190,9 +182,7 @@ class TestModelEndpoints:
         mock_provider = MagicMock()
         mock_provider.name = "anthropic"
         mock_provider.status = ProviderStatus.HEALTHY
-        mock_provider_factory.get_all_provider_info.return_value = [
-            mock_provider
-        ]
+        mock_provider_factory.get_all_provider_info.return_value = [mock_provider]
 
         # Mock model
         mock_model = ModelInfo(
@@ -242,9 +232,7 @@ class TestModelEndpoints:
         mock_provider = MagicMock()
         mock_provider.name = "openai"
         mock_provider.status = ProviderStatus.HEALTHY
-        mock_provider_factory.get_all_provider_info.return_value = [
-            mock_provider
-        ]
+        mock_provider_factory.get_all_provider_info.return_value = [mock_provider]
 
         # Mock empty models
         mock_model_discovery.discover_models.return_value = []
@@ -258,9 +246,7 @@ class TestModelEndpoints:
         # Assert response
         assert response.status_code == 404
         data = response.json()
-        assert (
-            "Model 'nonexistent-model' not found" in data["error"]["message"]
-        )
+        assert "Model 'nonexistent-model' not found" in data["error"]["message"]
 
     @pytest.mark.asyncio
     async def test_update_model_selection_success(
@@ -289,14 +275,10 @@ class TestModelEndpoints:
         mock_provider = MagicMock()
         mock_provider.name = "openai"
         mock_provider.status = ProviderStatus.HEALTHY
-        mock_provider_factory.get_all_provider_info.return_value = [
-            mock_provider
-        ]
+        mock_provider_factory.get_all_provider_info.return_value = [mock_provider]
 
         # Mock model
-        mock_model = ModelInfo(
-            id="gpt-4", created=1677649200, owned_by="openai"
-        )
+        mock_model = ModelInfo(id="gpt-4", created=1677649200, owned_by="openai")
         mock_model_discovery.get_model_info.return_value = mock_model
 
         # Mock config
@@ -353,9 +335,7 @@ class TestModelEndpoints:
         mock_provider = MagicMock()
         mock_provider.name = "openai"
         mock_provider.status = ProviderStatus.HEALTHY
-        mock_provider_factory.get_all_provider_info.return_value = [
-            mock_provider
-        ]
+        mock_provider_factory.get_all_provider_info.return_value = [mock_provider]
 
         # Mock empty models
         mock_model_discovery.get_model_info.return_value = None
@@ -400,16 +380,12 @@ class TestModelEndpoints:
         mock_provider = MagicMock()
         mock_provider.name = "openai"
         mock_provider.status = ProviderStatus.HEALTHY
-        mock_provider_factory.get_all_provider_info.return_value = [
-            mock_provider
-        ]
+        mock_provider_factory.get_all_provider_info.return_value = [mock_provider]
 
         # Mock models
         mock_models = [
             ModelInfo(id="gpt-4", created=1677649200, owned_by="openai"),
-            ModelInfo(
-                id="gpt-3.5-turbo", created=1677649200, owned_by="openai"
-            ),
+            ModelInfo(id="gpt-3.5-turbo", created=1677649200, owned_by="openai"),
         ]
         mock_model_discovery.discover_models.return_value = mock_models
         mock_cache_manager.clear_provider_cache.return_value = True
@@ -530,14 +506,10 @@ class TestModelEndpoints:
         mock_provider = MagicMock()
         mock_provider.name = "openai"
         mock_provider.status = ProviderStatus.HEALTHY
-        mock_provider_factory.get_all_provider_info.return_value = [
-            mock_provider
-        ]
+        mock_provider_factory.get_all_provider_info.return_value = [mock_provider]
 
         # Mock models
-        mock_models = [
-            ModelInfo(id="gpt-4", created=1677649200, owned_by="openai")
-        ]
+        mock_models = [ModelInfo(id="gpt-4", created=1677649200, owned_by="openai")]
         mock_model_discovery.discover_models.return_value = mock_models
 
         # Make multiple rapid requests to test rate limiting
@@ -565,9 +537,7 @@ class TestModelEndpoints:
 
         for endpoint in endpoints:
             if "model_selection" in endpoint:
-                response = client.put(
-                    endpoint, json={"selected_model": "test"}
-                )
+                response = client.put(endpoint, json={"selected_model": "test"})
             elif "refresh" in endpoint:
                 response = client.post(endpoint)
             else:

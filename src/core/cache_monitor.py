@@ -57,9 +57,7 @@ class CacheMonitor:
 
         self._running = True
         self._monitoring_task = asyncio.create_task(self._monitoring_loop())
-        logger.info(
-            "Cache monitor started", target_hit_rate=self.target_hit_rate
-        )
+        logger.info("Cache monitor started", target_hit_rate=self.target_hit_rate)
 
     async def stop_monitoring(self):
         """Stop cache monitoring"""
@@ -159,9 +157,7 @@ class CacheMonitor:
         provider_stats = await provider_discovery.get_cache_stats()
 
         hit_rate = stats.get("hit_rate", 0)
-        health_status = (
-            "healthy" if hit_rate >= self.target_hit_rate else "unhealthy"
-        )
+        health_status = "healthy" if hit_rate >= self.target_hit_rate else "unhealthy"
 
         report = {
             "timestamp": time.time(),
@@ -241,9 +237,7 @@ class CacheMonitor:
                             name=provider.name,
                             base_url=provider.base_url,
                             api_key=provider.api_key,
-                            organization=getattr(
-                                provider, "organization", None
-                            ),
+                            organization=getattr(provider, "organization", None),
                         )
                         await model_service.discover_models(provider_config)
                         results["models_warmed"] += 1

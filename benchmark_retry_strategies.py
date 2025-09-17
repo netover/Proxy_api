@@ -89,7 +89,7 @@ async def benchmark_retry_strategies():
     ]
 
     num_requests_per_scenario = 10
-    print(f"Test Configuration:")
+    print("Test Configuration:")
     print(f"  Scenarios: {len(scenarios)}")
     print(f"  Requests per scenario: {num_requests_per_scenario}")
     print()
@@ -154,10 +154,10 @@ async def benchmark_retry_strategies():
         total_v2_success / total_requests * 100 if total_requests > 0 else 0
     )
 
-    print(f"Overall Success Rate:")
+    print("Overall Success Rate:")
     print(f"  V1 (Optimized): {overall_v1_success_rate:.1f}%")
     print(f"  V2 (Advanced): {overall_v2_success_rate:.1f}%")
-    print(".1f")
+    print(".1")
     print()
 
     # Scenario breakdown
@@ -168,7 +168,7 @@ async def benchmark_retry_strategies():
         v2_rate = scenario_results["v2"].success_rate
         improvement = v2_rate - v1_rate
         print(f"  {scenario_name}:")
-        print(".1f" ".1f" "+.1f")
+        print(".1" ".1" "+.1")
 
     # Detailed metrics
     print("\nDetailed Metrics by Scenario:")

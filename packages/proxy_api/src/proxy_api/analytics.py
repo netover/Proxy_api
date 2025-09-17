@@ -3,7 +3,6 @@ Analytics module for Proxy API
 Provides endpoints for metrics aggregation and analysis
 """
 
-import asyncio
 import json
 import re
 from datetime import datetime
@@ -88,16 +87,12 @@ async def fetch_prometheus_metrics() -> Dict[str, Any]:
     """Fetch metrics from Prometheus metrics endpoint"""
     try:
         async with aiohttp.ClientSession() as session:
-            async with session.get(
-                f"{PROMETHEUS_URL}/metrics", timeout=5
-            ) as response:
+            async with session.get(f"{PROMETHEUS_URL}/metrics", timeout=5) as response:
                 if response.status == 200:
                     text = await response.text()
                     return parse_prometheus_metrics(text)
                 else:
-                    logger.error(
-                        f"Prometheus returned status {response.status}"
-                    )
+                    logger.error(f"Prometheus returned status {response.status}")
                     return {}
     except Exception as e:
         logger.error(f"Error fetching Prometheus metrics: {e}")
@@ -126,9 +121,7 @@ def parse_prometheus_metrics(metrics_text: str) -> Dict[str, Any]:
                 metrics[name] = []
             metrics[name].append(
                 {
-                    "labels": dict(
-                        pair.split("=") for pair in labels.split(",")
-                    ),
+                    "labels": dict(pair.split("=") for pair in labels.split(",")),
                     "value": float(value),
                 }
             )
@@ -149,9 +142,7 @@ async def extract_overview_metrics(metrics: Dict[str, Any]) -> OverviewMetrics:
                 if item.get("labels", {}).get("status", "").startswith("5"):
                     error_requests += item["value"]
 
-    error_rate = (
-        (error_requests / total_requests * 100) if total_requests > 0 else 0
-    )
+    error_rate = (error_requests / total_requests * 100) if total_requests > 0 else 0
 
     return OverviewMetrics(
         total_requests=int(total_requests),
@@ -200,9 +191,7 @@ async def read_recent_logs(limit: int = 100) -> List[LogEntry]:
     log_files = list(LOGS_DIR.glob("*.jsonl"))
 
     # Sort by modification time, newest first
-    log_files.sort(
-        key=lambda x: x.stat().st_mtime if x.exists() else 0, reverse=True
-    )
+    log_files.sort(key=lambda x: x.stat().st_mtime if x.exists() else 0, reverse=True)
 
     for log_file in log_files[:3]:
         try:
@@ -318,9 +307,7 @@ async def get_throughput_metrics(
 
         # Filter by provider if specified
         if provider and provider in throughput.by_provider:
-            throughput.by_provider = {
-                provider: throughput.by_provider[provider]
-            }
+            throughput.by_provider = {provider: throughput.by_provider[provider]}
 
         return throughput
     except Exception as e:
@@ -378,9 +365,7 @@ async def prometheus_metrics():
     """Prometheus metrics export endpoint"""
     try:
         metrics_output = core_metrics_collector.get_prometheus_metrics()
-        return Response(
-            content=metrics_output, media_type="text/plain; charset=utf-8"
-        )
+        return Response(content=metrics_output, media_type="text/plain; charset=utf-8")
     except Exception as e:
         logger.error(f"Error generating Prometheus metrics: {e}")
         raise HTTPException(

@@ -23,9 +23,7 @@ class ParallelExecutionMode(Enum):
     """Execution modes for parallel fallback"""
 
     FIRST_SUCCESS = "first_success"  # First successful response wins
-    BEST_RESPONSE = (
-        "best_response"  # Wait for all, return best by quality/latency
-    )
+    BEST_RESPONSE = "best_response"  # Wait for all, return best by quality/latency
     LOAD_BALANCED = "load_balanced"  # Distribute load across healthy providers
     ADAPTIVE = "adaptive"  # Adaptive based on provider performance
 
@@ -117,9 +115,7 @@ class ParallelFallbackEngine:
         )
 
         # Get healthy providers for the model
-        candidate_providers = (
-            provider_discovery.get_healthy_providers_for_model(model)
-        )
+        candidate_providers = provider_discovery.get_healthy_providers_for_model(model)
 
         if not candidate_providers:
             return ParallelExecutionResult(
@@ -160,9 +156,7 @@ class ParallelFallbackEngine:
                     execution_id, selected_providers, request_data, timeout
                 )
             else:
-                raise ValueError(
-                    f"Unsupported execution mode: {execution_mode}"
-                )
+                raise ValueError(f"Unsupported execution mode: {execution_mode}")
 
         except Exception as e:
             logger.error(f"Parallel execution {execution_id} failed: {e}")
@@ -201,17 +195,13 @@ class ParallelFallbackEngine:
                 # Check if already completed by another provider
                 if completion_event.is_set():
                     attempt.end_time = time.time()
-                    attempt.latency_ms = (
-                        attempt.end_time - attempt.start_time
-                    ) * 1000
+                    attempt.latency_ms = (attempt.end_time - attempt.start_time) * 1000
                     return
 
                 # Get provider instance
                 provider = await provider_factory.get_provider(provider_name)
                 if not provider:
-                    raise ProviderError(
-                        f"Provider {provider_name} not available"
-                    )
+                    raise ProviderError(f"Provider {provider_name} not available")
 
                 # Execute with circuit breaker protection
                 circuit_breaker = get_circuit_breaker(provider_name)
@@ -252,9 +242,7 @@ class ParallelFallbackEngine:
                 attempt.end_time = time.time()
                 attempt.success = False
                 attempt.error = str(e)
-                attempt.latency_ms = (
-                    attempt.end_time - attempt.start_time
-                ) * 1000
+                attempt.latency_ms = (attempt.end_time - attempt.start_time) * 1000
 
                 # Record failed request
                 await provider_discovery.record_request_result(
@@ -272,8 +260,7 @@ class ParallelFallbackEngine:
 
         # Launch all provider requests in parallel
         tasks = [
-            asyncio.create_task(execute_provider(provider))
-            for provider in providers
+            asyncio.create_task(execute_provider(provider)) for provider in providers
         ]
 
         try:

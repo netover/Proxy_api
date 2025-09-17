@@ -3,11 +3,7 @@ import requests
 import json
 import time
 from unittest.mock import Mock, patch
-from fastapi.testclient import TestClient
-from httpx import AsyncClient
 import asyncio
-from concurrent.futures import ThreadPoolExecutor
-import threading
 
 
 class TestPenetrationTesting:
@@ -48,18 +44,14 @@ class TestPenetrationTesting:
 
             # Check if account is locked
             if username in failed_attempts:
-                if (
-                    now - failed_attempts[username]["last_attempt"]
-                    < lockout_duration
-                ):
+                if now - failed_attempts[username]["last_attempt"] < lockout_duration:
                     if failed_attempts[username]["count"] >= lockout_threshold:
                         return False  # Account locked
 
             # Reset counter if lockout period passed
             if (
                 username in failed_attempts
-                and now - failed_attempts[username]["last_attempt"]
-                >= lockout_duration
+                and now - failed_attempts[username]["last_attempt"] >= lockout_duration
             ):
                 failed_attempts[username]["count"] = 0
 
@@ -88,9 +80,7 @@ class TestPenetrationTesting:
                     result is False
                 ), f"Failed attempt {i} should be rejected but not locked"
             elif i >= lockout_threshold:
-                assert (
-                    result is False
-                ), f"Attempt {i} should be blocked due to lockout"
+                assert result is False, f"Attempt {i} should be blocked due to lockout"
 
         # Verify account is locked
         assert (
@@ -162,9 +152,7 @@ class TestPenetrationTesting:
 
         def detect_xss_vulnerability(output: str) -> bool:
             xss_indicators = ["<script", "javascript:", "onerror=", "onload="]
-            return any(
-                indicator in output.lower() for indicator in xss_indicators
-            )
+            return any(indicator in output.lower() for indicator in xss_indicators)
 
         for payload in xss_payloads:
             output = simulate_html_output(payload)
@@ -188,9 +176,7 @@ class TestPenetrationTesting:
         def validate_csrf_token(session_id: str, token: str) -> bool:
             return csrf_tokens.get(session_id) == token
 
-        def simulate_csrf_attack(
-            session_id: str, malicious_token: str = None
-        ) -> bool:
+        def simulate_csrf_attack(session_id: str, malicious_token: str = None) -> bool:
             # Simulate a state-changing operation
             token = malicious_token or "malicious_token"
             return validate_csrf_token(session_id, token)
@@ -322,9 +308,7 @@ class TestPenetrationTesting:
         import hmac
 
         def generate_hmac(message: str, key: str) -> str:
-            return hmac.new(
-                key.encode(), message.encode(), hashlib.sha256
-            ).hexdigest()
+            return hmac.new(key.encode(), message.encode(), hashlib.sha256).hexdigest()
 
         def verify_message(message: str, signature: str, key: str) -> bool:
             expected_signature = generate_hmac(message, key)
@@ -504,16 +488,12 @@ class TestPenetrationTesting:
                     or "../../../etc/passwd" in payload
                 ):
                     results["vulnerable"] = True
-                    results["details"].append(
-                        {"payload": payload, "successful": True}
-                    )
+                    results["details"].append({"payload": payload, "successful": True})
 
             return results
 
         # Test SQL injection exploit
-        sql_result = run_exploit(
-            "sql_injection", "http://localhost:8000/api/users"
-        )
+        sql_result = run_exploit("sql_injection", "http://localhost:8000/api/users")
         assert sql_result["vulnerable"] is True
         assert len(sql_result["details"]) > 0
 
@@ -522,9 +502,7 @@ class TestPenetrationTesting:
         assert xss_result["vulnerable"] is True
 
         # Test unknown exploit
-        unknown_result = run_exploit(
-            "unknown_exploit", "http://localhost:8000"
-        )
+        unknown_result = run_exploit("unknown_exploit", "http://localhost:8000")
         assert unknown_result["success"] is False
 
 
@@ -622,9 +600,7 @@ File found: /.env
         vulnerabilities = []
 
         for payload in fuzz_payloads:
-            response = requests.post(
-                "http://localhost:8000/api/login", json=payload
-            )
+            response = requests.post("http://localhost:8000/api/login", json=payload)
 
             if response.status_code == 500:
                 vulnerabilities.append(
@@ -643,6 +619,4 @@ File found: /.env
                     }
                 )
 
-        assert (
-            len(vulnerabilities) > 0
-        ), "No vulnerabilities detected during fuzzing"
+        assert len(vulnerabilities) > 0, "No vulnerabilities detected during fuzzing"

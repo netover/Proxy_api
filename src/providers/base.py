@@ -18,6 +18,4 @@ async def get_provider(config: ProviderConfig) -> Provider:
         provider = await provider_factory.create_provider(config)
         return provider  # Returns BaseProvider instance, which is compatible
     except Exception as e:
-        raise ValueError(
-            f"Failed to load provider class for {config.type}: {e}"
-        )
+        raise ValueError(f"Failed to load provider class for {config.type}: {e}")

@@ -73,9 +73,7 @@ async def verify_api_key(
 
     if not api_key_auth.verify_api_key(api_key):
         logger.warning("Invalid API key provided", path=request.url.path)
-        raise HTTPException(
-            status_code=401, detail="Invalid or unauthorized API key"
-        )
+        raise HTTPException(status_code=401, detail="Invalid or unauthorized API key")
 
     logger.info("API key verified successfully", path=request.url.path)
     return True

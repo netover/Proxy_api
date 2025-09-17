@@ -10,16 +10,14 @@ import json
 import smtplib
 import time
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Callable
-from urllib.parse import urljoin
+from typing import Any, Dict, List, Optional
 
 import aiohttp
-import psutil
 
 from .logging import ContextualLogger
 from .metrics import metrics_collector
@@ -59,9 +57,7 @@ class AlertRule:
 
     name: str
     description: str
-    metric_path: (
-        str  # Dot-separated path to metric (e.g., "system_health.cpu_percent")
-    )
+    metric_path: str  # Dot-separated path to metric (e.g., "system_health.cpu_percent")
     condition: str  # Comparison operator: ">", "<", ">=", "<=", "==", "!="
     threshold: float
     severity: AlertSeverity
@@ -114,15 +110,11 @@ class NotificationManager:
                 return False
 
             msg = MIMEMultipart()
-            msg["From"] = email_config.get(
-                "from_address", "alerts@proxy-api.com"
-            )
+            msg["From"] = email_config.get("from_address", "alerts@proxy-api.com")
             msg["To"] = ", ".join(email_config.get("recipients", []))
-            msg["Subject"] = (
-                f"[{alert.severity.value.upper()}] {alert.rule_name}"
-            )
+            msg["Subject"] = f"[{alert.severity.value.upper()}] {alert.rule_name}"
 
-            body = f"""
+            body = """
 Alert Details:
 - Rule: {alert.rule_name}
 - Severity: {alert.severity.value}
@@ -143,22 +135,16 @@ Description: {rule.description}
             if email_config.get("use_tls", True):
                 server.starttls()
             if email_config.get("username"):
-                server.login(
-                    email_config["username"], email_config.get("password", "")
-                )
+                server.login(email_config["username"], email_config.get("password", ""))
 
             server.send_message(msg)
             server.quit()
 
-            logger.info(
-                "Email alert sent", alert_id=alert.id, rule=alert.rule_name
-            )
+            logger.info("Email alert sent", alert_id=alert.id, rule=alert.rule_name)
             return True
 
         except Exception as e:
-            logger.error(
-                "Failed to send email alert", error=str(e), alert_id=alert.id
-            )
+            logger.error("Failed to send email alert", error=str(e), alert_id=alert.id)
             return False
 
     async def send_webhook(self, alert: Alert, rule: AlertRule) -> bool:
@@ -183,9 +169,7 @@ Description: {rule.description}
 
             headers = {"Content-Type": "application/json"}
             if webhook_config.get("auth_token"):
-                headers["Authorization"] = (
-                    f"Bearer {webhook_config['auth_token']}"
-                )
+                headers["Authorization"] = f"Bearer {webhook_config['auth_token']}"
 
             async with session.post(
                 webhook_config["url"], json=payload, headers=headers
@@ -288,9 +272,7 @@ Description: {rule.description}
                     return False
 
         except Exception as e:
-            logger.error(
-                "Failed to send Slack alert", error=str(e), alert_id=alert.id
-            )
+            logger.error("Failed to send Slack alert", error=str(e), alert_id=alert.id)
             return False
 
     async def send_log(self, alert: Alert, rule: AlertRule) -> bool:
@@ -547,9 +529,7 @@ class AlertManager:
                     continue
 
                 # Check cooldown period
-                if current_time - rule.last_triggered < (
-                    rule.cooldown_minutes * 60
-                ):
+                if current_time - rule.last_triggered < (rule.cooldown_minutes * 60):
                     continue
 
                 # Get metric value
@@ -605,9 +585,7 @@ class AlertManager:
 
                             # Send resolution notification
                             if self.notification_manager:
-                                await self.notification_manager.notify(
-                                    alert, rule
-                                )
+                                await self.notification_manager.notify(alert, rule)
 
                             logger.info(
                                 "Alert resolved",
@@ -617,8 +595,7 @@ class AlertManager:
 
                         # Keep resolved alerts for a short time, then remove
                         if (
-                            current_time
-                            - (alert.resolved_timestamp or alert.timestamp)
+                            current_time - (alert.resolved_timestamp or alert.timestamp)
                             > 3600
                         ):  # 1 hour
                             del self.active_alerts[alert_key]
@@ -635,13 +612,9 @@ class AlertManager:
 
         check_interval = self.config.get("check_interval_seconds", 30)
 
-        logger.info(
-            "Starting alert monitoring", interval_seconds=check_interval
-        )
+        logger.info("Starting alert monitoring", interval_seconds=check_interval)
 
-        self._check_task = asyncio.create_task(
-            self._monitoring_loop(check_interval)
-        )
+        self._check_task = asyncio.create_task(self._monitoring_loop(check_interval))
 
     async def _monitoring_loop(self, interval: int):
         """Main monitoring loop"""
@@ -695,9 +668,7 @@ class AlertManager:
                 alert.status = AlertStatus.ACKNOWLEDGED
                 alert.acknowledged_by = acknowledged_by
                 alert.acknowledged_at = time.time()
-                logger.info(
-                    "Alert acknowledged", alert_id=alert_id, by=acknowledged_by
-                )
+                logger.info("Alert acknowledged", alert_id=alert_id, by=acknowledged_by)
                 break
 
     def get_alert_rules(self) -> List[Dict[str, Any]]:

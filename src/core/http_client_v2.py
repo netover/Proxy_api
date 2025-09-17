@@ -34,20 +34,18 @@ class AdvancedHTTPClient:
 
     def __init__(
         self,
-        max_keepalive_connections: int = 100,
-        max_connections: int = 1000,
-        keepalive_expiry: float = 30.0,
         timeout: float = 30.0,
         connect_timeout: float = 10.0,
+        read_timeout: float = 30.0,
+        pool_limits: Dict[str, Any] = None,
         retry_config: Optional[RetryConfig] = None,
         circuit_breaker=None,
         provider_name: str = "",
     ):
-        self.max_keepalive_connections = max_keepalive_connections
-        self.max_connections = max_connections
-        self.keepalive_expiry = keepalive_expiry
         self.timeout = timeout
         self.connect_timeout = connect_timeout
+        self.read_timeout = read_timeout
+        self.pool_limits = pool_limits or {}
         self.circuit_breaker = circuit_breaker
         self.provider_name = provider_name
 
@@ -86,12 +84,14 @@ class AdvancedHTTPClient:
             return
 
         limits = httpx.Limits(
-            max_keepalive_connections=self.max_keepalive_connections,
-            max_connections=self.max_connections,
-            keepalive_expiry=self.keepalive_expiry,
+            max_keepalive_connections=self.pool_limits.get("max_keepalive_connections"),
+            max_connections=self.pool_limits.get("max_connections"),
+            keepalive_expiry=self.pool_limits.get("keepalive_timeout"),
         )
 
-        timeout = httpx.Timeout(self.timeout, connect=self.connect_timeout)
+        timeout = httpx.Timeout(
+            self.timeout, connect=self.connect_timeout, read=self.read_timeout
+        )
 
         self._client = httpx.AsyncClient(
             limits=limits,
@@ -103,8 +103,8 @@ class AdvancedHTTPClient:
         logger.info(
             f"Advanced HTTP client initialized for {self.provider_name}",
             extra={
-                "max_keepalive": self.max_keepalive_connections,
-                "max_connections": self.max_connections,
+                "max_keepalive": self.pool_limits.get("max_keepalive_connections"),
+                "max_connections": self.pool_limits.get("max_connections"),
                 "timeout": self.timeout,
                 "retry_strategy": type(self.retry_strategy).__name__,
             },
@@ -115,9 +115,7 @@ class AdvancedHTTPClient:
         if self._client and not self._closed:
             await self._client.aclose()
             self._closed = True
-            logger.info(
-                f"Advanced HTTP client closed for {self.provider_name}"
-            )
+            logger.info(f"Advanced HTTP client closed for {self.provider_name}")
 
     async def request(
         self,
@@ -193,13 +191,7 @@ class AdvancedHTTPClient:
                     connection_info = {
                         "total_connections": len(pool.connections),
                         "available_connections": (
-                            len(
-                                [
-                                    c
-                                    for c in pool.connections
-                                    if c.is_available()
-                                ]
-                            )
+                            len([c for c in pool.connections if c.is_available()])
                             if hasattr(pool.connections[0], "is_available")
                             else 0
                         ),
@@ -256,9 +248,7 @@ class AdvancedHTTPClient:
 
         # Execute with retry strategy
         try:
-            return await self.retry_strategy.execute_with_retry(
-                execute_request
-            )
+            return await self.retry_strategy.execute_with_retry(execute_request)
         except Exception as e:
             self.error_count += 1
             logger.error(
@@ -309,9 +299,7 @@ class AdvancedHTTPClient:
             "errors_total": self.error_count,
             "avg_response_time_ms": round(avg_response_time * 1000, 2),
             "error_rate": (
-                self.error_count / self.request_count
-                if self.request_count > 0
-                else 0
+                self.error_count / self.request_count if self.request_count > 0 else 0
             ),
             "max_connections": self.max_connections,
             "max_keepalive_connections": self.max_keepalive_connections,
@@ -320,8 +308,7 @@ class AdvancedHTTPClient:
             "connection_reuse_rate": (
                 self.connection_reuse_count
                 / (self.connection_reuse_count + self.new_connection_count)
-                if (self.connection_reuse_count + self.new_connection_count)
-                > 0
+                if (self.connection_reuse_count + self.new_connection_count) > 0
                 else 0
             ),
             "pool_info": pool_info,
@@ -386,8 +373,7 @@ def configure_provider_retry_strategy(provider_name: str, strategy_name: str):
 def get_all_client_metrics() -> Dict[str, Dict[str, Any]]:
     """Get metrics for all HTTP clients"""
     return {
-        provider: client.get_metrics()
-        for provider, client in _http_clients.items()
+        provider: client.get_metrics() for provider, client in _http_clients.items()
     }
 
 

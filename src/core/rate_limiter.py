@@ -3,7 +3,6 @@ import time
 from typing import Any, Callable, Dict, Optional
 
 from fastapi import HTTPException, Request
-from fastapi.responses import JSONResponse
 from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
@@ -99,9 +98,7 @@ class TokenBucketRateLimiter:
             )
         else:
             reset_time = bucket.get_reset_time()
-            logger.warning(
-                "Rate limit exceeded", key=key, reset_in_seconds=reset_time
-            )
+            logger.warning("Rate limit exceeded", key=key, reset_in_seconds=reset_time)
 
         return allowed, bucket.get_reset_time()
 
@@ -186,12 +183,8 @@ class RateLimiter:
 
             # Initialize token bucket limiter with config values
             # Convert requests per window to requests per minute for the token bucket
-            rpm = int(
-                settings.requests_per_window * (60 / settings.window_seconds)
-            )
-            self.token_bucket_limiter = TokenBucketRateLimiter(
-                requests_per_minute=rpm
-            )
+            rpm = int(settings.requests_per_window * (60 / settings.window_seconds))
+            self.token_bucket_limiter = TokenBucketRateLimiter(requests_per_minute=rpm)
 
             self._last_config_update = time.time()
             logger.info(
@@ -246,9 +239,7 @@ class RateLimiter:
                         func, provider, *args, **kwargs
                     )
 
-            return (
-                wrapper if asyncio.iscoroutinefunction(func) else sync_wrapper
-            )
+            return wrapper if asyncio.iscoroutinefunction(func) else sync_wrapper
 
         return decorator
 
@@ -256,22 +247,16 @@ class RateLimiter:
         self, func: Callable, provider: str, *args, **kwargs
     ):
         """Handle rate limit exceeded with fallback strategies"""
-        logger.warning(
-            "Rate limit exceeded", provider=provider, function=func.__name__
-        )
+        logger.warning("Rate limit exceeded", provider=provider, function=func.__name__)
 
         # Apply fallback strategies
         if "secondary_provider" in self._fallback_strategies:
-            logger.info(
-                "Applying secondary provider fallback", provider=provider
-            )
+            logger.info("Applying secondary provider fallback", provider=provider)
             # This would need to be implemented based on your provider switching logic
 
         if "delay" in self._fallback_strategies:
             delay = self._fallback_strategies["delay"]
-            logger.info(
-                f"Applying delay fallback: {delay}s", provider=provider
-            )
+            logger.info(f"Applying delay fallback: {delay}s", provider=provider)
             await asyncio.sleep(delay)
             return await func(*args, **kwargs)
 
@@ -326,9 +311,7 @@ async def token_bucket_rate_limit(request: Request) -> None:
     client_ip = request.client.host if request.client else "unknown"
 
     # Check rate limit
-    allowed, reset_time = rate_limiter.token_bucket_limiter.is_allowed(
-        client_ip
-    )
+    allowed, reset_time = rate_limiter.token_bucket_limiter.is_allowed(client_ip)
 
     if not allowed:
         # Return HTTP 429 with Retry-After header

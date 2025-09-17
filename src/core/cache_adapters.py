@@ -7,9 +7,12 @@ and migration.
 """
 
 import asyncio
+import logging
 from typing import Any, Dict, List, Optional
 
 from .cache_interface import CacheStats, ICache
+
+logger = logging.getLogger(__name__)
 
 
 class ModelCacheAdapter:
@@ -37,9 +40,7 @@ class ModelCacheAdapter:
                     parts = key.split(":", 1)
                     if len(parts) == 2:
                         provider_name, base_url = parts
-                        result = self.model_cache.get_models(
-                            provider_name, base_url
-                        )
+                        result = self.model_cache.get_models(provider_name, base_url)
                         if result is not None:
                             self._stats.hits += 1
                             return result
@@ -48,6 +49,7 @@ class ModelCacheAdapter:
             return None
 
         except Exception as e:
+            logger.warning(f"Error during ModelCacheAdapter get for key {key}: {e}")
             self._stats.misses += 1
             return None
 
@@ -68,15 +70,14 @@ class ModelCacheAdapter:
                     parts = key.split(":", 1)
                     if len(parts) == 2:
                         provider_name, base_url = parts
-                        self.model_cache.set_models(
-                            provider_name, base_url, value
-                        )
+                        self.model_cache.set_models(provider_name, base_url, value)
                         self._stats.sets += 1
                         return True
 
             return False
 
         except Exception as e:
+            logger.warning(f"Error during ModelCacheAdapter set for key {key}: {e}")
             return False
 
     async def delete(self, key: str) -> bool:
@@ -87,14 +88,13 @@ class ModelCacheAdapter:
                     parts = key.split(":", 1)
                     if len(parts) == 2:
                         provider_name, base_url = parts
-                        result = self.model_cache.invalidate(
-                            provider_name, base_url
-                        )
+                        result = self.model_cache.invalidate(provider_name, base_url)
                         if result:
                             self._stats.deletes += 1
                         return result
             return False
         except Exception as e:
+            logger.warning(f"Error during ModelCacheAdapter delete for key {key}: {e}")
             return False
 
     async def clear(self, category: Optional[str] = None) -> int:
@@ -105,6 +105,7 @@ class ModelCacheAdapter:
                 return count
             return 0
         except Exception as e:
+            logger.warning(f"Error during ModelCacheAdapter clear: {e}")
             return 0
 
     async def has(self, key: str) -> bool:
@@ -117,6 +118,7 @@ class ModelCacheAdapter:
                     return self.model_cache.is_valid(provider_name, base_url)
             return False
         except Exception as e:
+            logger.warning(f"Error during ModelCacheAdapter has for key {key}: {e}")
             return False
 
     async def get_many(
@@ -176,6 +178,9 @@ class ModelCacheAdapter:
                 },
             }
         except Exception as e:
+            logger.error(
+                f"Error during ModelCacheAdapter get_stats: {e}", exc_info=True
+            )
             return {"error": str(e)}
 
     def get_sync_stats(self) -> Dict[str, Any]:
@@ -201,6 +206,7 @@ class ModelCacheAdapter:
                 return self.model_cache.cleanup_expired()
             return 0
         except Exception as e:
+            logger.warning(f"Error during ModelCacheAdapter cleanup_expired: {e}")
             return 0
 
     async def optimize(self) -> Dict[str, Any]:
@@ -209,6 +215,7 @@ class ModelCacheAdapter:
             cleaned = await self.cleanup_expired()
             return {"cleaned_entries": cleaned}
         except Exception as e:
+            logger.error(f"Error during ModelCacheAdapter optimize: {e}", exc_info=True)
             return {"error": str(e)}
 
     async def start(self) -> None:
@@ -266,7 +273,8 @@ class SmartCacheAdapter:
         try:
             value = await self.smart_cache.get(key)
             return value is not None
-        except:
+        except Exception as e:
+            logger.warning(f"Error during SmartCacheAdapter has for key {key}: {e}")
             return False
 
     async def get_many(
@@ -319,6 +327,9 @@ class SmartCacheAdapter:
                 "smart_cache_stats": smart_stats,
             }
         except Exception as e:
+            logger.error(
+                f"Error during SmartCacheAdapter get_stats: {e}", exc_info=True
+            )
             return {"error": str(e)}
 
     def get_sync_stats(self) -> Dict[str, Any]:
@@ -386,9 +397,7 @@ class UnifiedCacheAdapter:
         priority: int = 1,
     ) -> bool:
         """Set value in unified cache"""
-        return await self.unified_cache.set(
-            key, value, ttl, category, priority
-        )
+        return await self.unified_cache.set(key, value, ttl, category, priority)
 
     async def delete(self, key: str) -> bool:
         """Delete key from unified cache"""
@@ -452,6 +461,9 @@ class UnifiedCacheAdapter:
                 "unified_cache_stats": stats,
             }
         except Exception as e:
+            logger.error(
+                f"Error during UnifiedCacheAdapter get_stats: {e}", exc_info=True
+            )
             return {"error": str(e)}
 
     def get_sync_stats(self) -> Dict[str, Any]:
@@ -485,10 +497,7 @@ class UnifiedCacheAdapter:
 
     def is_running(self) -> bool:
         """Check if adapter is running"""
-        return (
-            hasattr(self.unified_cache, "_running")
-            and self.unified_cache._running
-        )
+        return hasattr(self.unified_cache, "_running") and self.unified_cache._running
 
 
 # Factory functions for creating adapted caches

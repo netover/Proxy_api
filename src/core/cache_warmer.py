@@ -91,9 +91,7 @@ class WarmingPattern:
 
         # Score combines frequency, recency, and priority
         # Higher score = more likely to be needed soon
-        recency_factor = max(
-            0, 1 - (recency / (24 * 3600))
-        )  # Decay over 24 hours
+        recency_factor = max(0, 1 - (recency / (24 * 3600)))  # Decay over 24 hours
 
         return frequency * recency_factor * priority_factor
 
@@ -170,9 +168,7 @@ class CacheWarmer:
 
         # Warming queue and execution
         self._warming_queue: asyncio.Queue = asyncio.Queue()
-        self._warming_executor = ThreadPoolExecutor(
-            max_workers=max_concurrent_warmings
-        )
+        self._warming_executor = ThreadPoolExecutor(max_workers=max_concurrent_warmings)
         self._active_warmings: Set[str] = set()
 
         # Redis client for distributed lock
@@ -207,13 +203,9 @@ class CacheWarmer:
         if not self.redis_client:
             try:
                 # This is a placeholder for proper config injection
-                redis_url = os.environ.get(
-                    "REDIS_URL", "redis://localhost:6379"
-                )
+                redis_url = os.environ.get("REDIS_URL", "redis://localhost:6379")
                 self.redis_client = redis.from_url(redis_url)
-                logger.info(
-                    "CacheWarmer connected to Redis for distributed locking."
-                )
+                logger.info("CacheWarmer connected to Redis for distributed locking.")
             except Exception as e:
                 logger.warning(
                     f"CacheWarmer could not connect to Redis for distributed locking: {e}"
@@ -224,15 +216,11 @@ class CacheWarmer:
         tasks = []
 
         if self.enable_pattern_analysis:
-            self._pattern_task = asyncio.create_task(
-                self._pattern_analysis_loop()
-            )
+            self._pattern_task = asyncio.create_task(self._pattern_analysis_loop())
             tasks.append(self._pattern_task)
 
         if self.enable_scheduled_warming:
-            self._scheduled_task = asyncio.create_task(
-                self._scheduled_warming_loop()
-            )
+            self._scheduled_task = asyncio.create_task(self._scheduled_warming_loop())
             tasks.append(self._scheduled_task)
 
         # Main warming task
@@ -269,9 +257,7 @@ class CacheWarmer:
 
         with self._pattern_lock:
             if key not in self._access_patterns:
-                self._access_patterns[key] = WarmingPattern(
-                    key=key, category=category
-                )
+                self._access_patterns[key] = WarmingPattern(key=key, category=category)
 
             pattern = self._access_patterns[key]
             pattern.access_count += 1
@@ -280,9 +266,7 @@ class CacheWarmer:
 
             # Keep only recent access times (last 7 days)
             cutoff = time.time() - (7 * 24 * 3600)
-            pattern.access_times = [
-                t for t in pattern.access_times if t > cutoff
-            ]
+            pattern.access_times = [t for t in pattern.access_times if t > cutoff]
 
     async def warm_key(
         self, key: str, getter_func: Callable, priority: int = 1
@@ -313,9 +297,7 @@ class CacheWarmer:
             return {"error": "Discovery service not initialized"}
 
         async def getter_func():
-            return await self._discovery_service.discover_models(
-                provider_config
-            )
+            return await self._discovery_service.discover_models(provider_config)
 
         cache_key = f"models:{provider_config.name}:{provider_config.base_url}"
 
@@ -420,10 +402,7 @@ class CacheWarmer:
                             continue
 
                         last_run = schedule_last_run.get(name, 0)
-                        if (
-                            current_time - last_run
-                            >= schedule.interval_seconds
-                        ):
+                        if current_time - last_run >= schedule.interval_seconds:
                             # Queue scheduled warming
                             await self._queue_scheduled_warming(schedule)
                             schedule_last_run[name] = current_time
@@ -554,9 +533,7 @@ class CacheWarmer:
                             f"Would predictively warm: {pattern.key} (score: {score:.2f})"
                         )
 
-    async def _queue_model_discovery_warming(
-        self, pattern: WarmingPattern
-    ) -> None:
+    async def _queue_model_discovery_warming(self, pattern: WarmingPattern) -> None:
         """Queue model discovery warming for predictive patterns"""
         try:
             # Parse provider info from key
@@ -595,13 +572,9 @@ class CacheWarmer:
                 logger.debug(f"Queued predictive warming for {pattern.key}")
 
         except Exception as e:
-            logger.error(
-                f"Error queuing predictive warming for {pattern.key}: {e}"
-            )
+            logger.error(f"Error queuing predictive warming for {pattern.key}: {e}")
 
-    async def _queue_scheduled_warming(
-        self, schedule: WarmingSchedule
-    ) -> None:
+    async def _queue_scheduled_warming(self, schedule: WarmingSchedule) -> None:
         """Queue scheduled warming tasks"""
         try:
             # Get keys that match the schedule's target categories
@@ -635,18 +608,14 @@ class CacheWarmer:
             )
 
         except Exception as e:
-            logger.error(
-                f"Error queuing scheduled warming for {schedule.name}: {e}"
-            )
+            logger.error(f"Error queuing scheduled warming for {schedule.name}: {e}")
 
-    async def _get_keys_for_schedule(
-        self, schedule: WarmingSchedule
-    ) -> List[str]:
+    async def _get_keys_for_schedule(self, schedule: WarmingSchedule) -> List[str]:
         """Get keys that match schedule criteria"""
         keys = []
 
         # Get cache stats to find keys by category
-        cache_stats = await self.cache.get_stats()
+        await self.cache.get_stats()
 
         # For now, return some sample keys based on categories
         # In a real implementation, this would query the cache for keys by category
@@ -681,10 +650,8 @@ class CacheWarmer:
 
                     async def getter_func():
                         if self._discovery_service:
-                            return (
-                                await self._discovery_service.discover_models(
-                                    provider_config
-                                )
+                            return await self._discovery_service.discover_models(
+                                provider_config
                             )
                         return None
 
@@ -703,7 +670,7 @@ class CacheWarmer:
 
         # Adjust based on task type and priority
         task_type = task.get("type", "unknown")
-        priority = task.get("priority", 1)
+        task.get("priority", 1)
 
         if task_type == "demand":
             # Demand warming gets longer TTL
@@ -724,7 +691,7 @@ class CacheWarmer:
 
     async def get_warming_stats(self) -> Dict[str, Any]:
         """Get warming statistics"""
-        cache_stats = await self.cache.get_stats()
+        await self.cache.get_stats()
 
         return {
             "total_warmings": self.stats.total_warmings,
@@ -746,13 +713,9 @@ class CacheWarmer:
             "active_warmings": len(self._active_warmings),
             "queued_warmings": self._warming_queue.qsize(),
             "tracked_patterns": len(self._access_patterns),
-            "active_schedules": len(
-                [s for s in self._schedules.values() if s.enabled]
-            ),
+            "active_schedules": len([s for s in self._schedules.values() if s.enabled]),
             "cache_improvement": round(self.stats.cache_hit_improvement, 3),
-            "warming_effectiveness": round(
-                self.stats.warming_effectiveness, 3
-            ),
+            "warming_effectiveness": round(self.stats.warming_effectiveness, 3),
         }
 
     async def optimize_warming_strategy(self) -> Dict[str, Any]:

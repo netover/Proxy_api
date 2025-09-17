@@ -13,8 +13,6 @@ def safe_background_task(func):
         except asyncio.CancelledError:
             logger.info(f"Background task {func.__name__} was cancelled")
         except Exception as e:
-            logger.error(
-                f"Background task {func.__name__} failed: {e}", exc_info=True
-            )
+            logger.error(f"Background task {func.__name__} failed: {e}", exc_info=True)
 
     return wrapper

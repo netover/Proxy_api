@@ -115,7 +115,7 @@ async def validate_ttl_expiration():
     await cache.set(
         short_ttl_key, {"data": "short_ttl"}, ttl=2, category="test"
     )
-    print(f"  Set entry with 2-second TTL")
+    print("  Set entry with 2-second TTL")
 
     # Check immediately
     result = await cache.get(short_ttl_key, category="test")
@@ -135,7 +135,7 @@ async def validate_ttl_expiration():
     await cache.set(
         long_ttl_key, {"data": "long_ttl"}, ttl=30, category="test"
     )
-    print(f"  Set entry with 30-second TTL")
+    print("  Set entry with 30-second TTL")
 
     # Check immediately
     result = await cache.get(long_ttl_key, category="test")
@@ -147,7 +147,7 @@ async def validate_ttl_expiration():
     await cache.set(
         smart_ttl_key, {"data": "smart_ttl"}, ttl=10, category="test"
     )
-    print(f"  Set entry with 10-second TTL")
+    print("  Set entry with 10-second TTL")
 
     # Access frequently to trigger smart TTL
     print("  Accessing entry multiple times to trigger smart TTL...")

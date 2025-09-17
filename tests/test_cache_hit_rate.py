@@ -7,7 +7,6 @@ import asyncio
 import time
 import pytest
 from unittest.mock import AsyncMock, patch
-from typing import List
 
 from src.core.model_discovery import ModelDiscoveryService, ProviderConfig
 from src.core.provider_discovery import provider_discovery
@@ -129,9 +128,7 @@ class TestCacheHitRate:
         provider_discovery._provider_metrics["test_provider"] = (
             provider_discovery._get_or_create_metrics("test_provider")
         )
-        provider_discovery._provider_metrics["test_provider"].record_request(
-            True, 100
-        )
+        provider_discovery._provider_metrics["test_provider"].record_request(True, 100)
 
         # First call - should be cache miss
         report1 = await provider_discovery.get_provider_performance_report()
@@ -194,9 +191,7 @@ class TestCacheHitRate:
         hit_rate = hits / total_reads if total_reads > 0 else 0
 
         print(f"Unified cache hit rate under load: {hit_rate:.2%}")
-        assert (
-            hit_rate >= 0.9
-        ), f"Cache hit rate {hit_rate:.2%} is below 90% target"
+        assert hit_rate >= 0.9, f"Cache hit rate {hit_rate:.2%} is below 90% target"
 
         # Verify cache stats
         stats = await cache.get_stats()
@@ -221,9 +216,7 @@ class TestCacheHitRate:
         # Stop monitoring
         await cache_monitor.stop_monitoring()
 
-    async def test_cache_warming(
-        self, setup_cache, mock_provider_config, mock_models
-    ):
+    async def test_cache_warming(self, setup_cache, mock_provider_config, mock_models):
         """Test cache warming functionality"""
         # Mock the model discovery
         with patch("aiohttp.ClientSession") as mock_session:
@@ -293,9 +286,7 @@ class TestCacheHitRate:
             assert len(cached_models) == 1
 
             # Invalidate cache
-            invalidated = await service.invalidate_model_cache(
-                mock_provider_config
-            )
+            invalidated = await service.invalidate_model_cache(mock_provider_config)
             assert invalidated
 
             # Next call should be a cache miss (would make HTTP call if not mocked)

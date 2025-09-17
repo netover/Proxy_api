@@ -64,9 +64,7 @@ class CacheStats:
     @property
     def hit_rate(self) -> float:
         """Calculate hit rate"""
-        return (
-            self.hits / self.total_requests if self.total_requests > 0 else 0.0
-        )
+        return self.hits / self.total_requests if self.total_requests > 0 else 0.0
 
 
 class ICache(Protocol):
@@ -184,9 +182,7 @@ class ICacheWarmer(Protocol):
         """Warm a specific key"""
         ...
 
-    async def warm_category(
-        self, category: str, priority: int = 1
-    ) -> Dict[str, Any]:
+    async def warm_category(self, category: str, priority: int = 1) -> Dict[str, Any]:
         """Warm all keys in a category"""
         ...
 

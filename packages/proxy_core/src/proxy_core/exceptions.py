@@ -1,13 +1,10 @@
 from typing import Optional
-import httpx
 
 
 class ProviderError(Exception):
     """Base exception for all provider errors"""
 
-    def __init__(
-        self, message: str, provider: str = "", code: str = "provider_error"
-    ):
+    def __init__(self, message: str, provider: str = "", code: str = "provider_error"):
         self.message = message
         self.provider = provider
         self.code = code

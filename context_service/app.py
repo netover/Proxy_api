@@ -32,7 +32,7 @@ async def condense_context_endpoint(req: CondenseRequest):
     try:
         logger.info(f"Received condensation request with {len(req.chunks)} chunks, max_tokens={req.max_tokens}")
         summary = await condense_context(req.chunks, req.max_tokens)
-        logger.info(f"Condensation completed successfully")
+        logger.info("Condensation completed successfully")
         return CondenseResponse(summary=summary)
     except ValueError as e:
         logger.error(f"Validation error: {e}")

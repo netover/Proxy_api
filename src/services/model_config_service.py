@@ -54,9 +54,7 @@ class ModelConfigService:
 
         # Validate model is supported by provider
         if not self._validate_model_supported(provider_name, model_name):
-            available_models = self._config_manager.get_available_models(
-                provider_name
-            )
+            available_models = self._config_manager.get_available_models(provider_name)
             raise ValidationError(
                 f"Model '{model_name}' not supported by provider '{provider_name}'. "
                 f"Available models: {available_models}"
@@ -74,9 +72,7 @@ class ModelConfigService:
                 "message": f"Model '{model_name}' selected for provider '{provider_name}'",
             }
         except Exception as e:
-            raise ConfigurationError(
-                f"Failed to save model selection: {str(e)}"
-            )
+            raise ConfigurationError(f"Failed to save model selection: {str(e)}")
 
     def update_model_selection(
         self, provider_name: str, model_name: str
@@ -101,18 +97,14 @@ class ModelConfigService:
 
         # Validate model is supported by provider
         if not self._validate_model_supported(provider_name, model_name):
-            available_models = self._config_manager.get_available_models(
-                provider_name
-            )
+            available_models = self._config_manager.get_available_models(provider_name)
             raise ValidationError(
                 f"Model '{model_name}' not supported by provider '{provider_name}'. "
                 f"Available models: {available_models}"
             )
 
         # Check if selection exists and is editable
-        current_selection = self._model_manager.get_model_selection(
-            provider_name
-        )
+        current_selection = self._model_manager.get_model_selection(provider_name)
         if not current_selection:
             raise ValidationError(
                 f"No model selection exists for provider '{provider_name}'"
@@ -137,9 +129,7 @@ class ModelConfigService:
             else:
                 raise ConfigurationError("Failed to update model selection")
         except Exception as e:
-            raise ConfigurationError(
-                f"Failed to update model selection: {str(e)}"
-            )
+            raise ConfigurationError(f"Failed to update model selection: {str(e)}")
 
     def remove_model_selection(self, provider_name: str) -> Dict[str, Any]:
         """
@@ -160,9 +150,7 @@ class ModelConfigService:
             raise ValidationError(f"Provider '{provider_name}' not found")
 
         # Check if selection exists and is editable
-        current_selection = self._model_manager.get_model_selection(
-            provider_name
-        )
+        current_selection = self._model_manager.get_model_selection(provider_name)
         if not current_selection:
             return {
                 "success": False,
@@ -175,9 +163,7 @@ class ModelConfigService:
             )
 
         try:
-            success = self._config_manager.remove_model_selection(
-                provider_name
-            )
+            success = self._config_manager.remove_model_selection(provider_name)
             if success:
                 return {
                     "success": True,
@@ -187,9 +173,7 @@ class ModelConfigService:
             else:
                 raise ConfigurationError("Failed to remove model selection")
         except Exception as e:
-            raise ConfigurationError(
-                f"Failed to remove model selection: {str(e)}"
-            )
+            raise ConfigurationError(f"Failed to remove model selection: {str(e)}")
 
     def get_all_model_selections(self) -> Dict[str, Dict[str, Any]]:
         """
@@ -217,9 +201,7 @@ class ModelConfigService:
             raise ValidationError(f"Provider '{provider_name}' not found")
 
         selected_model = self.get_model_selection(provider_name)
-        available_models = self._config_manager.get_available_models(
-            provider_name
-        )
+        available_models = self._config_manager.get_available_models(provider_name)
 
         return {
             "provider": provider_name,
@@ -238,10 +220,7 @@ class ModelConfigService:
             List of provider model information dictionaries
         """
         providers = self._config_manager.load_config().providers
-        return [
-            self.get_provider_model_info(provider.name)
-            for provider in providers
-        ]
+        return [self.get_provider_model_info(provider.name) for provider in providers]
 
     def validate_model_selection(
         self, provider_name: str, model_name: str
@@ -272,9 +251,7 @@ class ModelConfigService:
 
         # Check model is supported
         if not self._validate_model_supported(provider_name, model_name):
-            available_models = self._config_manager.get_available_models(
-                provider_name
-            )
+            available_models = self._config_manager.get_available_models(provider_name)
             result["errors"].append(
                 f"Model '{model_name}' not supported. Available: {available_models}"
             )
@@ -308,9 +285,7 @@ class ModelConfigService:
 
         for provider_name, model_name in selections.items():
             try:
-                result = self.set_model_selection(
-                    provider_name, model_name, editable
-                )
+                result = self.set_model_selection(provider_name, model_name, editable)
                 results["results"][provider_name] = result
                 results["successful"] += 1
             except (ValidationError, ConfigurationError) as e:
@@ -324,9 +299,7 @@ class ModelConfigService:
         results["success"] = results["failed"] == 0
         return results
 
-    def clear_all_model_selections(
-        self, force: bool = False
-    ) -> Dict[str, Any]:
+    def clear_all_model_selections(self, force: bool = False) -> Dict[str, Any]:
         """
         Clear all model selections
 
@@ -344,9 +317,7 @@ class ModelConfigService:
                 "message": f"Cleared {count} model selection(s)",
             }
         except Exception as e:
-            raise ConfigurationError(
-                f"Failed to clear model selections: {str(e)}"
-            )
+            raise ConfigurationError(f"Failed to clear model selections: {str(e)}")
 
     def reload_model_selections(self) -> Dict[str, Any]:
         """
@@ -364,24 +335,15 @@ class ModelConfigService:
                 "selections": {k: v.model_name for k, v in selections.items()},
             }
         except Exception as e:
-            raise ConfigurationError(
-                f"Failed to reload model selections: {str(e)}"
-            )
+            raise ConfigurationError(f"Failed to reload model selections: {str(e)}")
 
     def _validate_provider_exists(self, provider_name: str) -> bool:
         """Check if a provider exists"""
-        return (
-            self._config_manager.get_provider_by_name(provider_name)
-            is not None
-        )
+        return self._config_manager.get_provider_by_name(provider_name) is not None
 
-    def _validate_model_supported(
-        self, provider_name: str, model_name: str
-    ) -> bool:
+    def _validate_model_supported(self, provider_name: str, model_name: str) -> bool:
         """Check if a model is supported by a provider"""
-        available_models = self._config_manager.get_available_models(
-            provider_name
-        )
+        available_models = self._config_manager.get_available_models(provider_name)
         return model_name in available_models
 
     def _is_selection_editable(self, provider_name: str) -> bool:

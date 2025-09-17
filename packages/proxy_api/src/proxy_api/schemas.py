@@ -18,9 +18,7 @@ class ChatRequest(BaseModel):
     """Request model for chat completions."""
 
     model: str = Field(..., description="Model identifier")
-    messages: List[ChatMessage] = Field(
-        ..., description="List of chat messages"
-    )
+    messages: List[ChatMessage] = Field(..., description="List of chat messages")
     temperature: Optional[float] = Field(
         0.7, ge=0.0, le=2.0, description="Sampling temperature"
     )
@@ -36,9 +34,7 @@ class ChatRequest(BaseModel):
     presence_penalty: Optional[float] = Field(
         0.0, ge=-2.0, le=2.0, description="Presence penalty"
     )
-    stop: Optional[Union[str, List[str]]] = Field(
-        None, description="Stop sequences"
-    )
+    stop: Optional[Union[str, List[str]]] = Field(None, description="Stop sequences")
     stream: Optional[bool] = Field(False, description="Stream responses")
 
     @validator("messages")
@@ -59,17 +55,13 @@ class ChatChoice(BaseModel):
 
     index: int = Field(..., description="Choice index")
     message: ChatMessage = Field(..., description="Chat message")
-    finish_reason: Optional[str] = Field(
-        None, description="Reason for completion"
-    )
+    finish_reason: Optional[str] = Field(None, description="Reason for completion")
 
 
 class ChatUsage(BaseModel):
     """Token usage information."""
 
-    prompt_tokens: int = Field(
-        ..., description="Number of tokens in the prompt"
-    )
+    prompt_tokens: int = Field(..., description="Number of tokens in the prompt")
     completion_tokens: int = Field(
         ..., description="Number of tokens in the completion"
     )
@@ -83,9 +75,7 @@ class ChatResponse(BaseModel):
     object: str = Field(default="chat.completion", description="Object type")
     created: int = Field(..., description="Unix timestamp of creation")
     model: str = Field(..., description="Model identifier")
-    choices: List[ChatChoice] = Field(
-        ..., description="List of completion choices"
-    )
+    choices: List[ChatChoice] = Field(..., description="List of completion choices")
     usage: ChatUsage = Field(..., description="Token usage information")
 
 
@@ -137,23 +127,15 @@ class ProviderConfig(BaseModel):
     """Provider configuration."""
 
     name: str = Field(..., description="Provider name")
-    api_key: Optional[str] = Field(
-        None, description="API key for the provider"
-    )
-    base_url: Optional[str] = Field(
-        None, description="Base URL for the provider"
-    )
+    api_key: Optional[str] = Field(None, description="API key for the provider")
+    base_url: Optional[str] = Field(None, description="Base URL for the provider")
     models: List[str] = Field(
         default_factory=list, description="List of supported models"
     )
     enabled: bool = Field(True, description="Whether the provider is enabled")
     priority: int = Field(0, description="Priority for provider selection")
-    rate_limit: Optional[int] = Field(
-        None, description="Rate limit per minute"
-    )
-    timeout: Optional[int] = Field(
-        30, description="Request timeout in seconds"
-    )
+    rate_limit: Optional[int] = Field(None, description="Rate limit per minute")
+    timeout: Optional[int] = Field(30, description="Request timeout in seconds")
 
 
 class ConfigUpdateRequest(BaseModel):
@@ -162,17 +144,13 @@ class ConfigUpdateRequest(BaseModel):
     providers: Optional[List[ProviderConfig]] = Field(
         None, description="Provider configurations"
     )
-    settings: Optional[Dict[str, Any]] = Field(
-        None, description="General settings"
-    )
+    settings: Optional[Dict[str, Any]] = Field(None, description="General settings")
 
 
 class ConfigResponse(BaseModel):
     """Response model for configuration."""
 
-    providers: List[ProviderConfig] = Field(
-        ..., description="Provider configurations"
-    )
+    providers: List[ProviderConfig] = Field(..., description="Provider configurations")
     settings: Dict[str, Any] = Field(..., description="General settings")
     version: str = Field(..., description="Configuration version")
     last_updated: int = Field(..., description="Unix timestamp of last update")

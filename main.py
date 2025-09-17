@@ -77,7 +77,7 @@ async def lifespan(app: FastAPI):
 
         # Initialize HTTP client
         with TracedSpan("http_client.initialize"):
-            http_client = get_advanced_http_client(config=config.http_client)
+            http_client = get_advanced_http_client(**config.http_client)
             await http_client.initialize()
             app.state.http_client = http_client
             logger.info("HTTP client initialized")
@@ -167,12 +167,16 @@ async def lifespan(app: FastAPI):
 
 
 # --- FastAPI App Setup ---
+from src.middleware.security_headers import SecurityHeadersMiddleware
+
 app = FastAPI(
     title=config.app.name,
     version=config.app.version,
     description="High-performance LLM proxy with intelligent routing and fallback",
     lifespan=lifespan,
 )
+
+app.add_middleware(SecurityHeadersMiddleware)
 
 # Include API routers
 app.include_router(root_router)

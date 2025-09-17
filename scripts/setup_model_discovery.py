@@ -325,7 +325,7 @@ CUSTOM_PROVIDER_API_KEY=your-custom-provider-key-here
         try:
             # Create startup script for Unix-like systems
             startup_sh = self.scripts_dir / "start.sh"
-            startup_content = f"""#!/bin/bash
+            startup_content = """#!/bin/bash
 # ProxyAPI Model Discovery Startup Script
 # Generated on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 
@@ -357,7 +357,7 @@ python web_ui.py
             
             # Create startup script for Windows
             startup_bat = self.scripts_dir / "start.bat"
-            startup_bat_content = f"""@echo off
+            startup_bat_content = """@echo off
 REM ProxyAPI Model Discovery Startup Script
 REM Generated on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 

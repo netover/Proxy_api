@@ -1,15 +1,12 @@
 import pytest
 import time
 import hashlib
-import hmac
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 from fastapi import HTTPException
-from fastapi.testclient import TestClient
-from httpx import AsyncClient
 import jwt
 from datetime import datetime, timedelta
 
-from src.core.auth import APIKeyAuth, verify_api_key, get_api_key_auth
+from src.core.auth import APIKeyAuth, verify_api_key
 
 
 class TestAuthenticationSecurity:
@@ -64,9 +61,7 @@ class TestAuthenticationSecurity:
         if times:
             avg_time = sum(times) / len(times)
             max_deviation = max(abs(t - avg_time) for t in times)
-            relative_deviation = (
-                max_deviation / avg_time if avg_time > 0 else 0
-            )
+            relative_deviation = max_deviation / avg_time if avg_time > 0 else 0
 
             assert (
                 relative_deviation < 0.1
@@ -87,9 +82,7 @@ class TestAuthenticationSecurity:
 
         # This is more of a warning test - weak keys should still work but be flagged
         for key in api_keys:
-            assert (
-                auth.verify_api_key(key) is True
-            ), f"Valid key rejected: {key}"
+            assert auth.verify_api_key(key) is True, f"Valid key rejected: {key}"
 
     def test_jwt_token_security(self):
         """Test JWT token security if used"""
@@ -120,9 +113,7 @@ class TestAuthenticationSecurity:
         sessions = {}
 
         def create_session(user_id: str) -> str:
-            session_id = hashlib.sha256(
-                f"{user_id}{time.time()}".encode()
-            ).hexdigest()
+            session_id = hashlib.sha256(f"{user_id}{time.time()}".encode()).hexdigest()
             sessions[session_id] = {
                 "user_id": user_id,
                 "created": time.time(),
@@ -189,7 +180,7 @@ class TestAuthenticationSecurity:
     def test_api_key_leakage_prevention(self):
         """Test prevention of API key leakage in logs and responses"""
         api_keys = [
-            "sk-1234567890abcdef",
+            "sk-1234567890abcde",
             "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9",
         ]
         auth = APIKeyAuth(api_keys)
@@ -202,14 +193,12 @@ class TestAuthenticationSecurity:
 
         # Simulate authentication with logging
         with patch("src.core.logging.logger.info", side_effect=mock_log):
-            result = auth.verify_api_key("sk-1234567890abcdef")
+            result = auth.verify_api_key("sk-1234567890abcde")
             assert result is True
 
         # Check that sensitive data is not logged
         for message in logged_messages:
-            assert (
-                "sk-1234567890abcdef" not in message
-            ), "API key leaked in logs"
+            assert "sk-1234567890abcde" not in message, "API key leaked in logs"
             assert (
                 "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9" not in message
             ), "JWT token leaked in logs"
@@ -234,9 +223,7 @@ class TestAuthenticationSecurity:
         # Simulate concurrent authentication attempts
         threads = []
         for i in range(10):
-            thread = threading.Thread(
-                target=auth_worker, args=("concurrent_test_key",)
-            )
+            thread = threading.Thread(target=auth_worker, args=("concurrent_test_key",))
             threads.append(thread)
             thread.start()
 
@@ -277,9 +264,7 @@ class TestAuthenticationSecurity:
                     result is True
                 ), f"Valid key with whitespace should work: {attempt}"
             else:
-                assert (
-                    result is False
-                ), f"Bypass attempt should fail: {attempt}"
+                assert result is False, f"Bypass attempt should fail: {attempt}"
 
     def test_token_replay_attack_prevention(self):
         """Test prevention of token replay attacks"""
@@ -309,9 +294,7 @@ class TestAuthenticationSecurity:
         hashed_passwords = {}
         for pwd in passwords:
             # Use proper hashing (in real implementation)
-            hashed = hashlib.pbkdf2_hmac(
-                "sha256", pwd.encode(), b"salt", 100000
-            )
+            hashed = hashlib.pbkdf2_hmac("sha256", pwd.encode(), b"salt", 100000)
             hashed_passwords[pwd] = hashed.hex()
 
         # Verify hashes are different
@@ -440,9 +423,7 @@ class TestAuthorizationSecurity:
 
         def perform_admin_action(user: str):
             if user_roles.get(user) != "admin":
-                raise HTTPException(
-                    status_code=403, detail="Admin access required"
-                )
+                raise HTTPException(status_code=403, detail="Admin access required")
             return "admin_action_performed"
 
         # Admin can perform admin actions

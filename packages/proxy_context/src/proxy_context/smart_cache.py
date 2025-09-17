@@ -6,7 +6,7 @@ Intelligent caching with TTL, size limits, and memory management.
 import asyncio
 import time
 import hashlib
-from typing import Dict, Any, Optional, Union, List
+from typing import Dict, Any, Optional
 from collections import OrderedDict
 import logging
 from dataclasses import dataclass, field
@@ -157,9 +157,7 @@ class SmartCache:
         elif isinstance(obj, (list, tuple)):
             return sum(self._estimate_size(item) for item in obj)
         elif isinstance(obj, dict):
-            return sum(
-                len(str(k)) + self._estimate_size(v) for k, v in obj.items()
-            )
+            return sum(len(str(k)) + self._estimate_size(v) for k, v in obj.items())
         else:
             # Rough estimate for other objects
             return 256
@@ -167,9 +165,7 @@ class SmartCache:
     async def get(self, key: str) -> Optional[Any]:
         """Get value from cache"""
         start_time = (
-            time.time()
-            if is_feature_enabled("cache_performance_monitoring")
-            else None
+            time.time() if is_feature_enabled("cache_performance_monitoring") else None
         )
 
         with self._lock:
@@ -205,9 +201,7 @@ class SmartCache:
 
             if start_time:
                 access_time = time.time() - start_time
-                logger.debug(
-                    f"Cache hit for key: {key}, time: {access_time:.6f}s"
-                )
+                logger.debug(f"Cache hit for key: {key}, time: {access_time:.6f}s")
 
             return entry.value
 
@@ -235,9 +229,7 @@ class SmartCache:
             if not skip_memory_check and not await self._check_memory_limit(
                 entry.size_bytes
             ):
-                logger.warning(
-                    "Cache memory limit exceeded, skipping cache set"
-                )
+                logger.warning("Cache memory limit exceeded, skipping cache set")
                 return False
 
             # Remove existing entry if present
@@ -278,9 +270,7 @@ class SmartCache:
                 del self._cache[key]
 
             if expired_keys:
-                logger.info(
-                    f"Cleaned up {len(expired_keys)} expired cache entries"
-                )
+                logger.info(f"Cleaned up {len(expired_keys)} expired cache entries")
 
     async def _enforce_size_limit(self):
         """Enforce maximum cache size using LRU eviction"""
@@ -295,9 +285,7 @@ class SmartCache:
     async def _enforce_memory_limit(self):
         """Enforce memory limits by evicting least recently used items"""
         with self._lock:
-            current_memory = sum(
-                entry.size_bytes for entry in self._cache.values()
-            )
+            current_memory = sum(entry.size_bytes for entry in self._cache.values())
 
             if current_memory > self.max_memory_bytes:
                 # Calculate how much memory to free (target 80% of max)
@@ -325,22 +313,14 @@ class SmartCache:
 
     async def _check_memory_limit(self, additional_bytes: int) -> bool:
         """Check if adding additional bytes would exceed memory limit"""
-        current_memory = sum(
-            entry.size_bytes for entry in self._cache.values()
-        )
+        current_memory = sum(entry.size_bytes for entry in self._cache.values())
         return current_memory + additional_bytes <= self.max_memory_bytes
 
     def get_stats(self) -> Dict[str, Any]:
         """Get cache statistics"""
         with self._lock:
-            current_memory = sum(
-                entry.size_bytes for entry in self._cache.values()
-            )
-            hit_rate = (
-                self.hits / self.total_requests
-                if self.total_requests > 0
-                else 0
-            )
+            current_memory = sum(entry.size_bytes for entry in self._cache.values())
+            hit_rate = self.hits / self.total_requests if self.total_requests > 0 else 0
 
             return {
                 "entries": len(self._cache),

@@ -202,9 +202,7 @@ class UnifiedCache:
 
         # Monitoring task
         if self.enable_consistency_monitoring:
-            self._monitoring_task = asyncio.create_task(
-                self._monitoring_loop()
-            )
+            self._monitoring_task = asyncio.create_task(self._monitoring_loop())
             tasks.append(self._monitoring_task)
 
         logger.info("UnifiedCache background tasks started")
@@ -251,9 +249,7 @@ class UnifiedCache:
         elif isinstance(obj, (list, tuple)):
             return sum(self._estimate_size(item) for item in obj)
         elif isinstance(obj, dict):
-            return sum(
-                len(str(k)) + self._estimate_size(v) for k, v in obj.items()
-            )
+            return sum(len(str(k)) + self._estimate_size(v) for k, v in obj.items())
         else:
             return 256  # Rough estimate for other objects
 
@@ -262,9 +258,7 @@ class UnifiedCache:
         start_time = time.time()
 
         with self._lock:
-            self.metrics.total_requests = (
-                getattr(self.metrics, "total_requests", 0) + 1
-            )
+            self.metrics.total_requests = getattr(self.metrics, "total_requests", 0) + 1
 
             if key not in self._memory_cache:
                 self.metrics.misses += 1
@@ -455,9 +449,7 @@ class UnifiedCache:
 
             return len(keys_to_remove)
 
-    async def warmup(
-        self, keys: List[str], getter_func: callable
-    ) -> Dict[str, Any]:
+    async def warmup(self, keys: List[str], getter_func: callable) -> Dict[str, Any]:
         """Warm up cache with specific keys"""
         results = {
             "total": len(keys),
@@ -509,14 +501,10 @@ class UnifiedCache:
                 "inconsistencies_found": self.metrics.inconsistencies_found,
                 "memory_pressure_events": self.metrics.memory_pressure_events,
                 "disk_operations": self.metrics.disk_operations,
-                "average_access_time": round(
-                    self.metrics.average_access_time, 4
-                ),
+                "average_access_time": round(self.metrics.average_access_time, 4),
                 "peak_memory_usage": self.metrics.peak_memory_usage,
                 "categories": dict(self.metrics.categories),
-                "cache_dir": (
-                    str(self.cache_dir) if self.enable_disk_cache else None
-                ),
+                "cache_dir": (str(self.cache_dir) if self.enable_disk_cache else None),
                 "smart_ttl_enabled": self.enable_smart_ttl,
                 "predictive_warming_enabled": self.enable_predictive_warming,
                 "consistency_monitoring_enabled": self.enable_consistency_monitoring,
@@ -543,13 +531,9 @@ class UnifiedCache:
                     try:
                         value = await getter_func()
                         await self.set(key, value)
-                        logger.debug(
-                            f"Background warming completed for key: {key}"
-                        )
+                        logger.debug(f"Background warming completed for key: {key}")
                     except Exception as e:
-                        logger.error(
-                            f"Background warming failed for key {key}: {e}"
-                        )
+                        logger.error(f"Background warming failed for key {key}: {e}")
                     finally:
                         self._warming_queue.task_done()
 
@@ -573,9 +557,7 @@ class UnifiedCache:
         """Remove expired entries"""
         with self._lock:
             expired_keys = [
-                key
-                for key, entry in self._memory_cache.items()
-                if entry.is_expired()
+                key for key, entry in self._memory_cache.items() if entry.is_expired()
             ]
 
             for key in expired_keys:
@@ -583,9 +565,7 @@ class UnifiedCache:
                 self.metrics.expirations += 1
 
             if expired_keys:
-                logger.info(
-                    f"Cleaned up {len(expired_keys)} expired cache entries"
-                )
+                logger.info(f"Cleaned up {len(expired_keys)} expired cache entries")
 
     async def _enforce_size_limit(self) -> None:
         """Enforce maximum cache size using intelligent eviction"""
@@ -595,17 +575,13 @@ class UnifiedCache:
                 candidates = list(self._memory_cache.items())
 
                 # Sort by priority (lower priority first) then by last access
-                candidates.sort(
-                    key=lambda x: (x[1].priority, x[1].last_accessed)
-                )
+                candidates.sort(key=lambda x: (x[1].priority, x[1].last_accessed))
 
                 key, entry = candidates[0]
                 del self._memory_cache[key]
                 self.metrics.evictions += 1
 
-                logger.debug(
-                    f"Evicted cache entry: {key} (priority: {entry.priority})"
-                )
+                logger.debug(f"Evicted cache entry: {key} (priority: {entry.priority})")
 
     async def _enforce_memory_limit(self) -> None:
         """Enforce memory limits by evicting least recently used items"""
@@ -637,9 +613,7 @@ class UnifiedCache:
 
     async def _check_memory_limit(self, additional_bytes: int) -> bool:
         """Check if adding additional bytes would exceed memory limit"""
-        current_memory = sum(
-            entry.size_bytes for entry in self._memory_cache.values()
-        )
+        current_memory = sum(entry.size_bytes for entry in self._memory_cache.values())
         return current_memory + additional_bytes <= self.max_memory_bytes
 
     async def _optimize_ttl(self) -> None:
@@ -663,10 +637,7 @@ class UnifiedCache:
 
     async def _check_consistency(self) -> None:
         """Check cache consistency between memory and disk"""
-        if (
-            not self.enable_disk_cache
-            or not self.enable_consistency_monitoring
-        ):
+        if not self.enable_disk_cache or not self.enable_consistency_monitoring:
             return
 
         self.metrics.consistency_checks += 1
@@ -683,9 +654,7 @@ class UnifiedCache:
                         or abs(disk_entry.timestamp - entry.timestamp) > 1
                     ):  # 1 second tolerance
                         inconsistencies += 1
-                        logger.warning(
-                            f"Cache inconsistency detected for key: {key}"
-                        )
+                        logger.warning(f"Cache inconsistency detected for key: {key}")
 
             if inconsistencies > 0:
                 self.metrics.inconsistencies_found += inconsistencies
@@ -713,9 +682,7 @@ class UnifiedCache:
 
         # Update average
         if self._access_times:
-            self.metrics.average_access_time = statistics.mean(
-                self._access_times
-            )
+            self.metrics.average_access_time = statistics.mean(self._access_times)
 
     def _record_access_pattern(self, key: str) -> None:
         """Record access pattern for predictive warming"""
@@ -796,9 +763,7 @@ class UnifiedCache:
             self.metrics.disk_operations += 1
 
         except Exception as e:
-            logger.error(
-                f"Error saving to disk cache for key {entry.key}: {e}"
-            )
+            logger.error(f"Error saving to disk cache for key {entry.key}: {e}")
 
     async def _delete_from_disk(self, key: str) -> None:
         """Delete entry from disk cache"""
@@ -844,12 +809,8 @@ async def get_unified_cache() -> UnifiedCache:
                 max_size=getattr(cache_config, "max_size", 10000),
                 default_ttl=getattr(cache_config, "default_ttl", 1800),
                 max_memory_mb=getattr(cache_config, "max_memory_mb", 512),
-                enable_disk_cache=getattr(
-                    cache_config, "enable_disk_cache", True
-                ),
-                enable_smart_ttl=getattr(
-                    cache_config, "enable_smart_ttl", True
-                ),
+                enable_disk_cache=getattr(cache_config, "enable_disk_cache", True),
+                enable_smart_ttl=getattr(cache_config, "enable_smart_ttl", True),
                 enable_predictive_warming=getattr(
                     cache_config, "enable_predictive_warming", True
                 ),

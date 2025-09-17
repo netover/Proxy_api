@@ -21,7 +21,7 @@ def run_command(cmd, cwd=None):
             print(f"STDOUT: {result.stdout}")
             print(f"STDERR: {result.stderr}")
             return False
-        print(f"Command succeeded")
+        print("Command succeeded")
         return True
     except Exception as e:
         print(f"Command failed with exception: {e}")

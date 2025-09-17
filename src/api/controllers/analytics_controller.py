@@ -23,9 +23,7 @@ async def get_metrics(request: Request, _: bool = Depends(verify_api_key)):
 
     # Add provider status to metrics
     for provider_name, provider_metrics in metrics.items():
-        provider = next(
-            (p for p in provider_info if p.name == provider_name), None
-        )
+        provider = next((p for p in provider_info if p.name == provider_name), None)
         if provider:
             provider_metrics.update(
                 {
@@ -41,9 +39,9 @@ async def get_metrics(request: Request, _: bool = Depends(verify_api_key)):
 
     response_time = time.time() - start_time
     total_requests = sum(m.get("total_requests", 0) for m in metrics.values())
-    avg_success_rate = sum(
-        m.get("success_rate", 0) for m in metrics.values()
-    ) / max(len(metrics), 1)
+    avg_success_rate = sum(m.get("success_rate", 0) for m in metrics.values()) / max(
+        len(metrics), 1
+    )
 
     logger.info(
         "Metrics retrieved",
@@ -65,9 +63,7 @@ async def get_metrics(request: Request, _: bool = Depends(verify_api_key)):
 
 
 @router.get("/metrics/prometheus")
-async def get_prometheus_metrics(
-    request: Request, _: bool = Depends(verify_api_key)
-):
+async def get_prometheus_metrics(request: Request, _: bool = Depends(verify_api_key)):
     """Prometheus-compatible metrics endpoint"""
     start_time = time.time()
     logger.info("Prometheus metrics request started")
@@ -82,6 +78,4 @@ async def get_prometheus_metrics(
         data_size_bytes=data_size,
     )
 
-    return Response(
-        content=prometheus_data, media_type="text/plain; charset=utf-8"
-    )
+    return Response(content=prometheus_data, media_type="text/plain; charset=utf-8")

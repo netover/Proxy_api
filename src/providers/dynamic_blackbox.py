@@ -100,24 +100,16 @@ class DynamicBlackboxProvider(DynamicProvider):
             self.logger.error(f"Chat completion failed: {e}")
             raise
 
-    async def create_text_completion(
-        self, request: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def create_text_completion(self, request: Dict[str, Any]) -> Dict[str, Any]:
         """Create text completion (mapped to chat completion)"""
 
-    async def create_embeddings(
-        self, request: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def create_embeddings(self, request: Dict[str, Any]) -> Dict[str, Any]:
         """Create embeddings (not supported by Blackbox)"""
-        raise NotImplementedError(
-            "Blackbox provider does not support embeddings"
-        )
+        raise NotImplementedError("Blackbox provider does not support embeddings")
         messages = [{"role": "user", "content": request.get("prompt", "")}]
         chat_request = {**request, "messages": messages}
         return await self.create_completion(chat_request)
 
-    async def create_embeddings(
-        self, request: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def create_embeddings(self, request: Dict[str, Any]) -> Dict[str, Any]:
         """Create embeddings (not supported by Blackbox)"""
         raise NotImplementedError("Blackbox.ai does not support embeddings.")

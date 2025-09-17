@@ -206,7 +206,7 @@ class ModelDiscoveryDemo:
         
         # Cache statistics
         stats = self.cache_manager.get_stats()
-        print(f"\n📊 Cache Statistics:")
+        print("\n📊 Cache Statistics:")
         print(f"  Hits: {stats.get('hits', 0)}")
         print(f"  Misses: {stats.get('misses', 0)}")
         print(f"  Hit Rate: {stats.get('hit_rate', 0):.1f}%")
@@ -356,7 +356,7 @@ class ModelDiscoveryDemo:
         ]
         
         print("🔧 Custom provider integration:")
-        print(f"  Provider: custom_ai")
+        print("  Provider: custom_ai")
         print(f"  Models: {len(custom_models)}")
         
         for model in custom_models:
@@ -548,7 +548,7 @@ class ModelDiscoveryDemo:
             print("="*80)
             print(f"✅ Total models discovered: {len(models)}")
             print(f"✅ Cache hit rate: {cache_stats.get('hit_rate', 0):.1f}%")
-            print(f"✅ Custom providers: 1")
+            print("✅ Custom providers: 1")
             print(f"✅ Error scenarios handled: {len(error_handling)}")
             print(f"✅ Batch operations: {len(batch_results)}")
             print(f"✅ Real-time updates: {len(updates)}")

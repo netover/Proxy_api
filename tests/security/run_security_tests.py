@@ -9,7 +9,6 @@ and penetration testing capabilities.
 
 import argparse
 import sys
-import os
 import json
 import time
 from datetime import datetime
@@ -37,9 +36,7 @@ logger = logging.getLogger(__name__)
 class SecurityTestRunner:
     """Main security test runner class"""
 
-    def __init__(
-        self, base_url: str = "http://localhost:8000", verbose: bool = False
-    ):
+    def __init__(self, base_url: str = "http://localhost:8000", verbose: bool = False):
         self.base_url = base_url
         self.verbose = verbose
         self.results = {
@@ -63,9 +60,7 @@ class SecurityTestRunner:
         ]
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
-            futures = [
-                executor.submit(test_suite) for test_suite in test_suites
-            ]
+            futures = [executor.submit(test_suite) for test_suite in test_suites]
             for future in concurrent.futures.as_completed(futures):
                 try:
                     result = future.result()
@@ -233,7 +228,7 @@ class SecurityTestRunner:
         findings = []
 
         try:
-            cmd = ["bandit", "-r", "src/", "-f", "json"]
+            cmd = ["bandit", "-r", "src/", "-", "json"]
             result = subprocess.run(
                 cmd,
                 capture_output=True,
@@ -252,9 +247,7 @@ class SecurityTestRunner:
                             "description": issue.get("issue_text", ""),
                             "file": issue.get("filename", ""),
                             "line": issue.get("line_number", 0),
-                            "confidence": issue.get(
-                                "issue_confidence", "UNKNOWN"
-                            ),
+                            "confidence": issue.get("issue_confidence", "UNKNOWN"),
                         }
                     )
             else:
@@ -355,14 +348,10 @@ class SecurityTestRunner:
         """Generate test summary"""
         total_tests = len(self.results["tests_run"])
         completed_tests = sum(
-            1
-            for test in self.results["tests_run"]
-            if test["status"] == "completed"
+            1 for test in self.results["tests_run"] if test["status"] == "completed"
         )
         failed_tests = sum(
-            1
-            for test in self.results["tests_run"]
-            if test["status"] == "failed"
+            1 for test in self.results["tests_run"] if test["status"] == "failed"
         )
 
         # Count vulnerabilities by severity
@@ -436,18 +425,14 @@ class SecurityTestRunner:
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="LLM Proxy API Security Test Runner"
-    )
+    parser = argparse.ArgumentParser(description="LLM Proxy API Security Test Runner")
     parser.add_argument(
         "--url",
         default="http://localhost:8000",
         help="Target URL to test (default: http://localhost:8000)",
     )
     parser.add_argument("--output", "-o", help="Output file for test results")
-    parser.add_argument(
-        "--verbose", "-v", action="store_true", help="Verbose output"
-    )
+    parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output")
     parser.add_argument(
         "--test-type",
         choices=["all", "vuln", "auth", "input", "pentest", "deps"],
@@ -474,20 +459,20 @@ def main():
     runner = SecurityTestRunner(args.url, args.verbose)
 
     if args.test_type == "all":
-        results = runner.run_all_tests()
+        runner.run_all_tests()
     elif args.test_type == "vuln":
-        results = runner.run_vulnerability_scanning()
+        runner.run_vulnerability_scanning()
     elif args.test_type == "auth":
-        results = runner.run_authentication_tests()
+        runner.run_authentication_tests()
     elif args.test_type == "input":
-        results = runner.run_input_validation_tests()
+        runner.run_input_validation_tests()
     elif args.test_type == "pentest":
-        results = runner.run_penetration_tests()
+        runner.run_penetration_tests()
     elif args.test_type == "deps":
-        results = runner.run_dependency_scanning()
+        runner.run_dependency_scanning()
 
     # Save and display results
-    output_file = runner.save_report(args.output)
+    runner.save_report(args.output)
     runner.print_summary()
 
     # Exit with appropriate code

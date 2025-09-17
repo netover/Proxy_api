@@ -91,9 +91,7 @@ async def test_get_metrics_success():
                 summary = json_response["summary"]
                 assert summary["total_providers"] == 2
                 assert summary["total_requests"] == 150  # 100 + 50
-                assert (
-                    summary["average_success_rate"] == 0.965
-                )  # (0.95 + 0.98) / 2
+                assert summary["average_success_rate"] == 0.965  # (0.95 + 0.98) / 2
 
 
 @pytest.mark.asyncio
@@ -165,17 +163,13 @@ response_time_seconds_sum 225.5
 response_time_seconds_count 150
 """
 
-        mock_metrics_collector.get_prometheus_metrics.return_value = (
-            prometheus_data
-        )
+        mock_metrics_collector.get_prometheus_metrics.return_value = prometheus_data
 
         async with AsyncClient(app=app, base_url="http://test") as ac:
             headers = {"Authorization": "Bearer test_key"}
             response = await ac.get("/metrics/prometheus", headers=headers)
             assert response.status_code == 200
-            assert (
-                response.headers["content-type"] == "text/plain; charset=utf-8"
-            )
+            assert response.headers["content-type"] == "text/plain; charset=utf-8"
             assert prometheus_data in response.text
 
 
@@ -214,9 +208,7 @@ async def test_get_prometheus_metrics_empty():
             headers = {"Authorization": "Bearer test_key"}
             response = await ac.get("/metrics/prometheus", headers=headers)
             assert response.status_code == 200
-            assert (
-                response.headers["content-type"] == "text/plain; charset=utf-8"
-            )
+            assert response.headers["content-type"] == "text/plain; charset=utf-8"
             assert response.text == ""
 
 
@@ -249,9 +241,7 @@ async def test_metrics_with_provider_errors():
         mock_provider.error_count = 20
 
         mock_provider_factory = AsyncMock()
-        mock_provider_factory.get_all_provider_info.return_value = [
-            mock_provider
-        ]
+        mock_provider_factory.get_all_provider_info.return_value = [mock_provider]
         mock_app_state.provider_factory = mock_provider_factory
 
         async with AsyncClient(app=app, base_url="http://test") as ac:
@@ -289,9 +279,7 @@ async def test_metrics_with_forced_provider():
         mock_provider.error_count = 0
 
         mock_provider_factory = AsyncMock()
-        mock_provider_factory.get_all_provider_info.return_value = [
-            mock_provider
-        ]
+        mock_provider_factory.get_all_provider_info.return_value = [mock_provider]
         mock_app_state.provider_factory = mock_provider_factory
 
         async with AsyncClient(app=app, base_url="http://test") as ac:

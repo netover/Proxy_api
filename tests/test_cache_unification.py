@@ -9,22 +9,17 @@ Comprehensive testing suite for the unified cache system, including:
 """
 
 import asyncio
-import json
 import logging
-import os
 import pytest
 import tempfile
 import time
 from pathlib import Path
-from typing import Dict, List, Any, Optional
-from unittest.mock import Mock, patch, AsyncMock
 
-from src.core.unified_cache import UnifiedCache, get_unified_cache, CacheEntry
+from src.core.unified_cache import UnifiedCache
 from src.core.cache_migration import CacheMigrationService, MigrationConfig
 from src.core.cache_warmer import CacheWarmer
 from src.core.cache_monitor import CacheMonitor
 from src.models.model_info import ModelInfo
-from src.core.model_discovery import ProviderConfig
 
 
 logger = logging.getLogger(__name__)
@@ -104,9 +99,7 @@ class TestUnifiedCacheCore:
     """Test core unified cache functionality"""
 
     @pytest.mark.asyncio
-    async def test_cache_basic_operations(
-        self, unified_cache, sample_model_info
-    ):
+    async def test_cache_basic_operations(self, unified_cache, sample_model_info):
         """Test basic cache operations"""
         # Test cache set
         key = "test:models:openai"
@@ -169,12 +162,8 @@ class TestUnifiedCacheCore:
         await unified_cache.set(
             "models:openai", sample_model_info[:1], category="models"
         )
-        await unified_cache.set(
-            "response:123", {"result": "test"}, category="response"
-        )
-        await unified_cache.set(
-            "summary:456", {"summary": "test"}, category="summary"
-        )
+        await unified_cache.set("response:123", {"result": "test"}, category="response")
+        await unified_cache.set("summary:456", {"summary": "test"}, category="summary")
 
         stats = await unified_cache.get_stats()
         assert "models" in stats["categories"]
@@ -429,9 +418,7 @@ class TestCacheMonitor:
         """Test alert system"""
         # Fill cache to potentially trigger alerts
         for i in range(100):
-            await unified_cache.set(
-                f"test:key{i}", {"data": f"value{i}"}, ttl=1
-            )
+            await unified_cache.set(f"test:key{i}", {"data": f"value{i}"}, ttl=1)
 
         # Wait for monitoring to detect issues
         await asyncio.sleep(2)
@@ -491,9 +478,7 @@ class TestCacheIntegration:
 
         # Verify all operations completed
         stats = await unified_cache.get_stats()
-        assert (
-            stats["entries"] >= 50
-        )  # At least 50 entries from 5 workers * 10 items
+        assert stats["entries"] >= 50  # At least 50 entries from 5 workers * 10 items
 
     @pytest.mark.asyncio
     async def test_memory_pressure_handling(self, unified_cache):
@@ -532,9 +517,7 @@ class TestCacheIntegration:
         assert total_time < 5.0  # Less than 5 seconds for 200 operations
 
         operations_per_second = 200 / total_time
-        logger.info(
-            f"Cache operations per second: {operations_per_second:.2f}"
-        )
+        logger.info(f"Cache operations per second: {operations_per_second:.2f}")
 
 
 class TestChaosEngineering:
@@ -563,9 +546,7 @@ class TestChaosEngineering:
         assert restored == value
 
     @pytest.mark.asyncio
-    async def test_disk_corruption_handling(
-        self, unified_cache, temp_cache_dir
-    ):
+    async def test_disk_corruption_handling(self, unified_cache, temp_cache_dir):
         """Test handling of disk corruption"""
         key = "corruption:test"
         value = {"test": "data"}
@@ -574,9 +555,7 @@ class TestChaosEngineering:
         await unified_cache.set(key, value)
 
         # Simulate disk corruption by writing invalid data
-        cache_file = (
-            temp_cache_dir / f"{unified_cache._generate_key(key)}.json"
-        )
+        cache_file = temp_cache_dir / f"{unified_cache._generate_key(key)}.json"
         with open(cache_file, "w") as f:
             f.write("invalid json content")
 

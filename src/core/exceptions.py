@@ -4,9 +4,7 @@ from typing import Optional
 class ProviderError(Exception):
     """Base exception for all provider errors"""
 
-    def __init__(
-        self, message: str, provider: str = "", code: str = "provider_error"
-    ):
+    def __init__(self, message: str, provider: str = "", code: str = "provider_error"):
         self.message = message
         self.provider = provider
         self.code = code
@@ -26,12 +24,8 @@ class ProviderNotFoundError(ProviderError):
 
     def __init__(self, provider_name: str, message: str = None):
         self.provider_name = provider_name
-        message = (
-            message or f"Provider '{provider_name}' not found in registry"
-        )
-        super().__init__(
-            message, provider=provider_name, code="provider_not_found"
-        )
+        message = message or f"Provider '{provider_name}' not found in registry"
+        super().__init__(message, provider=provider_name, code="provider_not_found")
 
 
 class ProviderUnavailableError(ProviderError):
@@ -39,12 +33,8 @@ class ProviderUnavailableError(ProviderError):
 
     def __init__(self, provider_name: str, message: str = None):
         self.provider_name = provider_name
-        message = (
-            message or f"Provider '{provider_name}' is currently unavailable"
-        )
-        super().__init__(
-            message, provider=provider_name, code="provider_unavailable"
-        )
+        message = message or f"Provider '{provider_name}' is currently unavailable"
+        super().__init__(message, provider=provider_name, code="provider_unavailable")
 
 
 class InvalidRequestError(ProviderError):

@@ -26,7 +26,8 @@ def fix_file(filepath):
     try:
         with open(filepath, "r", encoding="utf-8") as f:
             content = f.read()
-    except:
+    except IOError as e:
+        print(f"Error reading file {filepath}: {e}")
         return False
 
     original = content

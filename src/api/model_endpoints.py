@@ -40,15 +40,9 @@ class ModelManager:
         app_state = request.app.state.app_state
 
         # Validate provider exists
-        provider_info = (
-            await app_state.provider_factory.get_all_provider_info()
-        )
+        provider_info = await app_state.provider_factory.get_all_provider_info()
         provider = next(
-            (
-                p
-                for p in provider_info
-                if p.name.lower() == provider_name.lower()
-            ),
+            (p for p in provider_info if p.name.lower() == provider_name.lower()),
             None,
         )
 
@@ -65,9 +59,7 @@ class ModelManager:
                 base_url=provider.base_url,
                 api_key=provider.api_key or "dummy-key",
             )
-            models = await app_state.model_discovery.discover_models(
-                provider_config
-            )
+            models = await app_state.model_discovery.discover_models(provider_config)
 
             # Convert to extended model format
             extended_models = []
@@ -93,13 +85,9 @@ class ModelManager:
             )
 
         except Exception as e:
-            self.logger.error(
-                f"Failed to get models for provider {provider_name}: {e}"
-            )
+            self.logger.error(f"Failed to get models for provider {provider_name}: {e}")
             sanitized_error = error_handler._sanitize_error_message(str(e))
-            raise InvalidRequestError(
-                f"Failed to retrieve models: {sanitized_error}"
-            )
+            raise InvalidRequestError(f"Failed to retrieve models: {sanitized_error}")
 
     async def get_model_details(
         self, request: Request, provider_name: str, model_id: str
@@ -108,15 +96,9 @@ class ModelManager:
         app_state = request.app.state.app_state
 
         # Validate provider exists
-        provider_info = (
-            await app_state.provider_factory.get_all_provider_info()
-        )
+        provider_info = await app_state.provider_factory.get_all_provider_info()
         provider = next(
-            (
-                p
-                for p in provider_info
-                if p.name.lower() == provider_name.lower()
-            ),
+            (p for p in provider_info if p.name.lower() == provider_name.lower()),
             None,
         )
 
@@ -181,15 +163,9 @@ class ModelManager:
         app_state = request.app.state.app_state
 
         # Validate provider exists
-        provider_info = (
-            await app_state.provider_factory.get_all_provider_info()
-        )
+        provider_info = await app_state.provider_factory.get_all_provider_info()
         provider = next(
-            (
-                p
-                for p in provider_info
-                if p.name.lower() == provider_name.lower()
-            ),
+            (p for p in provider_info if p.name.lower() == provider_name.lower()),
             None,
         )
 
@@ -249,9 +225,7 @@ class ModelManager:
             }
 
         except Exception as e:
-            logger.error(
-                f"Failed to update model selection for {provider_name}: {e}"
-            )
+            logger.error(f"Failed to update model selection for {provider_name}: {e}")
             sanitized_error = error_handler._sanitize_error_message(str(e))
             raise InvalidRequestError(
                 f"Failed to update model selection: {sanitized_error}"
@@ -267,15 +241,9 @@ class ModelManager:
         app_state = request.app.state.app_state
 
         # Validate provider exists
-        provider_info = (
-            await app_state.provider_factory.get_all_provider_info()
-        )
+        provider_info = await app_state.provider_factory.get_all_provider_info()
         provider = next(
-            (
-                p
-                for p in provider_info
-                if p.name.lower() == provider_name.lower()
-            ),
+            (p for p in provider_info if p.name.lower() == provider_name.lower()),
             None,
         )
 
@@ -298,9 +266,7 @@ class ModelManager:
                 base_url=provider.base_url,
                 api_key=provider.api_key or "dummy-key",
             )
-            models = await app_state.model_discovery.discover_models(
-                provider_config
-            )
+            models = await app_state.model_discovery.discover_models(provider_config)
 
             duration_ms = (time.time() - start_time) * 1000
 
@@ -323,9 +289,7 @@ class ModelManager:
         except Exception as e:
             logger.error(f"Failed to refresh models for {provider_name}: {e}")
             sanitized_error = error_handler._sanitize_error_message(str(e))
-            raise InvalidRequestError(
-                f"Failed to refresh models: {sanitized_error}"
-            )
+            raise InvalidRequestError(f"Failed to refresh models: {sanitized_error}")
 
     def _infer_capabilities(self, model_id: str) -> List[str]:
         """Infer model capabilities based on model ID patterns."""
@@ -384,9 +348,7 @@ async def list_provider_models(
     return await model_manager.get_provider_models(request, provider_name)
 
 
-@router.get(
-    "/{provider_name}/models/{model_id}", response_model=ModelDetailResponse
-)
+@router.get("/{provider_name}/models/{model_id}", response_model=ModelDetailResponse)
 @rate_limiter.limit("60/minute")
 async def get_model_info(
     request: Request,
@@ -403,9 +365,7 @@ async def get_model_info(
     Returns comprehensive model information including capabilities,
     limitations, and configuration options.
     """
-    return await model_manager.get_model_details(
-        request, provider_name, model_id
-    )
+    return await model_manager.get_model_details(request, provider_name, model_id)
 
 
 @router.put("/{provider_name}/model_selection", response_model=Dict[str, Any])
@@ -425,9 +385,7 @@ async def update_model_selection(
     Allows updating the default model selection, priority, and
     provider-specific configuration parameters.
     """
-    return await model_manager.update_model_selection(
-        request, provider_name, selection
-    )
+    return await model_manager.update_model_selection(request, provider_name, selection)
 
 
 @router.post("/{provider_name}/models/refresh", response_model=RefreshResponse)
@@ -447,9 +405,7 @@ async def refresh_provider_models(
     models from the provider's API. Useful when new models are released
     or existing models are updated.
     """
-    return await model_manager.refresh_models(
-        request, provider_name, background_tasks
-    )
+    return await model_manager.refresh_models(request, provider_name, background_tasks)
 
 
 # Error handlers are now handled at the app level

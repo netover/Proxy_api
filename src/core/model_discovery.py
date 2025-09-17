@@ -50,21 +50,19 @@ class ProviderConfig:
 
     def __str__(self) -> str:
         """String representation of the provider config."""
-        return (
-            f"ProviderConfig(name='{self.name}', base_url='{self.base_url}')"
-        )
+        return f"ProviderConfig(name='{self.name}', base_url='{self.base_url}')"
 
     def __repr__(self) -> str:
         """Detailed string representation for debugging."""
         return (
-            f"ProviderConfig("
+            "ProviderConfig("
             f"name='{self.name}', "
             f"base_url='{self.base_url}', "
-            f"api_key='***masked***', "
+            "api_key='***masked***', "
             f"organization={self.organization}, "
             f"timeout={self.timeout}, "
             f"max_retries={self.max_retries}"
-            f")"
+            ")"
         )
 
 
@@ -96,9 +94,7 @@ class ModelDiscoveryService:
         """
         self.http_client = http_client or HTTPClient()
         self._cache = None
-        logger.info(
-            "ModelDiscoveryService initialized", service_type="model_discovery"
-        )
+        logger.info("ModelDiscoveryService initialized", service_type="model_discovery")
 
     async def _get_cache(self):
         """Get or initialize the unified cache instance"""
@@ -106,18 +102,12 @@ class ModelDiscoveryService:
             self._cache = await get_unified_cache()
         return self._cache
 
-    def _generate_model_cache_key(
-        self, provider_config: ProviderConfig
-    ) -> str:
+    def _generate_model_cache_key(self, provider_config: ProviderConfig) -> str:
         """Generate a unique cache key for provider models"""
-        key_string = (
-            f"models:{provider_config.name}:{provider_config.base_url}"
-        )
+        key_string = f"models:{provider_config.name}:{provider_config.base_url}"
         return hashlib.md5(key_string.encode()).hexdigest()
 
-    async def invalidate_model_cache(
-        self, provider_config: ProviderConfig
-    ) -> bool:
+    async def invalidate_model_cache(self, provider_config: ProviderConfig) -> bool:
         """
         Invalidate cached model data for a specific provider.
 
@@ -185,9 +175,7 @@ class ModelDiscoveryService:
             "cache_max_memory_mb": stats.get("max_memory_mb", 0),
         }
 
-    async def discover_models(
-        self, provider_config: ProviderConfig
-    ) -> List[ModelInfo]:
+    async def discover_models(self, provider_config: ProviderConfig) -> List[ModelInfo]:
         """
         Discover all available models from a provider with intelligent caching.
 
@@ -247,21 +235,19 @@ class ModelDiscoveryService:
             ) as session:
                 for attempt in range(provider_config.max_retries + 1):
                     try:
-                        async with session.get(
-                            url, headers=headers
-                        ) as response:
+                        async with session.get(url, headers=headers) as response:
                             if response.status == 200:
                                 data = await response.json()
                                 break
                             elif response.status == 401:
                                 raise ProviderError(
                                     f"Authentication failed for {provider_config.name}. "
-                                    f"Check your API key."
+                                    "Check your API key."
                                 )
                             elif response.status == 403:
                                 raise ProviderError(
                                     f"Access forbidden for {provider_config.name}. "
-                                    f"Check your permissions."
+                                    "Check your permissions."
                                 )
                             elif response.status == 429:
                                 if attempt < provider_config.max_retries:

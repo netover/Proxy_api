@@ -58,9 +58,7 @@ class TestFeatureFlag:
 
     def test_rollout_percentage_full(self):
         """Test 100% rollout"""
-        flag = FeatureFlag(
-            name="test_flag", enabled=True, rollout_percentage=100
-        )
+        flag = FeatureFlag(name="test_flag", enabled=True, rollout_percentage=100)
 
         # Should always be enabled regardless of context
         assert flag.is_enabled_for() is True
@@ -68,9 +66,7 @@ class TestFeatureFlag:
 
     def test_rollout_percentage_zero(self):
         """Test 0% rollout"""
-        flag = FeatureFlag(
-            name="test_flag", enabled=True, rollout_percentage=0
-        )
+        flag = FeatureFlag(name="test_flag", enabled=True, rollout_percentage=0)
 
         # Should never be enabled
         assert flag.is_enabled_for() is False
@@ -78,9 +74,7 @@ class TestFeatureFlag:
 
     def test_rollout_percentage_partial(self):
         """Test partial rollout with deterministic hashing"""
-        flag = FeatureFlag(
-            name="test_flag", enabled=True, rollout_percentage=50
-        )
+        flag = FeatureFlag(name="test_flag", enabled=True, rollout_percentage=50)
 
         # Test with known user IDs to verify deterministic behavior
         # These specific user IDs are chosen to fall within/outside the 50% rollout
@@ -103,9 +97,7 @@ class TestFeatureFlag:
 
     def test_disabled_flag(self):
         """Test disabled flag"""
-        flag = FeatureFlag(
-            name="test_flag", enabled=False, rollout_percentage=100
-        )
+        flag = FeatureFlag(name="test_flag", enabled=False, rollout_percentage=100)
 
         assert flag.is_enabled_for() is False
         assert flag.is_enabled_for({"user_id": "user1"}) is False

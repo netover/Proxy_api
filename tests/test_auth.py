@@ -1,10 +1,7 @@
 import pytest
 import hashlib
-import secrets
 from unittest.mock import Mock, patch
 from fastapi import HTTPException
-from fastapi.testclient import TestClient
-from httpx import AsyncClient
 
 from src.core.auth import APIKeyAuth, verify_api_key, get_api_key_auth
 
@@ -19,9 +16,7 @@ class TestAPIKeyAuth:
 
         assert len(auth.valid_api_key_hashes) == 3
         # Verify keys are hashed
-        expected_hashes = {
-            hashlib.sha256(key.encode()).hexdigest() for key in api_keys
-        }
+        expected_hashes = {hashlib.sha256(key.encode()).hexdigest() for key in api_keys}
         assert auth.valid_api_key_hashes == expected_hashes
 
     def test_init_with_empty_keys(self):
@@ -100,12 +95,8 @@ class TestAPIKeyAuth:
         auth = APIKeyAuth(api_keys)
 
         assert auth.verify_api_key("key-with_special.chars!@#") is True
-        assert (
-            auth.verify_api_key("key-with_special.chars!@# ") is False
-        )  # Extra space
-        assert (
-            auth.verify_api_key("key-with_special.chars!@") is False
-        )  # Missing chars
+        assert auth.verify_api_key("key-with_special.chars!@# ") is False  # Extra space
+        assert auth.verify_api_key("key-with_special.chars!@") is False  # Missing chars
 
     def test_verify_api_key_unicode(self):
         """Test verify_api_key with unicode characters"""
@@ -293,7 +284,6 @@ class TestAuthIntegration:
         """Test authentication integration with FastAPI app"""
         # This would require setting up a test app with authentication
         # For now, we'll test the components individually
-        pass
 
     def test_api_key_hashing_consistency(self):
         """Test that API key hashing is consistent"""

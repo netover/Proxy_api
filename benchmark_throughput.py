@@ -139,9 +139,9 @@ async def benchmark_throughput():
 
         # Print configuration results
         print(f"  Results for {config['name']}:")
-        print(".1f")
-        print(".1f")
-        print(".1f")
+        print(".1")
+        print(".1")
+        print(".1")
         print(f"    V1 Success Rate: {v1_result.success_rate:.1f}%")
         print(f"    V2 Success Rate: {v2_result.success_rate:.1f}%")
         print(
@@ -177,10 +177,10 @@ async def benchmark_throughput():
     avg_v1_rps = total_v1_rps / num_configs if num_configs > 0 else 0
     avg_v2_rps = total_v2_rps / num_configs if num_configs > 0 else 0
 
-    print(f"Average Requests/Second:")
-    print(".1f")
-    print(".1f")
-    print(".1f")
+    print("Average Requests/Second:")
+    print(".1")
+    print(".1")
+    print(".1")
     print()
 
     # Configuration breakdown
@@ -192,9 +192,9 @@ async def benchmark_throughput():
         improvement = ((v2_rps - v1_rps) / v1_rps * 100) if v1_rps > 0 else 0
 
         print(f"  {config_name}:")
-        print(".1f")
-        print(".1f")
-        print("+6.1f")
+        print(".1")
+        print(".1")
+        print("+6.1")
 
     # Performance scaling analysis
     print("\nPerformance Scaling Analysis:")
@@ -210,18 +210,18 @@ async def benchmark_throughput():
         med_v1 = medium_config["v1"].requests_per_second
         high_v1 = high_config["v1"].requests_per_second
 
-        print(".1f")
-        print(".1f")
-        print(".1f")
+        print(".1")
+        print(".1")
+        print(".1")
 
         print("V2 Scaling:")
         low_v2 = low_config["v2"].requests_per_second
         med_v2 = medium_config["v2"].requests_per_second
         high_v2 = high_config["v2"].requests_per_second
 
-        print(".1f")
-        print(".1f")
-        print(".1f")
+        print(".1")
+        print(".1")
+        print(".1")
 
     # Resource efficiency analysis
     print("\nResource Efficiency Analysis:")
@@ -245,9 +245,9 @@ async def benchmark_throughput():
             else 0
         )
 
-        print(".3f")
-        print(".3f")
-        print("+6.3f")
+        print(".3")
+        print(".3")
+        print("+6.3")
 
     # Detailed metrics
     print("\nDetailed Metrics by Configuration:")

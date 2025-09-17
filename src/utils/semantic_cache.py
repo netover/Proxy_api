@@ -3,8 +3,7 @@ Semantic Cache using Sentence Transformers and FAISS
 Provides a cache that retrieves items based on semantic similarity of keys.
 """
 
-import numpy as np
-from typing import Dict, Any, Optional, List, Tuple
+from typing import Dict, Any, Optional, List
 
 # Import necessary libraries, with error handling for missing dependencies
 try:
@@ -17,9 +16,7 @@ except ImportError:
 try:
     import faiss
 except ImportError:
-    raise ImportError(
-        "FAISS is not installed. Please run 'pip install faiss-cpu'."
-    )
+    raise ImportError("FAISS is not installed. Please run 'pip install faiss-cpu'.")
 
 
 class SemanticCache:

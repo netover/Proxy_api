@@ -35,9 +35,7 @@ class ResponseValidator:
             required_fields = ["id", "object", "created", "model", "choices"]
             for field in required_fields:
                 if field not in response:
-                    logger.warning(
-                        f"Missing required field in chat response: {field}"
-                    )
+                    logger.warning(f"Missing required field in chat response: {field}")
                     response[field] = self._get_default_value(field)
 
             # Validate choices structure
@@ -57,12 +55,8 @@ class ResponseValidator:
                     validated_choice = {
                         "index": choice.get("index", i),
                         "message": {
-                            "role": choice.get("message", {}).get(
-                                "role", "assistant"
-                            ),
-                            "content": choice.get("message", {}).get(
-                                "content", ""
-                            ),
+                            "role": choice.get("message", {}).get("role", "assistant"),
+                            "content": choice.get("message", {}).get("content", ""),
                         },
                         "finish_reason": choice.get("finish_reason", "stop"),
                     }
@@ -76,9 +70,7 @@ class ResponseValidator:
             # Validate response size
             response_size = len(json.dumps(response).encode("utf-8"))
             if response_size > self.max_response_size:
-                logger.warning(
-                    f"Response size too large: {response_size} bytes"
-                )
+                logger.warning(f"Response size too large: {response_size} bytes")
                 # Truncate if necessary
                 response = self._truncate_large_response(response)
 
@@ -86,9 +78,7 @@ class ResponseValidator:
 
         except Exception as e:
             logger.error(f"Error validating chat completion response: {e}")
-            return self._create_error_response(
-                "Response validation failed", str(e)
-            )
+            return self._create_error_response("Response validation failed", str(e))
 
     async def validate_text_completion_response(
         self, response: Dict[str, Any]
@@ -129,9 +119,7 @@ class ResponseValidator:
 
         except Exception as e:
             logger.error(f"Error validating text completion response: {e}")
-            return self._create_error_response(
-                "Response validation failed", str(e)
-            )
+            return self._create_error_response("Response validation failed", str(e))
 
     async def validate_embedding_response(
         self, response: Dict[str, Any]
@@ -173,9 +161,7 @@ class ResponseValidator:
 
         except Exception as e:
             logger.error(f"Error validating embedding response: {e}")
-            return self._create_error_response(
-                "Response validation failed", str(e)
-            )
+            return self._create_error_response("Response validation failed", str(e))
 
     async def validate_image_generation_response(
         self, response: Dict[str, Any]
@@ -216,9 +202,7 @@ class ResponseValidator:
 
         except Exception as e:
             logger.error(f"Error validating image response: {e}")
-            return self._create_error_response(
-                "Response validation failed", str(e)
-            )
+            return self._create_error_response("Response validation failed", str(e))
 
     async def validate_generic_response(
         self, response: Dict[str, Any]
@@ -237,9 +221,7 @@ class ResponseValidator:
 
         except Exception as e:
             logger.error(f"Error validating generic response: {e}")
-            return self._create_error_response(
-                "Response validation failed", str(e)
-            )
+            return self._create_error_response("Response validation failed", str(e))
 
     def _sanitize_response(self, response: Dict[str, Any]) -> Dict[str, Any]:
         """Remove or mask sensitive information from response."""
@@ -258,9 +240,7 @@ class ResponseValidator:
 
         return sanitize_value(response)
 
-    def _validate_response_size(
-        self, response: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    def _validate_response_size(self, response: Dict[str, Any]) -> Dict[str, Any]:
         """Validate and potentially truncate response based on size."""
         response_str = json.dumps(response)
         response_size = len(response_str.encode("utf-8"))
@@ -275,9 +255,7 @@ class ResponseValidator:
                 for choice in response["choices"]:
                     if "message" in choice and "content" in choice["message"]:
                         content = choice["message"]["content"]
-                        if (
-                            len(content) > 10000
-                        ):  # Arbitrary large content limit
+                        if len(content) > 10000:  # Arbitrary large content limit
                             choice["message"]["content"] = (
                                 content[:10000] + "...[truncated]"
                             )
@@ -297,17 +275,13 @@ class ResponseValidator:
 
         return response
 
-    def _truncate_large_response(
-        self, response: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    def _truncate_large_response(self, response: Dict[str, Any]) -> Dict[str, Any]:
         """Truncate response to fit size limits."""
         # Simple truncation strategy - keep essential fields only
         truncated = {
             "id": response.get("id", "truncated"),
             "object": response.get("object", "error"),
-            "created": response.get(
-                "created", int(datetime.now().timestamp())
-            ),
+            "created": response.get("created", int(datetime.now().timestamp())),
             "model": response.get("model", "unknown"),
             "choices": [
                 {
@@ -339,9 +313,7 @@ class ResponseValidator:
         }
         return defaults.get(field, None)
 
-    def _create_error_response(
-        self, error_type: str, message: str
-    ) -> Dict[str, Any]:
+    def _create_error_response(self, error_type: str, message: str) -> Dict[str, Any]:
         """Create a standardized error response."""
         return {
             "error": {

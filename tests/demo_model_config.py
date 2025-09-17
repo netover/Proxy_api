@@ -7,7 +7,6 @@ import os
 import tempfile
 import json
 from pathlib import Path
-import time
 
 # Add the src directory to the path
 import sys
@@ -62,17 +61,10 @@ def demo_persistence():
         # Verify they match
         assert len(selections) == len(selections2)
         for provider in selections:
-            assert (
-                selections[provider].model_name
-                == selections2[provider].model_name
-            )
-            assert (
-                selections[provider].editable == selections2[provider].editable
-            )
+            assert selections[provider].model_name == selections2[provider].model_name
+            assert selections[provider].editable == selections2[provider].editable
 
-        print(
-            "   [OK] Persistence verified - selections maintained across restarts"
-        )
+        print("   [OK] Persistence verified - selections maintained across restarts")
 
     finally:
         # Cleanup
@@ -135,9 +127,7 @@ def demo_hot_reload():
         assert openai_selection.model_name == "gpt-4"
         assert anthropic_selection.model_name == "claude-3-haiku"
 
-        print(
-            "   [OK] Hot-reload verified - external changes detected and loaded"
-        )
+        print("   [OK] Hot-reload verified - external changes detected and loaded")
 
     finally:
         # Cleanup
@@ -179,9 +169,7 @@ def demo_service_layer():
         print(f"\n   All selections: {selections}")
 
         # Validate selections
-        validation = service.validate_model_selection(
-            "test_provider1", "test_model1"
-        )
+        validation = service.validate_model_selection("test_provider1", "test_model1")
         print(f"   Validation result: {validation}")
 
         print("   [OK] Service layer functionality verified")

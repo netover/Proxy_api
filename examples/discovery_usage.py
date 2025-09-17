@@ -54,7 +54,7 @@ async def demonstrate_discovery():
         try:
             model_info = await provider.retrieve_model("gpt-4")
             if model_info:
-                print(f"GPT-4 details:")
+                print("GPT-4 details:")
                 print(f"  ID: {model_info.id}")
                 print(f"  Owner: {model_info.owned_by}")
                 print(f"  Created: {model_info.created_datetime}")

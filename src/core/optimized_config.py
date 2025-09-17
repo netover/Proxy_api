@@ -61,9 +61,7 @@ class ConfigCache:
         self.ttl_seconds = ttl_seconds
         self._executor = ThreadPoolExecutor(max_workers=2)
 
-    def _get_cache_key(
-        self, file_path: Path, section: Optional[str] = None
-    ) -> str:
+    def _get_cache_key(self, file_path: Path, section: Optional[str] = None) -> str:
         """Generate cache key from file path and optional section"""
         content = f"{file_path}:{section or 'full'}"
         return hashlib.md5(content.encode()).hexdigest()
@@ -76,7 +74,7 @@ class ConfigCache:
 
     def _evict_old_entries(self):
         """Evict expired and least recently used entries"""
-        current_time = time.time()
+        time.time()
 
         # Remove expired entries
         expired_keys = [k for k in self.cache.keys() if self._is_expired(k)]
@@ -232,9 +230,7 @@ class OptimizedConfigLoader:
                 elif file_path.suffix.lower() == ".json":
                     data = json.load(f)
                 else:
-                    raise ValueError(
-                        f"Unsupported config format: {file_path.suffix}"
-                    )
+                    raise ValueError(f"Unsupported config format: {file_path.suffix}")
 
             end_time = time.time()
             self.timings.append(
@@ -251,9 +247,7 @@ class OptimizedConfigLoader:
 
         return await loop.run_in_executor(self._executor, _sync_load)
 
-    async def _load_file_with_validation_async(
-        self, file_path: Path
-    ) -> Dict[str, Any]:
+    async def _load_file_with_validation_async(self, file_path: Path) -> Dict[str, Any]:
         """Load configuration file with schema validation"""
         from .config_schema import config_validator
 
@@ -373,9 +367,7 @@ class OptimizedConfigLoader:
         return {
             "total_loads": total_loads,
             "average_duration_ms": total_duration / total_loads,
-            "cache_hit_rate": (
-                cache_hits / total_loads if total_loads > 0 else 0
-            ),
+            "cache_hit_rate": (cache_hits / total_loads if total_loads > 0 else 0),
             "total_file_size_loaded": sum(t.file_size for t in self.timings),
             "lazy_loads": sum(1 for t in self.timings if t.lazy_loaded),
         }

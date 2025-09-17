@@ -46,9 +46,7 @@ class RequestValidator:
             # Validate model name
             model = request_data.get("model", "")
             if not model:
-                raise InvalidRequestError(
-                    "Model name is required", param="model"
-                )
+                raise InvalidRequestError("Model name is required", param="model")
 
             if not self._is_valid_model_name(model):
                 raise InvalidRequestError(
@@ -95,9 +93,7 @@ class RequestValidator:
 
                 # Sanitize content
                 sanitized_content = self._sanitize_text(content)
-                sanitized_messages.append(
-                    {"role": role, "content": sanitized_content}
-                )
+                sanitized_messages.append({"role": role, "content": sanitized_content})
 
             # Validate and sanitize other parameters
             sanitized_request = request_data.copy()
@@ -128,9 +124,7 @@ class RequestValidator:
         except Exception as e:
             logger.error(f"Unexpected error validating chat request: {e}")
             sanitized_error = error_handler._sanitize_error_message(str(e))
-            raise InvalidRequestError(
-                f"Request validation failed: {sanitized_error}"
-            )
+            raise InvalidRequestError(f"Request validation failed: {sanitized_error}")
 
     async def validate_text_completion_request(
         self, request_data: Dict[str, Any]
@@ -143,9 +137,7 @@ class RequestValidator:
                 raise InvalidRequestError("Prompt is required", param="prompt")
 
             if not isinstance(prompt, str):
-                raise InvalidRequestError(
-                    "Prompt must be a string", param="prompt"
-                )
+                raise InvalidRequestError("Prompt must be a string", param="prompt")
 
             if len(prompt) > self.max_prompt_length:
                 raise InvalidRequestError(
@@ -159,9 +151,7 @@ class RequestValidator:
             # Validate model
             model = request_data.get("model", "")
             if not self._is_valid_model_name(model):
-                raise InvalidRequestError(
-                    f"Invalid model name: {model}", param="model"
-                )
+                raise InvalidRequestError(f"Invalid model name: {model}", param="model")
 
             sanitized_request = request_data.copy()
             sanitized_request["prompt"] = sanitized_prompt
@@ -173,9 +163,7 @@ class RequestValidator:
         except Exception as e:
             logger.error(f"Unexpected error validating text request: {e}")
             sanitized_error = error_handler._sanitize_error_message(str(e))
-            raise InvalidRequestError(
-                f"Request validation failed: {sanitized_error}"
-            )
+            raise InvalidRequestError(f"Request validation failed: {sanitized_error}")
 
     async def validate_embedding_request(
         self, request_data: Dict[str, Any]
@@ -185,9 +173,7 @@ class RequestValidator:
             # Validate input text
             input_text = request_data.get("input", "")
             if not input_text:
-                raise InvalidRequestError(
-                    "Input text is required", param="input"
-                )
+                raise InvalidRequestError("Input text is required", param="input")
 
             if isinstance(input_text, list):
                 # Multiple inputs
@@ -214,9 +200,7 @@ class RequestValidator:
             # Validate model
             model = request_data.get("model", "")
             if not self._is_valid_model_name(model):
-                raise InvalidRequestError(
-                    f"Invalid model name: {model}", param="model"
-                )
+                raise InvalidRequestError(f"Invalid model name: {model}", param="model")
 
             sanitized_request = request_data.copy()
             sanitized_request["input"] = sanitized_inputs
@@ -228,9 +212,7 @@ class RequestValidator:
         except Exception as e:
             logger.error(f"Unexpected error validating embedding request: {e}")
             sanitized_error = error_handler._sanitize_error_message(str(e))
-            raise InvalidRequestError(
-                f"Request validation failed: {sanitized_error}"
-            )
+            raise InvalidRequestError(f"Request validation failed: {sanitized_error}")
 
     def _is_valid_model_name(self, model_name: str) -> bool:
         """Check if model name has valid format."""
@@ -259,9 +241,7 @@ class RequestValidator:
 
         return text
 
-    def _validate_common_parameters(
-        self, request_data: Dict[str, Any]
-    ) -> None:
+    def _validate_common_parameters(self, request_data: Dict[str, Any]) -> None:
         """Validate common parameters across all request types."""
         # Check for suspicious parameters
         suspicious_params = ["eval", "exec", "system", "import", "__"]

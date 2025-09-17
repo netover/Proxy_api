@@ -57,8 +57,7 @@ Environment Variables:
 
     # Set default output path from environment variables
     default_output = (
-        settings.export_default_output_dir
-        / settings.export_default_output_file
+        settings.export_default_output_dir / settings.export_default_output_file
     )
 
     parser.add_argument(
@@ -132,9 +131,7 @@ def validate_date(date_str: str) -> datetime:
         # Handle timezone-aware dates
         if "Z" in date_str:
             date_str = date_str.replace("Z", "+00:00")
-        elif (
-            "+" not in date_str and "-" not in date_str[-6:]
-        ):  # No timezone info
+        elif "+" not in date_str and "-" not in date_str[-6:]:  # No timezone info
             date_str += "+00:00"  # Assume UTC if no timezone
 
         dt = datetime.fromisoformat(date_str)
@@ -177,9 +174,7 @@ def filter_record_by_date(
         return False
 
 
-def filter_record_by_model(
-    record: Dict[str, Any], model_filter: Optional[str]
-) -> bool:
+def filter_record_by_model(record: Dict[str, Any], model_filter: Optional[str]) -> bool:
     """Filter record based on model name."""
     if not model_filter:
         return True

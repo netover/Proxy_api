@@ -2,7 +2,6 @@
 
 import json
 import logging
-import os
 import threading
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -29,9 +28,7 @@ except ImportError:
             with self._lock:
                 if key not in self._cache:
                     raise KeyError(key)
-                if datetime.now() - self._timestamps[key] > timedelta(
-                    seconds=self.ttl
-                ):
+                if datetime.now() - self._timestamps[key] > timedelta(seconds=self.ttl):
                     del self._cache[key]
                     del self._timestamps[key]
                     raise KeyError(key)
@@ -41,9 +38,7 @@ except ImportError:
             with self._lock:
                 if len(self._cache) >= self.maxsize:
                     # Simple eviction - remove oldest
-                    oldest_key = min(
-                        self._timestamps, key=self._timestamps.get
-                    )
+                    oldest_key = min(self._timestamps, key=self._timestamps.get)
                     del self._cache[oldest_key]
                     del self._timestamps[oldest_key]
                 self._cache[key] = value
@@ -94,9 +89,7 @@ except ImportError:
             """Return a list of (key, value) pairs."""
             with self._lock:
                 return [
-                    (k, self[k])
-                    for k in list(self._cache.keys())
-                    if k in self._cache
+                    (k, self[k]) for k in list(self._cache.keys()) if k in self._cache
                 ]
 
 
@@ -202,26 +195,16 @@ class ModelCache:
 
                         cache_key = cache_file.stem
                         models_data = data.get("models", [])
-                        timestamp = datetime.fromisoformat(
-                            data.get("timestamp", "")
-                        )
+                        timestamp = datetime.fromisoformat(data.get("timestamp", ""))
 
                         # Check if entry is still valid
-                        if datetime.now() - timestamp < timedelta(
-                            seconds=self.ttl
-                        ):
-                            models = [
-                                ModelInfo.from_dict(m) for m in models_data
-                            ]
+                        if datetime.now() - timestamp < timedelta(seconds=self.ttl):
+                            models = [ModelInfo.from_dict(m) for m in models_data]
                             self._cache[cache_key] = models
-                            logger.debug(
-                                f"Loaded cache entry from disk: {cache_key}"
-                            )
+                            logger.debug(f"Loaded cache entry from disk: {cache_key}")
 
                     except (json.JSONDecodeError, KeyError, ValueError) as e:
-                        logger.warning(
-                            f"Failed to load cache file {cache_file}: {e}"
-                        )
+                        logger.warning(f"Failed to load cache file {cache_file}: {e}")
                         # Remove invalid cache file
                         cache_file.unlink(missing_ok=True)
 
@@ -267,9 +250,7 @@ class ModelCache:
         with self._lock:
             try:
                 models = self._cache[cache_key]
-                logger.debug(
-                    f"Cache hit for {provider_name}: {len(models)} models"
-                )
+                logger.debug(f"Cache hit for {provider_name}: {len(models)} models")
                 return models
             except KeyError:
                 logger.debug(f"Cache miss for {provider_name}")
