@@ -37,6 +37,57 @@ class CircuitBreakerOpenException(Exception):
         super().__init__(message)
 
 
+class InMemoryCircuitBreaker:
+    """A non-persistent, in-memory circuit breaker for fallback."""
+
+    def __init__(
+        self,
+        service_name: str,
+        failure_threshold: int = 5,
+        recovery_timeout: int = 60,
+        expected_exceptions: Tuple[Type[Exception], ...] = (Exception,),
+    ):
+        self.name = service_name
+        self.failure_threshold = failure_threshold
+        self.recovery_timeout = recovery_timeout
+        self.expected_exceptions = expected_exceptions
+        self.state = CircuitState.CLOSED
+        self.failures = 0
+        self.last_failure_time = 0
+
+    async def _get_state(self) -> str:
+        if (
+            self.state == CircuitState.OPEN
+            and (time.time() - self.last_failure_time) > self.recovery_timeout
+        ):
+            self.state = CircuitState.HALF_OPEN
+        return self.state
+
+    async def _record_success(self):
+        self.failures = 0
+        self.state = CircuitState.CLOSED
+
+    async def _record_failure(self):
+        self.failures += 1
+        if self.failures >= self.failure_threshold:
+            self.state = CircuitState.OPEN
+            self.last_failure_time = time.time()
+
+    async def call(self, func: Callable[..., Awaitable[Any]], *args, **kwargs) -> Any:
+        state = await self._get_state()
+        if state == CircuitState.OPEN:
+            raise CircuitBreakerOpenException(self.name)
+
+        try:
+            result = await func(*args, **kwargs)
+            if state == CircuitState.HALF_OPEN:
+                await self._record_success()
+            return result
+        except self.expected_exceptions:
+            await self._record_failure()
+            raise
+
+
 class DistributedCircuitBreaker:
     """
     A robust distributed circuit breaker using Redis for atomic state management.
@@ -239,36 +290,58 @@ _circuit_breakers: Dict[str, DistributedCircuitBreaker] = {}
 _redis_client: Optional[redis.Redis] = None
 
 
-async def initialize_circuit_breakers(redis_client: redis.Redis):
-    """Initializes the global Redis client for all circuit breakers."""
+async def initialize_circuit_breakers(redis_client: Optional[redis.Redis]):
+    """
+    Initializes the global Redis client for all circuit breakers.
+    If the client is not available or fails to connect, it logs a warning
+    and the system will use non-persistent circuit breakers.
+    """
     global _redis_client
-    _redis_client = redis_client
-    logger.info("Circuit breaker module initialized with Redis client.")
+    if not redis_client:
+        logger.warning("No Redis client provided. Circuit breakers will be non-persistent.")
+        _redis_client = None
+        return
+
+    try:
+        # Test the connection to Redis
+        await redis_client.ping()
+        _redis_client = redis_client
+        logger.info("Circuit breaker module initialized with Redis client.")
+    except (redis.exceptions.ConnectionError, redis.exceptions.TimeoutError) as e:
+        logger.error(f"Failed to connect to Redis for circuit breakers: {e}")
+        logger.warning("Circuit breakers will be non-persistent.")
+        _redis_client = None
+    except Exception as e:
+        logger.error(f"An unexpected error occurred during Redis initialization for circuit breakers: {e}")
+        _redis_client = None
 
 
 def get_circuit_breaker(
     name: str,
     failure_threshold: int = 5,
     recovery_timeout: int = 60,
-) -> DistributedCircuitBreaker:
+) -> DistributedCircuitBreaker | InMemoryCircuitBreaker:
     """
-    Gets or creates a distributed circuit breaker instance for a given service name.
-
-    Requires `initialize_circuit_breakers` to be called first.
+    Gets or creates a circuit breaker instance for a given service name.
+    Returns a DistributedCircuitBreaker if Redis is available, otherwise
+    an InMemoryCircuitBreaker.
     """
     global _redis_client
-    if _redis_client is None:
-        raise RuntimeError(
-            "Circuit breaker module not initialized. Call `initialize_circuit_breakers` first."
-        )
-
     if name not in _circuit_breakers:
-        _circuit_breakers[name] = DistributedCircuitBreaker(
-            redis_client=_redis_client,
-            service_name=name,
-            failure_threshold=failure_threshold,
-            recovery_timeout=recovery_timeout,
-        )
+        if _redis_client:
+            _circuit_breakers[name] = DistributedCircuitBreaker(
+                redis_client=_redis_client,
+                service_name=name,
+                failure_threshold=failure_threshold,
+                recovery_timeout=recovery_timeout,
+            )
+        else:
+            logger.warning(f"Creating in-memory circuit breaker for '{name}'.")
+            _circuit_breakers[name] = InMemoryCircuitBreaker(
+                service_name=name,
+                failure_threshold=failure_threshold,
+                recovery_timeout=recovery_timeout,
+            )
     return _circuit_breakers[name]
 
 

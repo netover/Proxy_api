@@ -121,20 +121,7 @@ class EnhancedProviderFactory:
 
         provider_name = config.provider
 
-        # Verificar o circuit breaker antes de tentar carregar o client
-        get_circuit_breaker(provider_name)
-        try:
-            # O 'call' do circuit breaker agora envolve a criação do cliente
-            # e a chamada ao método do cliente. Aqui, apenas verificamos o estado.
-            # A lógica de 'call' será aplicada no router.
-            pass  # A verificação real acontece no momento da chamada da API
-        except CircuitBreakerOpenException as e:
-            logger.error(
-                f"Circuit breaker para o provider '{provider_name}' está aberto."
-            )
-            raise ProviderUnavailableError(
-                f"Provider '{provider_name}' está temporariamente indisponível."
-            ) from e
+        # A verificação do circuit breaker é feita no router usando breaker.call()
 
         # Carrega o client dinamicamente
         client = self.loader.get_client(model_name)

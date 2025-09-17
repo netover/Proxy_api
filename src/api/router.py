@@ -18,6 +18,7 @@ from .controllers.config_controller import router as config_router
 from .controllers.health_controller import router as health_router
 from .controllers.context_controller import router as context_router
 from src.core.rate_limiter import rate_limiter
+from src.models.requests import ChatCompletionRequest
 from src.core.exceptions import ProviderNotFoundError, ProviderUnavailableError
 from .errors.custom_exceptions import APIException
 from .errors.error_handlers import (
@@ -49,16 +50,12 @@ async def list_models(request: Request):
 from fastapi import Depends
 
 @main_router.post("/chat/completions", tags=["chat"])
-async def chat_completions(request: Request, auth_result: bool = Depends(verify_api_key)):
+async def chat_completions(request: ChatCompletionRequest, auth_result: bool = Depends(verify_api_key)):
     """
     Main dynamic routing endpoint for chat completions.
     Routes requests to the appropriate provider based on the 'model' field.
     """
-    body = await request.json()
-    model_name = body.get("model")
-    if not model_name:
-        raise HTTPException(status_code=400, detail="'model' field is required.")
-
+    model_name = request.model
     with logger.span("dynamic_chat_completions", attributes={"model": model_name}):
         try:
             client, config = await provider_factory.get_provider_client(model_name)
@@ -68,8 +65,8 @@ async def chat_completions(request: Request, auth_result: bool = Depends(verify_
             response = await breaker.call(
                 client.chat_completions,
                 model=model_name,
-                messages=body.get("messages", []),
-                **{k: v for k, v in body.items() if k not in ["model", "messages"]},
+                messages=[msg.dict() for msg in request.messages],
+                **request.model_dump(exclude={"model", "messages"})
             )
 
             # Log spend if pricing info is available
