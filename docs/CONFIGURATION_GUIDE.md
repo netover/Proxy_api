@@ -212,6 +212,81 @@ condensation:
   cache_ttl: 300
 ```
 
+## Exemplo de Configuração Abrangente
+
+Este exemplo demonstra uma configuração mais complexa e realista, com múltiplos provedores, overrides de modelo e configurações de fallback.
+
+```yaml
+# config.yaml
+
+app:
+  name: "ProxyAPI Enterprise"
+  version: "2.1.0"
+
+server:
+  host: "0.0.0.0"
+  port: 8000
+
+auth:
+  api_keys:
+    - "prod-key-12345"
+    - "dev-key-67890"
+
+providers:
+  - name: "openai-gpt4"
+    type: "openai"
+    api_key_env: "OPENAI_API_KEY"
+    models:
+      - "gpt-4-turbo"
+      - "gpt-4"
+    enabled: true
+    priority: 1
+    timeout: 45
+    max_retries: 3
+    fallback_provider: "anthropic-claude3"
+
+  - name: "anthropic-claude3"
+    type: "anthropic"
+    api_key_env: "ANTHROPIC_API_KEY"
+    models:
+      - "claude-3-opus-20240229"
+      - "claude-3-sonnet-20240229"
+    enabled: true
+    priority: 2
+    timeout: 60
+
+  - name: "google-gemini"
+    type: "google"
+    api_key_env: "GOOGLE_API_KEY"
+    models:
+      - "gemini-1.5-pro-latest"
+    enabled: false # Temporarily disabled
+    priority: 3
+
+model_overrides:
+  "gpt-4-turbo":
+    max_tokens: 8192
+    temperature: 0.8
+    presence_penalty: 0.1
+
+caching:
+  enabled: true
+  response_cache:
+    max_size_mb: 256
+    ttl: 3600 # 1 hour
+  summary_cache:
+    max_size_mb: 128
+    ttl: 86400 # 24 hours
+
+rate_limit:
+  requests_per_window: 2000
+  window_seconds: 60
+  routes:
+    "/v1/chat/completions": "500/minute"
+    "/v1/embeddings": "1000/minute"
+
+```
+
 ## Core Application Settings
 
 ### Application Configuration

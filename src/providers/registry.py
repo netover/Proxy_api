@@ -41,42 +41,48 @@ class ProviderConfig(BaseModel):
 class ProviderRegistry:
     """Registry centralizado de 100+ providers."""
 
-    def __init__(self, config_path: str = "providers/registry.yaml"):
+    def __init__(self, config_paths: List[str] = None):
+        if config_paths is None:
+            config_paths = [
+                "providers/registry.yaml",
+                "config/providers.yaml",
+                "registry.yaml",
+            ]
         self.providers: Dict[str, ProviderConfig] = {}
-        self._load_registry(config_path)
+        self._load_registry(config_paths)
 
-    def _load_registry(self, config_path: str):
-        """Loads provider registry from a YAML or JSON file."""
-        try:
-            with open(config_path, "r", encoding="utf-8") as f:
-                if config_path.endswith(".yaml"):
-                    data = yaml.safe_load(f) or {}
-                else:
-                    data = json.load(f)
+    def _load_registry(self, config_paths: List[str]):
+        """Loads provider registry from a list of possible YAML or JSON file paths."""
+        import os
 
-            # The YAML file has a root 'providers' key. We need the dictionary under that key.
-            provider_data = data.get("providers")
-            if not isinstance(provider_data, dict):
-                logger.error(
-                    f"'{config_path}' is missing the root 'providers' key or it's not a dictionary."
-                )
-                provider_data = {}
+        for config_path in config_paths:
+            try:
+                with open(config_path, "r", encoding="utf-8") as f:
+                    if config_path.endswith(".yaml"):
+                        data = yaml.safe_load(f) or {}
+                    else:
+                        data = json.load(f)
 
-        except FileNotFoundError:
-            logger.warning(
-                f"Registry file not found at '{config_path}'. Using default registry."
-            )
-            provider_data = self._get_default_registry()
-        except (yaml.YAMLError, json.JSONDecodeError) as e:
-            logger.error(f"Error parsing registry file '{config_path}': {e}")
-            provider_data = {}  # Fallback to empty on parsing error
+                    provider_data = data.get("providers")
+                    if isinstance(provider_data, dict):
+                        for provider_id, config_data in provider_data.items():
+                            try:
+                                self.providers[provider_id] = ProviderConfig(**config_data)
+                            except Exception as e:
+                                logger.error(f"Failed to load provider config for '{provider_id}': {e}")
+                        logger.info(f"Loaded provider registry from {config_path}")
+                        return # Stop after finding the first valid file
+            except FileNotFoundError:
+                continue # Try the next path
+            except (yaml.YAMLError, json.JSONDecodeError) as e:
+                logger.error(f"Error parsing registry file '{config_path}': {e}")
+                continue # Try the next path
 
+        logger.warning("No provider registry file found. Using default registry.")
+        provider_data = self._get_default_registry()
         for provider_id, config_data in provider_data.items():
             try:
                 self.providers[provider_id] = ProviderConfig(**config_data)
-                logger.info(
-                    f"Provider carregado: {provider_id} ({config_data.get('provider')})"
-                )
             except Exception as e:
                 logger.error(f"Failed to load provider config for '{provider_id}': {e}")
 
@@ -152,5 +158,13 @@ class ProviderRegistry:
         return self.providers
 
 
+import os
+
 # Instância global para ser usada em toda a aplicação
-registry = ProviderRegistry(config_path="providers/registry.yaml")
+registry = ProviderRegistry(config_paths=[
+    "providers/registry.yaml",
+    "config/providers.yaml",
+    "registry.yaml",
+    os.path.expanduser("~/.proxyapi/providers.yaml"),
+    "/etc/proxyapi/providers.yaml",
+])

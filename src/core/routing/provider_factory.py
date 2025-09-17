@@ -7,39 +7,27 @@ import time
 from typing import Dict, Any, Optional, List
 from enum import Enum
 
-# --- Backward Compatibility Shims ---
-# These classes are kept for backward compatibility with older tests and modules.
-# They should be removed after all dependent modules are refactored.
-
-
 class ProviderStatus(str, Enum):
     HEALTHY = "healthy"
     DEGRADED = "degraded"
     UNHEALTHY = "unhealthy"
     DISABLED = "disabled"
 
-
 class ProviderCapability(str, Enum):
     CHAT_COMPLETION = "chat_completion"
     TEXT_COMPLETION = "text_completion"
     EMBEDDINGS = "embeddings"
 
-
 class BaseProvider:
     pass
-
 
 class ProviderFactory:
     pass
 
-
 class ProviderInfo:
     pass
 
-
-# Import ProviderType from the new registry module for compatibility
-
-# --- End of Backward Compatibility Shims ---
+from src.core.unified_config import UnifiedConfig
 from src.providers.registry import (
     ProviderRegistry,
     ProviderConfig,
@@ -52,6 +40,7 @@ from src.providers.dynamic_loader import (
 from src.core.circuit_breaker import (
     get_circuit_breaker,
     CircuitBreakerOpenException,
+    initialize_circuit_breakers,
 )
 from src.core.logging import StructuredLogger
 from src.core.exceptions import ProviderNotFoundError, ProviderUnavailableError
@@ -70,7 +59,7 @@ class EnhancedProviderFactory:
         self.loader = loader
         self.initialized = False
 
-    async def initialize(self):
+    async def initialize(self, config: UnifiedConfig):
         """
         Initializes the protection layers for the factory.
         This should be called during application startup.
@@ -78,21 +67,27 @@ class EnhancedProviderFactory:
         if self.initialized:
             return
 
-        # This is a temporary fix to make tests pass. In a real app, the redis client
-        # should be created once and passed in.
-        import redis.asyncio as redis
-        from src.core.circuit_breaker import initialize_circuit_breakers
-
-        try:
-            # This assumes Redis is available at the default location for tests.
-            redis_client = redis.from_url("redis://localhost")
-            await initialize_circuit_breakers(redis_client)
+        redis_url = config.condensation.cache_redis_url
+        if not redis_url:
+            logger.warning("No Redis URL configured in config.condensation.cache_redis_url. Circuit breakers will not be persistent.")
             self._initialize_protection()
             self.initialized = True
+            return
+
+        try:
+            import redis.asyncio as redis
+            redis_client = redis.from_url(redis_url, decode_responses=True)
+            await initialize_circuit_breakers(redis_client)
+            logger.info(f"Circuit breakers initialized with Redis at {redis_url}")
+        except ImportError:
+            logger.error("Redis library not found. Please install with 'pip install redis'.")
+            logger.warning("Falling back to non-persistent circuit breakers.")
         except Exception as e:
-            logger.error(f"Failed to initialize provider factory protections: {e}")
-            # Decide if we should raise the error or continue without protection
-            raise
+            logger.error(f"Failed to initialize provider factory protections with Redis: {e}")
+            logger.warning("Falling back to non-persistent circuit breakers.")
+
+        self._initialize_protection()
+        self.initialized = True
 
     def _initialize_protection(self):
         """
@@ -126,20 +121,7 @@ class EnhancedProviderFactory:
 
         provider_name = config.provider
 
-        # Verificar o circuit breaker antes de tentar carregar o client
-        get_circuit_breaker(provider_name)
-        try:
-            # O 'call' do circuit breaker agora envolve a criação do cliente
-            # e a chamada ao método do cliente. Aqui, apenas verificamos o estado.
-            # A lógica de 'call' será aplicada no router.
-            pass  # A verificação real acontece no momento da chamada da API
-        except CircuitBreakerOpenException as e:
-            logger.error(
-                f"Circuit breaker para o provider '{provider_name}' está aberto."
-            )
-            raise ProviderUnavailableError(
-                f"Provider '{provider_name}' está temporariamente indisponível."
-            ) from e
+        # A verificação do circuit breaker é feita no router usando breaker.call()
 
         # Carrega o client dinamicamente
         client = self.loader.get_client(model_name)

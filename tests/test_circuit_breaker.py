@@ -3,11 +3,13 @@ Tests for the robust, distributed Circuit Breaker implementation.
 Verifies atomic state transitions using a mocked Redis client.
 """
 
+import asyncio
 import json
 import time
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+import redis.asyncio as redis
 from src.core.circuit_breaker import (
     CircuitBreakerOpenException,
     CircuitState,
@@ -41,7 +43,7 @@ def mock_redis():
 
 
 @pytest.fixture
-async def circuit_breaker(mock_redis):
+def circuit_breaker(mock_redis):
     """Fixture to create a DistributedCircuitBreaker instance with a mocked redis."""
     breaker = DistributedCircuitBreaker(
         redis_client=mock_redis,
@@ -62,6 +64,7 @@ async def failing_func():
     raise ValueError("Test failure")
 
 
+@pytest.mark.asyncio
 class TestDistributedCircuitBreaker:
     async def test_initial_state_is_closed(self, circuit_breaker, mock_redis):
         state = await circuit_breaker._get_state()
@@ -69,6 +72,7 @@ class TestDistributedCircuitBreaker:
         assert state["failures"] == 0
         mock_redis.get.assert_called_once_with(circuit_breaker.key)
 
+    @pytest.mark.asyncio
     async def test_successful_call_in_closed_state(self, circuit_breaker, mock_redis):
         result = await circuit_breaker.call(successful_func)
         assert result == "success"
@@ -76,6 +80,7 @@ class TestDistributedCircuitBreaker:
         mock_redis.set.assert_not_called()
         mock_redis.delete.assert_not_called()
 
+    @pytest.mark.asyncio
     async def test_failure_increments_count(self, circuit_breaker, mock_redis):
         # Mock the pipeline to control the transaction
         pipeline = mock_redis.pipeline.return_value
@@ -103,6 +108,7 @@ class TestDistributedCircuitBreaker:
         assert actual_state["state"] == expected_state["state"]
         assert actual_state["failures"] == expected_state["failures"]
 
+    @pytest.mark.asyncio
     async def test_circuit_opens_after_threshold(self, circuit_breaker, mock_redis):
         # Simulate 2 existing failures
         initial_state = json.dumps(
@@ -123,8 +129,37 @@ class TestDistributedCircuitBreaker:
         call_args = pipeline.set.call_args[0]
         actual_state = json.loads(call_args[1])
         assert actual_state["state"] == CircuitState.OPEN.value
-        assert actual_state["failures"] == 3
 
+    @pytest.mark.asyncio
+    @patch("random.random", return_value=0.5)
+    async def test_recovery_timeout_with_jitter(self, mock_random, mock_redis):
+        """Test that jitter is added to the recovery timeout."""
+        breaker = DistributedCircuitBreaker(
+            redis_client=mock_redis,
+            service_name="test_jitter",
+            recovery_timeout=10
+        )
+        # Set state to OPEN
+        open_state = json.dumps(
+            {
+                "state": CircuitState.OPEN.value,
+                "failures": 3,
+                "timestamp": time.time(),
+            }
+        )
+        mock_redis.get.return_value = open_state
+
+        # Wait for less than the full timeout + jitter
+        await asyncio.sleep(10)
+        state = await breaker._get_state()
+        assert state["state"] == CircuitState.OPEN.value
+
+        # Wait for the full timeout + jitter
+        await asyncio.sleep(1)
+        state = await breaker._get_state()
+        assert state["state"] == CircuitState.HALF_OPEN.value
+
+    @pytest.mark.asyncio
     async def test_open_circuit_rejects_calls(self, circuit_breaker, mock_redis):
         # Set state to OPEN
         open_state = json.dumps(
@@ -139,6 +174,7 @@ class TestDistributedCircuitBreaker:
         with pytest.raises(CircuitBreakerOpenException):
             await circuit_breaker.call(successful_func)
 
+    @pytest.mark.asyncio
     async def test_circuit_moves_to_half_open(self, circuit_breaker, mock_redis):
         # Set state to OPEN, but with an expired timestamp
         expired_time = time.time() - circuit_breaker.recovery_timeout - 1
@@ -160,6 +196,7 @@ class TestDistributedCircuitBreaker:
         actual_state = json.loads(call_args[1])
         assert actual_state["state"] == CircuitState.HALF_OPEN.value
 
+    @pytest.mark.asyncio
     async def test_half_open_closes_on_success(self, circuit_breaker, mock_redis):
         # Set state to HALF_OPEN
         half_open_state = json.dumps(
@@ -177,6 +214,7 @@ class TestDistributedCircuitBreaker:
         # Verify the key was deleted (resetting to CLOSED)
         mock_redis.delete.assert_called_once_with(circuit_breaker.key)
 
+    @pytest.mark.asyncio
     async def test_half_open_reopens_on_failure(self, circuit_breaker, mock_redis):
         # Set state to HALF_OPEN
         half_open_state = json.dumps(
@@ -200,6 +238,7 @@ class TestDistributedCircuitBreaker:
         actual_state = json.loads(call_args[1])
         assert actual_state["state"] == CircuitState.OPEN.value
 
+    @pytest.mark.asyncio
     async def test_transaction_retry_on_watch_error(self, circuit_breaker, mock_redis):
         """Test that the failure recording logic retries if a WatchError occurs."""
         pipeline = mock_redis.pipeline.return_value
@@ -218,6 +257,39 @@ class TestDistributedCircuitBreaker:
         assert pipeline.execute.call_count == 2
         # Watch should have been called twice
         assert pipeline.watch.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_redis_connection_error_fallback(self, mock_redis):
+        """Test that the circuit breaker falls back to in-memory state when Redis is down."""
+        # Configure the mock to raise ConnectionError
+        mock_redis.get.side_effect = redis.exceptions.ConnectionError
+        mock_redis.set.side_effect = redis.exceptions.ConnectionError
+        mock_redis.delete.side_effect = redis.exceptions.ConnectionError
+        pipeline = mock_redis.pipeline.return_value
+        pipeline.execute.side_effect = redis.exceptions.ConnectionError
+
+        breaker = DistributedCircuitBreaker(
+            redis_client=mock_redis,
+            service_name="test_fallback",
+            failure_threshold=3
+        )
+
+        # First call should be allowed (in-memory state is CLOSED)
+        state = await breaker._get_state()
+        assert state["state"] == "CLOSED"
+
+        # Record failures until the breaker opens
+        for _ in range(3):
+            with pytest.raises(ValueError):
+                await breaker.call(failing_func)
+
+        # The in-memory state should now be OPEN
+        assert breaker.in_memory_state["state"] == "OPEN"
+        assert breaker.in_memory_state["failures"] == 3
+
+        # Further calls should be blocked
+        with pytest.raises(CircuitBreakerOpenException):
+            await breaker.call(successful_func)
 
 
 class TestCircuitBreakerFactory:

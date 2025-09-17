@@ -251,6 +251,27 @@ curl http://localhost:8000/metrics
 curl http://localhost:8000/metrics/prometheus
 ```
 
+## 📊 Diagrama de Fluxo de Requisição
+
+O diagrama abaixo ilustra o fluxo de uma requisição através do ProxyAPI, desde a entrada até a resposta final.
+
+```mermaid
+graph TD
+    A[Requisição do Cliente] --> B{ProxyAPI};
+    B --> C[Autenticação e Rate Limiting];
+    C --> D{Cache};
+    D -- Cache Hit --> E[Resposta em Cache];
+    D -- Cache Miss --> F[Seleção de Provedor];
+    F --> G{Circuit Breaker};
+    G -- Fechado --> H[Requisição ao Provedor de IA];
+    G -- Aberto --> I[Fallback para Próximo Provedor];
+    H --> J[Resposta do Provedor];
+    J --> K[Atualização do Cache];
+    K --> L[Resposta ao Cliente];
+    I --> F;
+    E --> L;
+```
+
 ## 🤝 Contributing
 
 We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.

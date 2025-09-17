@@ -3,11 +3,15 @@ from typing import Any, Dict, List, Optional, Union
 from pydantic import BaseModel, Field, field_validator
 
 
+class ChatMessage(BaseModel):
+    role: str
+    content: str
+
 class ChatCompletionRequest(BaseModel):
     """Pydantic model for chat completions request"""
 
     model: str = Field(..., min_length=1)
-    messages: List[Dict[str, Any]] = Field(..., min_length=1)
+    messages: List[ChatMessage] = Field(..., min_length=1)
     max_tokens: Optional[int] = Field(None, ge=1)
     temperature: Optional[float] = Field(None, ge=0.0, le=2.0)
     top_p: Optional[float] = Field(None, ge=0.0, le=1.0)
@@ -24,14 +28,6 @@ class ChatCompletionRequest(BaseModel):
     parallel_tool_calls: Optional[bool] = False
     response_format: Optional[Dict[str, Any]] = None
     seed: Optional[int] = None
-
-    @field_validator("messages")
-    @classmethod
-    def validate_messages(cls, v):
-        for msg in v:
-            if "role" not in msg or "content" not in msg:
-                raise ValueError("Each message must have 'role' and 'content'")
-        return v
 
     @field_validator("logit_bias")
     @classmethod

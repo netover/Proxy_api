@@ -22,6 +22,7 @@ from src.core.exceptions import (
     ServiceUnavailableError,
 )
 from src.core.logging import ContextualLogger
+from src.models.responses import ErrorResponse, ErrorDetail
 
 logger = ContextualLogger(__name__)
 
@@ -80,42 +81,34 @@ class ErrorHandler:
         except Exception as log_exc:
             logger.error(f"Failed to log error: {log_exc}")
 
-    def _create_error_response(self, exc: Exception, request_id: str) -> Dict[str, Any]:
+    def _create_error_response(self, exc: Exception, request_id: str) -> ErrorResponse:
         """Create standardized error response structure."""
-        base_response = {
-            "error": {
-                "request_id": request_id,
-                "timestamp": int(time.time()),
-                "type": self._get_error_type(exc),
-                "message": self._sanitize_error_message(str(exc)),
-            }
-        }
+        error_type = self._get_error_type(exc)
+        message = self._sanitize_error_message(str(exc))
+        code = self._get_error_code(exc)
 
-        # Add additional context for specific error types
+        error_detail = ErrorDetail(code=code, message=message)
+
         if isinstance(exc, InvalidRequestError):
-            base_response["error"]["param"] = getattr(exc, "param", None)
-            base_response["error"]["code"] = getattr(
-                exc, "code", "invalid_request_error"
-            )
+            error_detail.target = getattr(exc, "param", None)
 
+        return ErrorResponse(error=error_detail)
+
+    def _get_error_code(self, exc: Exception) -> str:
+        """Get standardized error code from exception type."""
+        if isinstance(exc, InvalidRequestError):
+            return getattr(exc, "code", "invalid_request_error")
         elif isinstance(exc, NotFoundError):
-            base_response["error"]["code"] = "resource_not_found"
-
+            return "resource_not_found"
         elif isinstance(exc, ServiceUnavailableError):
-            base_response["error"]["code"] = "service_unavailable"
-            base_response["error"]["retry_after"] = 30  # seconds
-
+            return "service_unavailable"
         elif isinstance(exc, AuthenticationError):
-            base_response["error"]["code"] = "authentication_failed"
-
+            return "authentication_failed"
         elif isinstance(exc, AuthorizationError):
-            base_response["error"]["code"] = "authorization_failed"
-
+            return "authorization_failed"
         elif isinstance(exc, RateLimitError):
-            base_response["error"]["code"] = "rate_limit_exceeded"
-            base_response["error"]["retry_after"] = getattr(exc, "retry_after", 60)
-
-        return base_response
+            return "rate_limit_exceeded"
+        return "internal_server_error"
 
     def _get_error_type(self, exc: Exception) -> str:
         """Map exception type to standardized error type."""
