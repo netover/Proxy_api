@@ -34,7 +34,7 @@ class ProviderMetrics:
     successful_requests: int = 0
     failed_requests: int = 0
     total_latency_ms: float = 0.0
-    min_latency_ms: float = float("in")
+    min_latency_ms: float = float("inf")
     max_latency_ms: float = 0.0
     last_request_time: float = 0.0
     error_rate_window: List[bool] = field(default_factory=list)

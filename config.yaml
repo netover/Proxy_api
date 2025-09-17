@@ -79,10 +79,7 @@ rate_limit:
 
 # Authentication
 auth:
-  api_keys:
-    - "test-key-123"
-    - "prod-key-456"
-    - "admin-key-789"
+  api_keys_env: "PROXY_API_KEYS"  # Points to an env var with comma-separated keys
 
 # Provider Configuration
 providers:

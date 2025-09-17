@@ -1,3 +1,6 @@
+--index-url https://download.pytorch.org/whl/cpu
+--extra-index-url https://pypi.org/simple
+
 # Core Framework (SECURITY UPDATED)
 fastapi>=0.115.0      # Security patches for CVE-2024-24762, CVE-2024-23917
 uvicorn[standard]>=0.30.0 # Performance + HTTP/2 support, security updates
@@ -18,6 +21,7 @@ orjson>=3.10.0        # 2-5x JSON serialization performance
 
 # API Features
 slowapi>=0.1.9        # For rate limiting API requests
+structlog>=24.0.0     # For structured logging
 anyio>=3.7.1          # Asynchronous networking library
 PyJWT>=2.8.0          # For JSON Web Tokens authentication
 pyasn1>=0.6.1         # Dependency of PyJWT
@@ -51,6 +55,7 @@ python-dotenv>=0.19   # Environment file management
 
 # Optional Dependencies (NEW)
 redis>=5.0.0          # Redis support for distributed caching (optional)
+apscheduler>=3.0.0    # For background tasks
 
 # Caching
 cachetools>=5.3.0     # TTL cache implementation for model discovery caching

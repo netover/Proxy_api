@@ -76,7 +76,19 @@ class RateLimitSettings(BaseModel):
 
 
 class AuthSettings(BaseModel):
-    api_keys: List[str]
+    api_keys_env: str = "PROXY_API_KEYS"
+
+    @property
+    def keys(self) -> List[str]:
+        """Loads API keys from a comma-separated environment variable."""
+        keys_str = os.getenv(self.api_keys_env)
+        if not keys_str:
+            logger.warning(
+                f"API key environment variable '{self.api_keys_env}' not set. "
+                "No proxy API keys will be available."
+            )
+            return []
+        return [key.strip() for key in keys_str.split(",") if key.strip()]
 
 
 class CondensationSettings(BaseModel):
@@ -133,7 +145,7 @@ class UnifiedConfig(BaseModel):
     @property
     def proxy_api_keys(self) -> List[str]:
         """Convenience property to access API keys directly."""
-        return self.auth.api_keys
+        return self.auth.keys
 
 
 class ConfigManager:

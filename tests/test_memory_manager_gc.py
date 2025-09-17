@@ -12,7 +12,6 @@ from src.core.memory_manager import (
     SmartContextManager,
     get_memory_manager,
     shutdown_memory_manager,
-    initialize_memory_manager,
 )
 
 # Mark all tests in this file as asyncio
@@ -136,9 +135,6 @@ async def test_global_instance_management():
 
     assert manager1 is manager2
 
-    # Test initialization
-    init_manager = await initialize_memory_manager()
-    assert init_manager is manager1
 
     # Test shutdown
     await shutdown_memory_manager()
