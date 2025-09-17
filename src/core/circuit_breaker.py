@@ -5,10 +5,12 @@ state store in Redis, ensuring consistency across multiple instances.
 """
 
 import json
+import random
 import time
 from enum import Enum
 from typing import Any, Awaitable, Callable, Dict, Optional, Tuple, Type
 
+import redis
 import redis.asyncio as redis
 from src.core.logging import ContextualLogger
 
@@ -65,6 +67,7 @@ class DistributedCircuitBreaker:
         self.failure_threshold = failure_threshold
         self.recovery_timeout = recovery_timeout
         self.expected_exceptions = expected_exceptions
+        self.in_memory_state: Dict[str, Any] = {}
 
         logger.info(
             f"Distributed circuit breaker initialized for '{self.name}'",
@@ -75,21 +78,41 @@ class DistributedCircuitBreaker:
         )
 
     async def _get_state(self) -> Dict[str, Any]:
-        """Retrieves the current state from Redis."""
-        state_data = await self.redis.get(self.key)
-        if not state_data:
-            return {
-                "state": CircuitState.CLOSED.value,
-                "failures": 0,
-                "timestamp": time.time(),
-            }
+        """
+        Retrieves the current state from Redis, with a fallback to in-memory state.
+        """
+        try:
+            state_data = await self.redis.get(self.key)
+            if not state_data:
+                # No state in Redis, return default closed state
+                return {
+                    "state": CircuitState.CLOSED.value,
+                    "failures": 0,
+                    "timestamp": time.time(),
+                }
+            state = json.loads(state_data)
+        except (redis.exceptions.ConnectionError, redis.exceptions.TimeoutError) as e:
+            logger.warning(
+                f"Redis connection error in circuit breaker '{self.name}': {e}. "
+                "Falling back to in-memory state."
+            )
+            # Use in-memory state as a fallback
+            if not self.in_memory_state:
+                self.in_memory_state = {
+                    "state": CircuitState.CLOSED.value,
+                    "failures": 0,
+                    "timestamp": time.time(),
+                }
+            return self.in_memory_state
 
         state = json.loads(state_data)
 
         # Check for recovery timeout
+        # Add jitter to recovery timeout to prevent thundering herd
+        jitter = self.recovery_timeout * 0.1 * random.random()
         if (
             state["state"] == CircuitState.OPEN.value
-            and (time.time() - state["timestamp"]) > self.recovery_timeout
+            and (time.time() - state["timestamp"]) > (self.recovery_timeout + jitter)
         ):
             new_state = {
                 "state": CircuitState.HALF_OPEN.value,
@@ -104,59 +127,77 @@ class DistributedCircuitBreaker:
 
     async def _record_success(self):
         """Records a successful call, resetting the circuit if it was HALF_OPEN."""
-        await self.redis.delete(self.key)
-        logger.info(f"Circuit breaker '{self.name}' reset to CLOSED after success.")
+        try:
+            await self.redis.delete(self.key)
+            logger.info(f"Circuit breaker '{self.name}' reset to CLOSED after success.")
+            self.in_memory_state.clear()  # Clear in-memory state on success
+        except (redis.exceptions.ConnectionError, redis.exceptions.TimeoutError) as e:
+            logger.warning(
+                f"Redis connection error while recording success for '{self.name}': {e}. "
+                "State may be inconsistent."
+            )
 
     async def _record_failure(self):
         """
         Records a failure atomically and opens the circuit if the threshold is met.
         Uses a Redis transaction (WATCH/MULTI/EXEC) to prevent race conditions.
         """
-        async with self.redis.pipeline() as pipe:
-            while True:
-                try:
-                    await pipe.watch(self.key)
-                    state_data = await pipe.get(self.key)
+        try:
+            pipeline = await self.redis.pipeline()
+            async with pipeline as pipe:
+                while True:
+                    try:
+                        await pipe.watch(self.key)
+                        state_data = await pipe.get(self.key)
 
-                    state = {
-                        "state": CircuitState.CLOSED.value,
-                        "failures": 0,
-                        "timestamp": time.time(),
-                    }
-                    if state_data:
-                        state = json.loads(state_data)
-
-                    failures = state.get("failures", 0) + 1
-
-                    pipe.multi()
-                    if (
-                        state["state"] == CircuitState.HALF_OPEN.value
-                        or failures >= self.failure_threshold
-                    ):
-                        new_state = {
-                            "state": CircuitState.OPEN.value,
-                            "failures": failures,
-                            "timestamp": time.time(),
-                        }
-                        pipe.set(self.key, json.dumps(new_state))
-                        logger.warning(
-                            f"Circuit breaker '{self.name}' is now OPEN due to failure threshold."
-                        )
-                    else:
-                        new_state = {
+                        state = {
                             "state": CircuitState.CLOSED.value,
-                            "failures": failures,
+                            "failures": 0,
                             "timestamp": time.time(),
                         }
-                        pipe.set(self.key, json.dumps(new_state))
+                        if state_data:
+                            state = json.loads(state_data)
 
-                    await pipe.execute()
-                    break
-                except redis.WatchError:
-                    logger.debug(
-                        f"WatchError on circuit breaker '{self.name}', retrying transaction."
-                    )
-                    continue
+                        failures = state.get("failures", 0) + 1
+
+                        pipe.multi()
+                        if (
+                            state["state"] == CircuitState.HALF_OPEN.value
+                            or failures >= self.failure_threshold
+                        ):
+                            new_state = {
+                                "state": CircuitState.OPEN.value,
+                                "failures": failures,
+                                "timestamp": time.time(),
+                            }
+                            pipe.set(self.key, json.dumps(new_state))
+                            logger.warning(
+                                f"Circuit breaker '{self.name}' is now OPEN due to failure threshold."
+                            )
+                        else:
+                            new_state = {
+                                "state": CircuitState.CLOSED.value,
+                                "failures": failures,
+                                "timestamp": time.time(),
+                            }
+                            pipe.set(self.key, json.dumps(new_state))
+
+                        await pipe.execute()
+                        break
+                    except redis.WatchError:
+                        logger.debug(
+                            f"WatchError on circuit breaker '{self.name}', retrying transaction."
+                        )
+                        continue
+        except (redis.exceptions.ConnectionError, redis.exceptions.TimeoutError) as e:
+            logger.warning(
+                f"Redis connection error while recording failure for '{self.name}': {e}. "
+                "Falling back to in-memory state."
+            )
+            # Update in-memory state
+            self.in_memory_state["failures"] = self.in_memory_state.get("failures", 0) + 1
+            if self.in_memory_state["failures"] >= self.failure_threshold:
+                self.in_memory_state["state"] = CircuitState.OPEN.value
 
     async def call(self, func: Callable[..., Awaitable[Any]], *args, **kwargs) -> Any:
         """
