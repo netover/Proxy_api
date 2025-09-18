@@ -10,18 +10,18 @@ import unittest.mock as mock
 from typing import Dict, Any
 from unittest.mock import AsyncMock
 
-from src.core.provider_discovery import provider_discovery
-from src.core.parallel_fallback import (
+from src.core.routing.provider_discovery import provider_discovery
+from src.core.routing.parallel_fallback import (
     parallel_fallback_engine,
     ParallelExecutionMode,
 )
-from src.core.circuit_breaker_pool import (
+from src.core.breaker.pool import (
     circuit_breaker_pool,
     AdaptiveTimeoutConfig,
     TimeoutStrategy,
 )
-from src.core.load_balancer import load_balancer, LoadBalancingStrategy
-from src.core.provider_factory import (
+from src.core.routing.balancer import load_balancer, LoadBalancingStrategy
+from src.core.providers.base import (
     BaseProvider,
     ProviderStatus,
 )
@@ -33,7 +33,8 @@ class MockProvider(BaseProvider):
     def __init__(
         self, name: str, response_time: float = 0.1, should_fail: bool = False
     ):
-        from src.core.unified_config import ProviderConfig, ProviderType
+        from src.core.config.models import ProviderConfig
+        from src.core.providers.models import ProviderType
 
         config = ProviderConfig(
             name=name,
@@ -86,7 +87,7 @@ class TestParallelExecutionIntegration:
         }
 
         # Mock provider factory
-        with mock.patch("src.core.parallel_fallback.provider_factory") as mock_factory:
+        with mock.patch("src.core.routing.parallel_fallback.provider_factory") as mock_factory:
             mock_factory.get_provider = AsyncMock(side_effect=self._mock_get_provider)
             mock_factory.get_all_provider_info = AsyncMock(
                 return_value=[
@@ -146,7 +147,7 @@ class TestParallelExecutionIntegration:
             "fail2": MockProvider("fail2", should_fail=True),
         }
 
-        with mock.patch("src.core.parallel_fallback.provider_factory") as mock_factory:
+        with mock.patch("src.core.routing.parallel_fallback.provider_factory") as mock_factory:
             mock_factory.get_provider = AsyncMock(
                 side_effect=lambda name: failing_providers.get(name)
             )
@@ -302,7 +303,7 @@ class TestParallelExecutionIntegration:
             "perplexity_medium": MockProvider("perplexity_medium", response_time=0.4),
         }
 
-        with mock.patch("src.core.parallel_fallback.provider_factory") as mock_factory:
+        with mock.patch("src.core.routing.parallel_fallback.provider_factory") as mock_factory:
             mock_factory.get_provider = AsyncMock(
                 side_effect=lambda name: realistic_providers.get(name)
             )
@@ -378,7 +379,7 @@ class TestParallelExecutionIntegration:
             return_value=test_providers,
         ):
             with mock.patch(
-                "src.core.parallel_fallback.provider_factory"
+                "src.core.routing.parallel_fallback.provider_factory"
             ) as mock_factory:
                 mock_providers = {
                     "perf_test_1": MockProvider("perf_test_1", response_time=0.1),

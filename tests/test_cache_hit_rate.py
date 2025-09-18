@@ -8,11 +8,12 @@ import time
 import pytest
 from unittest.mock import AsyncMock, patch
 
-from src.core.model_discovery import ModelDiscoveryService, ProviderConfig
-from src.core.provider_discovery import provider_discovery
-from src.core.unified_cache import get_unified_cache
-from src.core.cache_monitor import cache_monitor
-from src.models.model_info import ModelInfo
+from src.core.providers.discovery import ModelDiscoveryService
+from src.core.providers.models import ProviderConfig
+from src.core.providers import discovery as provider_discovery
+from src.core.cache.unified import get_unified_cache
+from src.core.cache.monitor import cache_monitor
+from src.core.providers.models import ModelInfo
 
 
 class TestCacheHitRate:

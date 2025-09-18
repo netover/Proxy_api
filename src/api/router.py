@@ -7,7 +7,7 @@ applies middleware, and handles errors consistently across the application.
 
 import time
 
-from fastapi import APIRouter, Request, HTTPException
+from fastapi import APIRouter, Request, HTTPException, Depends
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse, JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -27,9 +27,9 @@ from .errors.error_handlers import (
     validation_exception_handler,
 )
 from .validation.middleware import middleware_pipeline
-from src.core.provider_factory import provider_factory
+from src.core.routing.provider_factory import provider_factory
 from src.core.auth import verify_api_key
-from src.core.circuit_breaker import get_circuit_breaker
+from src.core.breaker.circuit_breaker import get_circuit_breaker
 from src.core.logging import StructuredLogger
 
 logger = StructuredLogger(__name__)
@@ -40,7 +40,7 @@ main_router = APIRouter(prefix="/v1")
 # --- Dynamic Endpoints ---
 
 
-@main_router.get("/models", tags=["models"])
+@main_router.get("/models", tags=["models"], dependencies=[Depends(verify_api_key)])
 @rate_limiter.limit(route="/v1/models")
 async def list_models(request: Request):
     """OpenAI-compatible /v1/models endpoint to list all 100+ models from the registry."""

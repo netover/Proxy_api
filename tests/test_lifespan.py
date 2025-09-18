@@ -10,7 +10,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from fastapi import FastAPI
 
 # Import the lifespan function and app
-from main import lifespan, app
+from src.main import app
+from src.bootstrap import lifespan
 
 
 class TestLifespanInitialization:
@@ -25,26 +26,26 @@ class TestLifespanInitialization:
     @pytest.mark.asyncio
     async def test_normal_startup_sequence(self, mock_app):
         """Test successful startup sequence with all components initialized"""
-        with patch("main.app_state") as mock_app_state, patch(
-            "main.telemetry"
+        with patch("src.bootstrap.app_state") as mock_app_state, patch(
+            "src.core.telemetry.telemetry"
         ) as mock_telemetry, patch(
-            "main.get_http_client"
+            "src.bootstrap.get_http_client"
         ) as mock_get_http_client, patch(
-            "main.get_response_cache"
+            "src.bootstrap.get_response_cache"
         ) as mock_get_response_cache, patch(
-            "main.get_summary_cache"
+            "src.bootstrap.get_summary_cache"
         ) as mock_get_summary_cache, patch(
-            "main.get_memory_manager"
+            "src.bootstrap.get_memory_manager"
         ) as mock_get_memory_manager, patch(
-            "src.utils.context_condenser.AsyncLRUCache"
+            "src.utils.cache.AsyncLRUCache"
         ) as mock_lru_cache, patch(
-            "main.APIKeyAuth"
+            "src.core.security.auth.APIKeyAuth"
         ) as mock_api_key_auth, patch(
-            "src.core.rate_limiter.rate_limiter"
+            "src.core.routing.rate_limiter.rate_limiter"
         ) as mock_rate_limiter, patch(
-            "main.chaos_monkey"
+            "src.bootstrap.chaos_monkey"
         ) as mock_chaos_monkey, patch(
-            "main.threading.Thread"
+            "threading.Thread"
         ) as mock_thread:
 
             # Setup mocks
@@ -109,30 +110,30 @@ class TestLifespanInitialization:
     @pytest.mark.asyncio
     async def test_normal_shutdown_sequence(self, mock_app):
         """Test successful shutdown sequence with all components cleaned up"""
-        with patch("main.app_state") as mock_app_state, patch(
-            "main.config_manager"
-        ) as mock_config_manager, patch("main.telemetry") as mock_telemetry, patch(
-            "main.get_http_client"
+        with patch("src.bootstrap.app_state") as mock_app_state, patch(
+            "src.core.config.manager"
+        ) as mock_config_manager, patch("src.core.telemetry.telemetry") as mock_telemetry, patch(
+            "src.bootstrap.get_http_client"
         ) as mock_get_http_client, patch(
-            "main.get_response_cache"
+            "src.bootstrap.get_response_cache"
         ) as mock_get_response_cache, patch(
-            "main.get_summary_cache"
+            "src.bootstrap.get_summary_cache"
         ) as mock_get_summary_cache, patch(
-            "main.get_memory_manager"
+            "src.bootstrap.get_memory_manager"
         ) as mock_get_memory_manager, patch(
-            "src.utils.context_condenser.AsyncLRUCache"
+            "src.utils.cache.AsyncLRUCache"
         ) as mock_lru_cache, patch(
-            "main.APIKeyAuth"
+            "src.core.security.auth.APIKeyAuth"
         ) as mock_api_key_auth, patch(
-            "src.core.rate_limiter.rate_limiter"
+            "src.core.routing.rate_limiter.rate_limiter"
         ) as mock_rate_limiter, patch(
-            "main.chaos_monkey"
+            "src.bootstrap.chaos_monkey"
         ) as mock_chaos_monkey, patch(
-            "main.threading.Thread"
+            "threading.Thread"
         ) as mock_thread, patch(
-            "main.shutdown_memory_manager"
+            "src.bootstrap.shutdown_memory_manager"
         ) as mock_shutdown_memory, patch(
-            "main.shutdown_caches"
+            "src.bootstrap.shutdown_caches"
         ) as mock_shutdown_caches, patch(
             "asyncio.all_tasks"
         ) as mock_all_tasks, patch(
@@ -189,26 +190,26 @@ class TestLifespanInitialization:
     @pytest.mark.asyncio
     async def test_startup_error_recovery(self, mock_app):
         """Test error recovery during startup phase"""
-        with patch("main.app_state") as mock_app_state, patch(
-            "main.config_manager"
-        ) as mock_config_manager, patch("main.telemetry"), patch(
-            "main.get_http_client"
+        with patch("src.bootstrap.app_state") as mock_app_state, patch(
+            "src.core.config.manager"
+        ) as mock_config_manager, patch("src.core.telemetry.telemetry"), patch(
+            "src.bootstrap.get_http_client"
         ), patch(
-            "main.get_response_cache"
+            "src.bootstrap.get_response_cache"
         ), patch(
-            "main.get_summary_cache"
+            "src.bootstrap.get_summary_cache"
         ), patch(
-            "main.get_memory_manager"
+            "src.bootstrap.get_memory_manager"
         ), patch(
-            "src.utils.context_condenser.AsyncLRUCache"
+            "src.utils.cache.AsyncLRUCache"
         ), patch(
-            "main.APIKeyAuth"
+            "src.core.security.auth.APIKeyAuth"
         ), patch(
-            "src.core.rate_limiter.rate_limiter"
+            "src.core.routing.rate_limiter.rate_limiter"
         ), patch(
-            "main.chaos_monkey"
+            "src.bootstrap.chaos_monkey"
         ), patch(
-            "main.threading.Thread"
+            "threading.Thread"
         ):
 
             # Setup mocks to cause startup failure
@@ -225,30 +226,30 @@ class TestLifespanInitialization:
     @pytest.mark.asyncio
     async def test_shutdown_error_recovery(self, mock_app):
         """Test error recovery during shutdown phase"""
-        with patch("main.app_state") as mock_app_state, patch(
-            "main.config_manager"
-        ) as mock_config_manager, patch("main.telemetry") as mock_telemetry, patch(
-            "main.get_http_client"
+        with patch("src.bootstrap.app_state") as mock_app_state, patch(
+            "src.core.config.manager"
+        ) as mock_config_manager, patch("src.core.telemetry.telemetry") as mock_telemetry, patch(
+            "src.bootstrap.get_http_client"
         ) as mock_get_http_client, patch(
-            "main.get_response_cache"
+            "src.bootstrap.get_response_cache"
         ) as mock_get_response_cache, patch(
-            "main.get_summary_cache"
+            "src.bootstrap.get_summary_cache"
         ) as mock_get_summary_cache, patch(
-            "main.get_memory_manager"
+            "src.bootstrap.get_memory_manager"
         ) as mock_get_memory_manager, patch(
-            "src.utils.context_condenser.AsyncLRUCache"
+            "src.utils.cache.AsyncLRUCache"
         ) as mock_lru_cache, patch(
-            "main.APIKeyAuth"
+            "src.core.security.auth.APIKeyAuth"
         ) as mock_api_key_auth, patch(
-            "src.core.rate_limiter.rate_limiter"
+            "src.core.routing.rate_limiter.rate_limiter"
         ) as mock_rate_limiter, patch(
-            "main.chaos_monkey"
+            "src.bootstrap.chaos_monkey"
         ) as mock_chaos_monkey, patch(
-            "main.threading.Thread"
+            "threading.Thread"
         ) as mock_thread, patch(
-            "main.shutdown_memory_manager"
+            "src.bootstrap.shutdown_memory_manager"
         ) as mock_shutdown_memory, patch(
-            "main.shutdown_caches"
+            "src.bootstrap.shutdown_caches"
         ) as mock_shutdown_caches, patch(
             "asyncio.all_tasks"
         ) as mock_all_tasks, patch(
@@ -303,26 +304,26 @@ class TestLifespanInitialization:
     @pytest.mark.asyncio
     async def test_component_initialization_verification(self, mock_app):
         """Test that all required components are properly initialized"""
-        with patch("main.app_state") as mock_app_state, patch(
-            "main.config_manager"
-        ) as mock_config_manager, patch("main.telemetry") as mock_telemetry, patch(
-            "main.get_http_client"
+        with patch("src.bootstrap.app_state") as mock_app_state, patch(
+            "src.core.config.manager"
+        ) as mock_config_manager, patch("src.core.telemetry.telemetry") as mock_telemetry, patch(
+            "src.bootstrap.get_http_client"
         ) as mock_get_http_client, patch(
-            "main.get_response_cache"
+            "src.bootstrap.get_response_cache"
         ) as mock_get_response_cache, patch(
-            "main.get_summary_cache"
+            "src.bootstrap.get_summary_cache"
         ) as mock_get_summary_cache, patch(
-            "main.get_memory_manager"
+            "src.bootstrap.get_memory_manager"
         ) as mock_get_memory_manager, patch(
-            "src.utils.context_condenser.AsyncLRUCache"
+            "src.utils.cache.AsyncLRUCache"
         ) as mock_lru_cache, patch(
-            "main.APIKeyAuth"
+            "src.core.security.auth.APIKeyAuth"
         ) as mock_api_key_auth, patch(
-            "src.core.rate_limiter.rate_limiter"
+            "src.core.routing.rate_limiter.rate_limiter"
         ) as mock_rate_limiter, patch(
-            "main.chaos_monkey"
+            "src.bootstrap.chaos_monkey"
         ) as mock_chaos_monkey, patch(
-            "main.threading.Thread"
+            "threading.Thread"
         ) as mock_thread:
 
             # Setup mocks
@@ -373,30 +374,30 @@ class TestLifespanInitialization:
     @pytest.mark.asyncio
     async def test_graceful_shutdown_verification(self, mock_app):
         """Test that shutdown properly cleans up all resources"""
-        with patch("main.app_state") as mock_app_state, patch(
-            "main.telemetry"
+        with patch("src.bootstrap.app_state") as mock_app_state, patch(
+            "src.core.telemetry.telemetry"
         ) as mock_telemetry, patch(
-            "main.get_http_client"
+            "src.bootstrap.get_http_client"
         ) as mock_get_http_client, patch(
-            "main.get_response_cache"
+            "src.bootstrap.get_response_cache"
         ) as mock_get_response_cache, patch(
-            "main.get_summary_cache"
+            "src.bootstrap.get_summary_cache"
         ) as mock_get_summary_cache, patch(
-            "main.get_memory_manager"
+            "src.bootstrap.get_memory_manager"
         ) as mock_get_memory_manager, patch(
-            "src.utils.context_condenser.AsyncLRUCache"
+            "src.utils.cache.AsyncLRUCache"
         ) as mock_lru_cache, patch(
-            "main.APIKeyAuth"
+            "src.core.security.auth.APIKeyAuth"
         ) as mock_api_key_auth, patch(
-            "src.core.rate_limiter.rate_limiter"
+            "src.core.routing.rate_limiter.rate_limiter"
         ) as mock_rate_limiter, patch(
-            "main.chaos_monkey"
+            "src.bootstrap.chaos_monkey"
         ) as mock_chaos_monkey, patch(
-            "main.threading.Thread"
+            "threading.Thread"
         ) as mock_thread, patch(
-            "main.shutdown_memory_manager"
+            "src.bootstrap.shutdown_memory_manager"
         ) as mock_shutdown_memory, patch(
-            "main.shutdown_caches"
+            "src.bootstrap.shutdown_caches"
         ) as mock_shutdown_caches, patch(
             "asyncio.all_tasks"
         ) as mock_all_tasks, patch(
@@ -469,26 +470,26 @@ class TestLifespanInitialization:
     @pytest.mark.asyncio
     async def test_cache_persistence_initialization(self, mock_app):
         """Test cache persistence initialization when enabled"""
-        with patch("main.app_state") as mock_app_state, patch(
-            "main.config_manager"
-        ) as mock_config_manager, patch("main.telemetry") as mock_telemetry, patch(
-            "main.get_http_client"
+        with patch("src.bootstrap.app_state") as mock_app_state, patch(
+            "src.core.config.manager"
+        ) as mock_config_manager, patch("src.core.telemetry.telemetry") as mock_telemetry, patch(
+            "src.bootstrap.get_http_client"
         ) as mock_get_http_client, patch(
-            "main.get_response_cache"
+            "src.bootstrap.get_response_cache"
         ) as mock_get_response_cache, patch(
-            "main.get_summary_cache"
+            "src.bootstrap.get_summary_cache"
         ) as mock_get_summary_cache, patch(
-            "main.get_memory_manager"
+            "src.bootstrap.get_memory_manager"
         ) as mock_get_memory_manager, patch(
-            "src.utils.context_condenser.AsyncLRUCache"
+            "src.utils.cache.AsyncLRUCache"
         ) as mock_lru_cache, patch(
-            "main.APIKeyAuth"
+            "src.core.security.auth.APIKeyAuth"
         ) as mock_api_key_auth, patch(
-            "src.core.rate_limiter.rate_limiter"
+            "src.core.routing.rate_limiter.rate_limiter"
         ) as mock_rate_limiter, patch(
-            "main.chaos_monkey"
+            "src.bootstrap.chaos_monkey"
         ) as mock_chaos_monkey, patch(
-            "main.threading.Thread"
+            "threading.Thread"
         ) as mock_thread:
 
             # Setup mocks with cache persistence enabled
@@ -527,26 +528,26 @@ class TestLifespanInitialization:
     @pytest.mark.asyncio
     async def test_web_ui_thread_startup(self, mock_app):
         """Test web UI thread is started during initialization"""
-        with patch("main.app_state") as mock_app_state, patch(
-            "main.config_manager"
-        ) as mock_config_manager, patch("main.telemetry") as mock_telemetry, patch(
-            "main.get_http_client"
+        with patch("src.bootstrap.app_state") as mock_app_state, patch(
+            "src.core.config.manager"
+        ) as mock_config_manager, patch("src.core.telemetry.telemetry") as mock_telemetry, patch(
+            "src.bootstrap.get_http_client"
         ) as mock_get_http_client, patch(
-            "main.get_response_cache"
+            "src.bootstrap.get_response_cache"
         ) as mock_get_response_cache, patch(
-            "main.get_summary_cache"
+            "src.bootstrap.get_summary_cache"
         ) as mock_get_summary_cache, patch(
-            "main.get_memory_manager"
+            "src.bootstrap.get_memory_manager"
         ) as mock_get_memory_manager, patch(
-            "src.utils.context_condenser.AsyncLRUCache"
+            "src.utils.cache.AsyncLRUCache"
         ) as mock_lru_cache, patch(
-            "main.APIKeyAuth"
+            "src.core.security.auth.APIKeyAuth"
         ) as mock_api_key_auth, patch(
-            "src.core.rate_limiter.rate_limiter"
+            "src.core.routing.rate_limiter.rate_limiter"
         ) as mock_rate_limiter, patch(
-            "main.chaos_monkey"
+            "src.bootstrap.chaos_monkey"
         ) as mock_chaos_monkey, patch(
-            "main.threading.Thread"
+            "threading.Thread"
         ) as mock_thread:
 
             # Setup mocks
@@ -601,22 +602,22 @@ class TestLifespanIntegration:
     def test_app_startup_time_tracking(self):
         """Test that startup time is tracked"""
         with patch("time.time", return_value=1234567890.0):
-            with patch("main.app_state"), patch("main.config_manager"), patch(
-                "main.telemetry"
-            ), patch("main.get_http_client"), patch("main.get_response_cache"), patch(
-                "main.get_summary_cache"
+            with patch("src.bootstrap.app_state"), patch("src.core.config.manager"), patch(
+                "src.core.telemetry.telemetry"
+            ), patch("src.bootstrap.get_http_client"), patch("src.bootstrap.get_response_cache"), patch(
+                "src.bootstrap.get_summary_cache"
             ), patch(
-                "main.get_memory_manager"
+                "src.bootstrap.get_memory_manager"
             ), patch(
-                "src.utils.context_condenser.AsyncLRUCache"
+                "src.utils.cache.AsyncLRUCache"
             ), patch(
-                "main.APIKeyAuth"
+                "src.core.security.auth.APIKeyAuth"
             ), patch(
-                "src.core.rate_limiter.rate_limiter"
+                "src.core.routing.rate_limiter.rate_limiter"
             ), patch(
-                "main.chaos_monkey"
+                "src.bootstrap.chaos_monkey"
             ), patch(
-                "main.threading.Thread"
+                "threading.Thread"
             ):
 
                 # Create a test app with lifespan

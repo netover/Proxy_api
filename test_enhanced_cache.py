@@ -7,8 +7,8 @@ import asyncio
 import sys
 import os
 
-from src.core.consolidated_cache import ConsolidatedCacheManager, CacheCategory
-from src.core.cache_interface import CacheStats
+from src.core.cache.consolidated import ConsolidatedCacheManager, CacheCategory
+from src.core.cache.interface import CacheStats
 
 
 async def test_enhanced_cache():

@@ -9,13 +9,13 @@ import pytest
 import random
 from typing import Dict, Any
 
-from src.core.parallel_fallback import (
+from src.core.routing.parallel_fallback import (
     parallel_fallback_engine,
     ParallelExecutionMode,
 )
-from src.core.provider_discovery import provider_discovery
-from src.core.circuit_breaker_pool import circuit_breaker_pool
-from src.core.load_balancer import load_balancer
+from src.core.providers import discovery as provider_discovery
+from src.core.breaker.pool import circuit_breaker_pool
+from src.core.routing.balancer import load_balancer
 
 
 class ChaoticProvider:
@@ -329,7 +329,7 @@ class TestChaosEngineering:
         """Helper to mock provider factory"""
         from unittest.mock import patch
 
-        return patch("src.core.parallel_fallback.provider_factory")
+        return patch("src.core.routing.parallel_fallback.provider_factory")
 
     def _mock_provider_discovery(self, provider_names):
         """Helper to mock provider discovery"""

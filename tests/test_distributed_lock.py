@@ -9,10 +9,10 @@ from unittest.mock import AsyncMock
 import pytest
 import pytest_asyncio
 
-from src.core.consolidated_cache_enhanced import (
+from src.core.cache.consolidated import (
     ConsolidatedCacheManager,
-    DistributedLock,
 )
+from src.core.cache.lock import DistributedLock
 
 # Mark all tests in this file as asyncio
 pytestmark = pytest.mark.asyncio

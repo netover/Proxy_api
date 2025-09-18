@@ -12,11 +12,8 @@ from concurrent.futures import ThreadPoolExecutor
 import sys
 import os
 
-# Add src to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
-
-from core.metrics import MetricsCollector, metrics_collector
-from core.telemetry import telemetry, TracedSpan
+from src.core.metrics.collector import MetricsCollector, metrics_collector
+from src.core.telemetry.telemetry import telemetry, TracedSpan
 
 
 def simulate_cpu_load(duration_seconds: int, target_percent: float):

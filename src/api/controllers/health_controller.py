@@ -5,12 +5,12 @@ from fastapi import APIRouter, Request
 
 from src.core.alerting import alert_manager
 from src.core.logging import ContextualLogger
-from src.core.metrics import metrics_collector
-from src.core.provider_factory import ProviderStatus
+from src.core.metrics.metrics import metrics_collector
+from src.core.routing.provider_factory import ProviderStatus
 import asyncio
 from src.core.rate_limiter import rate_limiter
 from src.core.unified_config import ProviderConfig
-from src.core.provider_factory import provider_factory
+from src.core.routing.provider_factory import provider_factory
 
 logger = ContextualLogger(__name__)
 

@@ -7,8 +7,26 @@ import json
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Iterator, List, Optional
+import logging
+import structlog
 
-from src.core.logging import ContextualLogger
+# Define ContextualLogger directly in this file
+class ContextualLogger:
+    def __init__(self, name: str):
+        self.logger = structlog.get_logger(name)
+
+    def info(self, message: str, **kwargs):
+        self.logger.info(message, **kwargs)
+
+    def warning(self, message: str, **kwargs):
+        self.logger.warning(message, **kwargs)
+
+    def error(self, message: str, **kwargs):
+        self.logger.error(message, **kwargs)
+
+    def debug(self, message: str, **kwargs):
+        self.logger.debug(message, **kwargs)
+
 
 logger = ContextualLogger(__name__)
 

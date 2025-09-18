@@ -1,15 +1,16 @@
 import asyncio
-from .logging import ContextualLogger
-from .unified_config import get_config, UnifiedConfig
-from .telemetry import telemetry, TracedSpan
-from .http_client_v2 import get_advanced_http_client
-from .smart_cache import get_response_cache, get_summary_cache, shutdown_caches
-from .memory_manager import get_memory_manager, shutdown_memory_manager
-from .auth import APIKeyAuth
-from .rate_limiter import rate_limiter
-from .chaos_engineering import chaos_monkey
-from .alerting import alert_manager
-from .provider_factory import provider_factory
+from src.services.logging import ContextualLogger
+from src.core.config.manager import get_config
+from src.core.config.models import UnifiedConfig
+from src.core.telemetry.telemetry import telemetry, TracedSpan
+from src.core.http.client_v2 import get_advanced_http_client
+from src.core.cache.smart import get_response_cache, get_summary_cache, shutdown_caches
+from src.core.memory.manager import get_memory_manager, shutdown_memory_manager
+from src.core.security.auth import APIKeyAuth
+from src.core.routing.rate_limiter import rate_limiter
+from src.core.chaos.monkey import chaos_monkey
+from src.core.alerting.manager import alert_manager
+from src.core.providers.factory import provider_factory
 
 logger = ContextualLogger(__name__)
 

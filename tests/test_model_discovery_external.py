@@ -7,9 +7,9 @@ import asyncio
 from unittest.mock import AsyncMock, patch
 
 import aiohttp
-from src.core.model_discovery import ModelDiscoveryService, ProviderConfig
-from src.models.model_info import ModelInfo
-from src.core.exceptions import ProviderError, ValidationError
+from src.core.routing.model_discovery import ModelDiscoveryService, ProviderConfig
+from src.core.providers.models import ModelInfo
+from src.core.routing.exceptions import ProviderError, ValidationError
 
 
 class TestModelDiscoveryExternalCalls:
@@ -81,7 +81,7 @@ class TestModelDiscoveryExternalCalls:
     ):
         """Test successful model discovery from external API"""
         with patch(
-            "src.core.model_discovery.get_unified_cache",
+            "src.core.routing.model_discovery.get_unified_cache",
             return_value=mock_cache,
         ):
             with patch("aiohttp.ClientSession") as mock_session_class:
@@ -135,7 +135,7 @@ class TestModelDiscoveryExternalCalls:
         mock_cache.get.return_value = cached_models
 
         with patch(
-            "src.core.model_discovery.get_unified_cache",
+            "src.core.routing.model_discovery.get_unified_cache",
             return_value=mock_cache,
         ):
             models = await discovery_service.discover_models(provider_config)
@@ -150,7 +150,7 @@ class TestModelDiscoveryExternalCalls:
     ):
         """Test authentication error handling"""
         with patch(
-            "src.core.model_discovery.get_unified_cache",
+            "src.core.routing.model_discovery.get_unified_cache",
             return_value=mock_cache,
         ):
             with patch("aiohttp.ClientSession") as mock_session_class:
@@ -174,7 +174,7 @@ class TestModelDiscoveryExternalCalls:
     ):
         """Test forbidden error handling"""
         with patch(
-            "src.core.model_discovery.get_unified_cache",
+            "src.core.routing.model_discovery.get_unified_cache",
             return_value=mock_cache,
         ):
             with patch("aiohttp.ClientSession") as mock_session_class:
@@ -197,7 +197,7 @@ class TestModelDiscoveryExternalCalls:
     ):
         """Test rate limit handling with retry"""
         with patch(
-            "src.core.model_discovery.get_unified_cache",
+            "src.core.routing.model_discovery.get_unified_cache",
             return_value=mock_cache,
         ):
             with patch("aiohttp.ClientSession") as mock_session_class:
@@ -230,7 +230,7 @@ class TestModelDiscoveryExternalCalls:
     ):
         """Test rate limit retry exhaustion"""
         with patch(
-            "src.core.model_discovery.get_unified_cache",
+            "src.core.routing.model_discovery.get_unified_cache",
             return_value=mock_cache,
         ):
             with patch("aiohttp.ClientSession") as mock_session_class:
@@ -253,7 +253,7 @@ class TestModelDiscoveryExternalCalls:
     ):
         """Test network error handling with retry"""
         with patch(
-            "src.core.model_discovery.get_unified_cache",
+            "src.core.routing.model_discovery.get_unified_cache",
             return_value=mock_cache,
         ):
             with patch("aiohttp.ClientSession") as mock_session_class:
@@ -286,7 +286,7 @@ class TestModelDiscoveryExternalCalls:
     ):
         """Test network error retry exhaustion"""
         with patch(
-            "src.core.model_discovery.get_unified_cache",
+            "src.core.routing.model_discovery.get_unified_cache",
             return_value=mock_cache,
         ):
             with patch("aiohttp.ClientSession") as mock_session_class:
@@ -309,7 +309,7 @@ class TestModelDiscoveryExternalCalls:
     ):
         """Test timeout error handling"""
         with patch(
-            "src.core.model_discovery.get_unified_cache",
+            "src.core.routing.model_discovery.get_unified_cache",
             return_value=mock_cache,
         ):
             with patch("aiohttp.ClientSession") as mock_session_class:
@@ -331,7 +331,7 @@ class TestModelDiscoveryExternalCalls:
     ):
         """Test invalid response format handling"""
         with patch(
-            "src.core.model_discovery.get_unified_cache",
+            "src.core.routing.model_discovery.get_unified_cache",
             return_value=mock_cache,
         ):
             with patch("aiohttp.ClientSession") as mock_session_class:
@@ -357,7 +357,7 @@ class TestModelDiscoveryExternalCalls:
     ):
         """Test handling of invalid model data in response"""
         with patch(
-            "src.core.model_discovery.get_unified_cache",
+            "src.core.routing.model_discovery.get_unified_cache",
             return_value=mock_cache,
         ):
             with patch("aiohttp.ClientSession") as mock_session_class:
@@ -399,7 +399,7 @@ class TestModelDiscoveryExternalCalls:
     ):
         """Test handling of empty model list"""
         with patch(
-            "src.core.model_discovery.get_unified_cache",
+            "src.core.routing.model_discovery.get_unified_cache",
             return_value=mock_cache,
         ):
             with patch("aiohttp.ClientSession") as mock_session_class:
@@ -424,7 +424,7 @@ class TestModelDiscoveryExternalCalls:
     ):
         """Test successful model validation"""
         with patch(
-            "src.core.model_discovery.get_unified_cache",
+            "src.core.routing.model_discovery.get_unified_cache",
             return_value=mock_cache,
         ):
             with patch("aiohttp.ClientSession") as mock_session_class:
@@ -448,7 +448,7 @@ class TestModelDiscoveryExternalCalls:
     ):
         """Test model validation for non-existent model"""
         with patch(
-            "src.core.model_discovery.get_unified_cache",
+            "src.core.routing.model_discovery.get_unified_cache",
             return_value=mock_cache,
         ):
             with patch("aiohttp.ClientSession") as mock_session_class:
@@ -472,7 +472,7 @@ class TestModelDiscoveryExternalCalls:
     ):
         """Test model validation with provider error"""
         with patch(
-            "src.core.model_discovery.get_unified_cache",
+            "src.core.routing.model_discovery.get_unified_cache",
             return_value=mock_cache,
         ):
             with patch("aiohttp.ClientSession") as mock_session_class:
@@ -495,7 +495,7 @@ class TestModelDiscoveryExternalCalls:
     ):
         """Test successful model info retrieval"""
         with patch(
-            "src.core.model_discovery.get_unified_cache",
+            "src.core.routing.model_discovery.get_unified_cache",
             return_value=mock_cache,
         ):
             with patch("aiohttp.ClientSession") as mock_session_class:
@@ -521,7 +521,7 @@ class TestModelDiscoveryExternalCalls:
     ):
         """Test model info retrieval for non-existent model"""
         with patch(
-            "src.core.model_discovery.get_unified_cache",
+            "src.core.routing.model_discovery.get_unified_cache",
             return_value=mock_cache,
         ):
             with patch("aiohttp.ClientSession") as mock_session_class:
@@ -545,7 +545,7 @@ class TestModelDiscoveryExternalCalls:
     ):
         """Test cache invalidation"""
         with patch(
-            "src.core.model_discovery.get_unified_cache",
+            "src.core.routing.model_discovery.get_unified_cache",
             return_value=mock_cache,
         ):
             result = await discovery_service.invalidate_model_cache(provider_config)
@@ -561,7 +561,7 @@ class TestModelDiscoveryExternalCalls:
         mock_cache.delete.return_value = False
 
         with patch(
-            "src.core.model_discovery.get_unified_cache",
+            "src.core.routing.model_discovery.get_unified_cache",
             return_value=mock_cache,
         ):
             result = await discovery_service.invalidate_model_cache(provider_config)
@@ -572,7 +572,7 @@ class TestModelDiscoveryExternalCalls:
     async def test_clear_all_cache(self, discovery_service, mock_cache):
         """Test clearing all model cache"""
         with patch(
-            "src.core.model_discovery.get_unified_cache",
+            "src.core.routing.model_discovery.get_unified_cache",
             return_value=mock_cache,
         ):
             count = await discovery_service.clear_all_model_cache()
@@ -584,7 +584,7 @@ class TestModelDiscoveryExternalCalls:
     async def test_cache_stats(self, discovery_service, mock_cache):
         """Test cache statistics retrieval"""
         with patch(
-            "src.core.model_discovery.get_unified_cache",
+            "src.core.routing.model_discovery.get_unified_cache",
             return_value=mock_cache,
         ):
             stats = await discovery_service.get_cache_stats()
@@ -606,7 +606,7 @@ class TestModelDiscoveryExternalCalls:
         )
 
         with patch(
-            "src.core.model_discovery.get_unified_cache",
+            "src.core.routing.model_discovery.get_unified_cache",
             return_value=mock_cache,
         ):
             with patch("aiohttp.ClientSession") as mock_session_class:
@@ -705,7 +705,7 @@ class TestModelDiscoveryIntegrationScenarios:
             mock_session.get.side_effect = mock_get
             mock_session_class.return_value.__aenter__.return_value = mock_session
 
-            with patch("src.core.model_discovery.get_unified_cache") as mock_cache_func:
+            with patch("src.core.routing.model_discovery.get_unified_cache") as mock_cache_func:
                 mock_cache = AsyncMock()
                 mock_cache.get.return_value = None
                 mock_cache.set.return_value = True

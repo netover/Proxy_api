@@ -15,11 +15,11 @@ import tempfile
 import time
 from pathlib import Path
 
-from src.core.unified_cache import UnifiedCache
-from src.core.cache_migration import CacheMigrationService, MigrationConfig
-from src.core.cache_warmer import CacheWarmer
-from src.core.cache_monitor import CacheMonitor
-from src.models.model_info import ModelInfo
+from src.core.cache.unified import UnifiedCache
+from src.core.cache.migration import CacheMigrationService, MigrationConfig
+from src.core.cache.warmer import CacheWarmer
+from src.core.cache.monitor import CacheMonitor
+from src.core.providers.models import ModelInfo
 
 
 logger = logging.getLogger(__name__)
@@ -319,7 +319,7 @@ class TestCacheWarmer:
     @pytest.mark.asyncio
     async def test_predictive_warming_score(self):
         """Test predictive warming score calculation"""
-        from src.core.cache_warmer import WarmingPattern
+        from src.core.cache.warmer import WarmingPattern
 
         pattern = WarmingPattern(
             key="test:key", access_count=20, last_accessed=time.time()

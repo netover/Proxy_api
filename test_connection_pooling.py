@@ -6,7 +6,7 @@ Test script to verify HTTP connection pooling and reuse in ProxyAPI
 import asyncio
 import time
 import logging
-from src.core.http_client_v2 import (
+from src.core.http.client_v2 import (
     get_advanced_http_client,
     get_all_client_metrics,
 )

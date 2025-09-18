@@ -8,13 +8,10 @@ import yaml
 import tempfile
 import os
 from pathlib import Path
-from src.core.unified_config import (
-    config_manager,
-    UnifiedConfig,
-    ProviderConfig,
-)
-from src.core.provider_factory import provider_factory
-from src.core.unified_config import ProviderType
+from src.core.config.manager import config_manager
+from src.core.config.models import UnifiedConfig, ProviderConfig
+from src.core.providers.factory import provider_factory
+from src.core.providers.models import ProviderType
 
 
 async def test_provider_forcing():

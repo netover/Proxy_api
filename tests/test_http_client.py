@@ -8,12 +8,12 @@ import threading
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
-from src.core.http_client import (
+from src.core.http.client import (
     OptimizedHTTPClient,
     get_http_client,
     http_client_context,
 )
-from src.core.http_client_v2 import (
+from src.core.http.client_v2 import (
     get_advanced_http_client,
     AdvancedHTTPClient,
 )
@@ -301,7 +301,7 @@ class TestOptimizedHTTPClient:
         await http_client.initialize()
 
         with patch.object(http_client._client, "request", return_value=mock_response):
-            with patch("src.core.http_client.logger") as mock_logger:
+            with patch("src.core.http.client.logger") as mock_logger:
                 await http_client.request("GET", "https://api.example.com/test")
 
                 # Check success logging
@@ -321,7 +321,7 @@ class TestOptimizedHTTPClient:
             "request",
             side_effect=httpx.ConnectError("Connection failed"),
         ):
-            with patch("src.core.http_client.logger") as mock_logger:
+            with patch("src.core.http.client.logger") as mock_logger:
                 with pytest.raises(httpx.ConnectError):
                     await http_client.request("GET", "https://api.example.com/test")
 
@@ -339,7 +339,7 @@ class TestOptimizedHTTPClient:
         mock_response.status_code = 200
 
         with patch.object(http_client._client, "request") as mock_request:
-            with patch("src.core.http_client.logger") as mock_logger:
+            with patch("src.core.http.client.logger") as mock_logger:
                 mock_request.side_effect = [
                     httpx.ConnectError("Connection failed"),
                     mock_response,
@@ -360,7 +360,7 @@ class TestHTTPClientGlobalFunctions:
     @pytest.mark.asyncio
     async def test_get_http_client_creates_instance(self):
         """Test get_http_client creates new instance"""
-        with patch("src.core.http_client._http_client", None):
+        with patch("src.core.http.client._http_client", None):
             client = await get_http_client()
             assert isinstance(client, OptimizedHTTPClient)
             assert client._client is not None
@@ -368,7 +368,7 @@ class TestHTTPClientGlobalFunctions:
     @pytest.mark.asyncio
     async def test_get_http_client_reuses_instance(self):
         """Test get_http_client reuses existing instance"""
-        with patch("src.core.http_client._http_client", None):
+        with patch("src.core.http.client._http_client", None):
             client1 = await get_http_client()
             client2 = await get_http_client()
             assert client1 is client2
@@ -376,7 +376,7 @@ class TestHTTPClientGlobalFunctions:
     @pytest.mark.asyncio
     async def test_get_http_client_recreates_closed_instance(self):
         """Test get_http_client recreates closed instance"""
-        with patch("src.core.http_client._http_client", None):
+        with patch("src.core.http.client._http_client", None):
             client1 = await get_http_client()
             await client1.close()
 
@@ -387,7 +387,7 @@ class TestHTTPClientGlobalFunctions:
     @pytest.mark.asyncio
     async def test_http_client_context(self):
         """Test http_client_context context manager"""
-        with patch("src.core.http_client._http_client", None):
+        with patch("src.core.http.client._http_client", None):
             async with http_client_context() as client:
                 assert isinstance(client, OptimizedHTTPClient)
                 assert client._client is not None
@@ -610,7 +610,7 @@ class TestHTTPClientMetrics:
         """Test connection pool metrics"""
         await metrics_client.initialize()
 
-        with patch("src.core.http_client.metrics_collector") as mock_collector:
+        with patch("src.core.http.client.metrics_collector") as mock_collector:
             metrics_client.get_metrics()
 
             # Verify connection pool metrics are sent to collector
@@ -629,7 +629,7 @@ class TestRaceConditionFixes:
     @pytest.mark.asyncio
     async def test_concurrent_get_http_client_creates_single_instance(self):
         """Test that concurrent calls to get_http_client create only one instance"""
-        with patch("src.core.http_client._http_client", None):
+        with patch("src.core.http.client._http_client", None):
             # Create multiple concurrent tasks
             tasks = [get_http_client() for _ in range(10)]
             clients = await asyncio.gather(*tasks)
@@ -643,7 +643,7 @@ class TestRaceConditionFixes:
 
     def test_concurrent_get_advanced_http_client_creates_single_instance(self):
         """Test that concurrent calls to get_advanced_http_client create only one instance per provider"""
-        with patch("src.core.http_client_v2._http_clients", {}):
+        with patch("src.core.http.client_v2._http_clients", {}):
             results = []
             exceptions = []
 
@@ -679,7 +679,7 @@ class TestRaceConditionFixes:
 
     def test_concurrent_different_providers_create_separate_instances(self):
         """Test that different providers get separate instances"""
-        with patch("src.core.http_client_v2._http_clients", {}):
+        with patch("src.core.http.client_v2._http_clients", {}):
             results = {}
             exceptions = []
 

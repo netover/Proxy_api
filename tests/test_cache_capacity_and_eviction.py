@@ -15,10 +15,10 @@ import threading
 import time
 import pytest
 
-from src.core.model_cache import ModelCache
-from src.core.smart_cache import SmartCache
-from src.core.unified_cache import UnifiedCache
-from src.models.model_info import ModelInfo
+from src.core.cache.model import ModelCache
+from src.core.cache.smart import SmartCache
+from src.core.cache.unified import UnifiedCache
+from src.core.providers.models import ModelInfo
 
 
 class TestCacheCapacityLimits:
@@ -67,7 +67,7 @@ class TestCacheCapacityLimits:
 
         # Add entries using proper SmartCache methods
         # Note: SmartCache is async, so we'll test the internal structure
-        from src.core.smart_cache import CacheEntry
+        from src.core.cache.smart import CacheEntry
 
         # Create cache entries manually for testing
         entry1 = CacheEntry(key="key1", value="value1", timestamp=time.time(), ttl=300)
@@ -103,7 +103,7 @@ class TestCacheCapacityLimits:
         cache = UnifiedCache(max_size=10, default_ttl=300)
 
         # Fill cache to capacity using proper CacheEntry objects
-        from src.core.unified_cache import CacheEntry
+        from src.core.cache.unified import CacheEntry
 
         for i in range(12):  # Exceed max_size
             entry = CacheEntry(
@@ -298,7 +298,7 @@ class TestMemoryPressureScenarios:
         cache = SmartCache(max_size=100, max_memory_mb=1)  # Very low memory limit
 
         # Fill cache with large entries using proper CacheEntry objects
-        from src.core.smart_cache import CacheEntry
+        from src.core.cache.smart import CacheEntry
 
         large_data = {"data": "x" * 10000}  # 10KB per entry
 
@@ -400,7 +400,7 @@ class TestMemoryPressureScenarios:
         cache = UnifiedCache(max_size=10, max_memory_mb=5, default_ttl=300)
 
         # Add entries with different priorities using proper CacheEntry objects
-        from src.core.unified_cache import CacheEntry
+        from src.core.cache.unified import CacheEntry
 
         for i in range(15):  # Exceed capacity
             priority = 1 if i < 5 else 5  # First 5 have low priority

@@ -1,7 +1,7 @@
 import pytest
 import pytest_asyncio
 from src.utils.semantic_cache import SemanticCache
-from src.core.smart_cache import SmartCache
+from src.core.cache.smart import SmartCache
 
 
 def test_semantic_cache_initialization():

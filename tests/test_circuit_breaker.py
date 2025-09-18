@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 import redis.asyncio as redis
-from src.core.circuit_breaker import (
+from src.core.breaker.circuit_breaker import (
     CircuitBreakerOpenException,
     CircuitState,
     DistributedCircuitBreaker,
@@ -310,7 +310,7 @@ class TestCircuitBreakerFactory:
     async def test_get_breaker_before_init_raises_error(self):
         """Test that calling get_circuit_breaker before initialization raises an error."""
         # Reset the global state for this test
-        from src.core import circuit_breaker
+        from src.core.breaker import circuit_breaker
 
         circuit_breaker._redis_client = None
         circuit_breaker._circuit_breakers = {}

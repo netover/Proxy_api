@@ -16,8 +16,8 @@ from pathlib import Path
 
 import httpx
 
-from src.core.alerting import alert_manager
-from src.core.metrics import metrics_collector
+from src.core.alerting.manager import alert_manager
+from src.core.metrics.collector import metrics_collector
 
 
 async def test_basic_metrics_collection():
@@ -52,7 +52,7 @@ async def test_alert_system():
     print("\n🔔 Testing alerting system...")
 
     # Create a test alert rule
-    from src.core.alerting import AlertRule, AlertSeverity, NotificationChannel
+    from src.core.alerting.models import AlertRule, AlertSeverity, NotificationChannel
 
     test_rule = AlertRule(
         name="test_high_error_rate",

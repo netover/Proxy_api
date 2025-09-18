@@ -4,9 +4,9 @@ import pytest
 from unittest.mock import AsyncMock, patch
 import aiohttp
 
-from src.models.model_info import ModelInfo
-from src.core.model_discovery import ModelDiscoveryService, ProviderConfig
-from src.core.exceptions import ProviderError, ValidationError
+from src.core.providers.models import ModelInfo
+from src.core.routing.model_discovery import ModelDiscoveryService, ProviderConfig
+from src.core.routing.exceptions import ProviderError, ValidationError
 
 
 class TestModelInfo:

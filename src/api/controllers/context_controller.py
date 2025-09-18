@@ -8,7 +8,7 @@ from slowapi.util import get_remote_address
 
 from src.core.exceptions import ServiceUnavailableError
 from src.core.logging import ContextualLogger
-from src.core.metrics import metrics_collector
+from src.core.metrics.metrics import metrics_collector
 
 logger = ContextualLogger(__name__)
 router = APIRouter()

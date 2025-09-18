@@ -14,10 +14,10 @@ import time
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from src.utils.context_condenser import AsyncLRUCache
-from src.core.unified_cache import UnifiedCache
-from src.core.provider_factory import ProviderFactory
-from src.core.parallel_fallback import ParallelFallbackEngine
+from src.utils.cache import AsyncLRUCache
+from src.core.cache.unified import UnifiedCache
+from src.core.providers.factory import ProviderFactory
+from src.core.routing.parallel_fallback import ParallelFallbackEngine
 
 
 class TestAsyncLRUCacheCancellation:
@@ -223,14 +223,18 @@ class TestParallelFallbackCancellation:
     async def test_execution_cancellation(self, engine):
         """Test that parallel execution properly cancels tasks"""
         # Mock provider discovery
-        with patch("src.core.parallel_fallback.provider_discovery") as mock_discovery:
+        with patch(
+            "src.core.routing.parallel_fallback.provider_discovery"
+        ) as mock_discovery:
             mock_discovery.get_healthy_providers_for_model.return_value = [
                 "provider1",
                 "provider2",
             ]
 
             # Mock provider factory
-            with patch("src.core.parallel_fallback.provider_factory") as mock_factory:
+            with patch(
+                "src.core.routing.parallel_fallback.provider_factory"
+            ) as mock_factory:
                 mock_provider = AsyncMock()
                 mock_provider.create_completion = AsyncMock(
                     side_effect=asyncio.sleep(10)

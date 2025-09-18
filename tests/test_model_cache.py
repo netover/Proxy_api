@@ -8,10 +8,10 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from src.core.model_cache import ModelCache
-from src.core.cache_manager import CacheManager
-from src.core.model_discovery import ModelDiscoveryService, ProviderConfig
-from src.models.model_info import ModelInfo
+from src.core.cache.model import ModelCache
+from src.core.cache.manager import CacheManager
+from src.core.routing.model_discovery import ModelDiscoveryService, ProviderConfig
+from src.core.providers.models import ModelInfo
 
 
 class TestModelCache:

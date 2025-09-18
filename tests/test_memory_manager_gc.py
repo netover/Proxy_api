@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 import pytest
 
-from src.core.memory_manager import (
+from src.core.memory.manager import (
     SmartContextManager,
     get_memory_manager,
     shutdown_memory_manager,

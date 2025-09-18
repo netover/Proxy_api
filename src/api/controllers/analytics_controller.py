@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Request, Response
 
 from src.core.auth import verify_api_key
 from src.core.logging import ContextualLogger
-from src.core.metrics import metrics_collector
+from src.core.metrics.metrics import metrics_collector
 
 logger = ContextualLogger(__name__)
 

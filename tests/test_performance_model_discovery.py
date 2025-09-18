@@ -17,11 +17,11 @@ import pytest
 import psutil
 from fastapi.testclient import TestClient
 
-from src.core.model_discovery import ModelDiscoveryService
-from src.core.cache_manager import CacheManager
-from src.core.provider_factory import ProviderFactory
-from main import app
-from src.models.model_info import ModelInfo
+from src.core.routing.model_discovery import ModelDiscoveryService
+from src.core.cache.manager import CacheManager
+from src.core.providers.factory import ProviderFactory
+from src.main import app
+from src.core.providers.models import ModelInfo
 
 
 class TestModelDiscoveryPerformance:
@@ -94,7 +94,7 @@ class TestModelDiscoveryPerformance:
             for i in range(1000)  # 1000 models
         ]
 
-        with patch("src.providers.openai.OpenAIDiscovery.get_models") as mock_openai:
+        with patch("src.core.routing.model_discovery.ModelDiscoveryService.discover_provider_models") as mock_openai:
             mock_openai.return_value = large_model_list
 
             # Measure performance
@@ -143,17 +143,8 @@ class TestModelDiscoveryPerformance:
         }
 
         # Mock all providers
-        mocks = []
-        for provider in providers:
-            patch_path = f'src.providers.{provider}.{provider.split("_")[-1].capitalize()}Discovery.get_models'
-            mock = patch(patch_path)
-            mocks.append(mock)
-            mock.start()
-
-        try:
-            # Configure mocks
-            for provider, mock in zip(providers, mocks):
-                mock.target.return_value = provider_models[provider]
+        with patch("src.core.routing.model_discovery.ModelDiscoveryService.discover_all_models") as mock_discover:
+            mock_discover.return_value = [model for models in provider_models.values() for model in models]
 
             # Measure performance
             def run_discovery():
@@ -202,7 +193,7 @@ class TestModelDiscoveryPerformance:
             )
         ]
 
-        with patch("src.providers.openai.OpenAIDiscovery.get_models") as mock_openai:
+        with patch("src.core.routing.model_discovery.ModelDiscoveryService.discover_provider_models") as mock_openai:
             mock_openai.return_value = test_models
 
             # First call - populate cache
@@ -253,7 +244,7 @@ class TestModelDiscoveryPerformance:
             for i in range(100)
         ]
 
-        with patch("src.providers.openai.OpenAIDiscovery.get_models") as mock_openai:
+        with patch("src.core.routing.model_discovery.ModelDiscoveryService.discover_provider_models") as mock_openai:
             mock_openai.return_value = test_models
 
             def run_concurrent_access():
@@ -303,7 +294,7 @@ class TestModelDiscoveryPerformance:
             for i in range(5000)  # 5000 models
         ]
 
-        with patch("src.providers.openai.OpenAIDiscovery.get_models") as mock_openai:
+        with patch("src.core.routing.model_discovery.ModelDiscoveryService.discover_provider_models") as mock_openai:
             mock_openai.return_value = huge_model_list
 
             def run_large_discovery():
@@ -382,7 +373,7 @@ class TestModelDiscoveryPerformance:
 
     def test_provider_timeout_handling(self, discovery_service):
         """Test timeout handling performance."""
-        with patch("src.providers.openai.OpenAIDiscovery.get_models") as mock_openai:
+        with patch("src.core.routing.model_discovery.ModelDiscoveryService.discover_provider_models") as mock_openai:
             # Simulate slow provider response
             async def slow_response():
                 await asyncio.sleep(5)  # Simulate slow API
@@ -434,7 +425,7 @@ class TestModelDiscoveryPerformance:
             ]
 
             with patch(
-                "src.providers.openai.OpenAIDiscovery.get_models"
+                "src.core.routing.model_discovery.ModelDiscoveryService.discover_provider_models"
             ) as mock_openai:
                 mock_openai.return_value = models
 

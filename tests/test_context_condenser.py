@@ -4,11 +4,12 @@ import time
 import os
 import hashlib
 from unittest.mock import Mock, AsyncMock, patch
-from src.utils.context_condenser import condense_context, AsyncLRUCache
-from src.core.unified_config import (
+from src.utils.context import condense_context
+from src.utils.cache import AsyncLRUCache
+from src.core.config.models import (
     CondensationSettings,
 )
-from src.core.provider_factory import BaseProvider
+from src.core.providers.base import BaseProvider
 
 
 @pytest.fixture
@@ -65,7 +66,7 @@ async def test_cache_hit(mock_request, mock_provider):
     mock_request.app.state.lru_cache.set(hash_key, ("cached summary", time.time()))
     mock_request.app.state.condensation_config.cache_ttl = 3600
     with patch(
-        "src.utils.context_condenser.provider_factory.create_provider",
+        "src.core.providers.factory.create_provider",
         return_value=mock_provider,
     ):
         summary = await condense_context(mock_request, chunks, max_tokens=512)
@@ -77,7 +78,7 @@ async def test_cache_miss_and_store(mock_request, mock_provider):
     mock_request.app.state.lru_cache = AsyncLRUCache(maxsize=1)
     chunks = ["new chunk"]
     with patch(
-        "src.utils.context_condenser.provider_factory.create_provider",
+        "src.core.providers.factory.create_provider",
         return_value=mock_provider,
     ):
         summary = await condense_context(mock_request, chunks, max_tokens=512)
@@ -95,7 +96,7 @@ async def test_adaptive_limit_enabled(mock_request, mock_provider):
     mock_request.app.state.condensation_config.max_tokens_default = 512
     chunks = ["long" * 1000]  # Large input
     with patch(
-        "src.utils.context_condenser.get_provider",
+        "src.core.providers.factory.get_provider",
         return_value=AsyncMock(return_value=mock_provider),
     ):
         summary = await condense_context(mock_request, chunks, max_tokens=1000)
@@ -108,7 +109,7 @@ async def test_adaptive_limit_disabled(mock_request, mock_provider):
     mock_request.app.state.condensation_config.adaptive_enabled = False
     chunks = ["long" * 1000]
     with patch(
-        "src.utils.context_condenser.get_provider",
+        "src.core.providers.factory.get_provider",
         return_value=AsyncMock(return_value=mock_provider),
     ):
         summary = await condense_context(mock_request, chunks, max_tokens=1000)
@@ -125,7 +126,7 @@ async def test_fallback_truncate(mock_request, mock_provider):
         {"choices": [{"message": {"content": "truncated summary"}}]},
     ]
     with patch(
-        "src.utils.context_condenser.get_provider",
+        "src.core.providers.factory.get_provider",
         return_value=AsyncMock(return_value=mock_provider),
     ):
         summary = await condense_context(mock_request, chunks, max_tokens=512)
@@ -153,7 +154,7 @@ async def test_fallback_secondary_provider(
         "choices": [{"message": {"content": "secondary summary"}}]
     }
     with patch(
-        "src.utils.context_condenser.get_provider",
+        "src.core.providers.factory.get_provider",
         side_effect=[mock_provider1, mock_provider2],
     ):
         summary = await condense_context(mock_request, chunks, max_tokens=512)
@@ -175,7 +176,7 @@ async def test_parallelism_success(mock_request, mock_provider1, mock_provider2)
         return_value={"choices": [{"message": {"content": "other"}}]}
     )
     with patch(
-        "src.utils.context_condenser.get_provider",
+        "src.core.providers.factory.get_provider",
         side_effect=[mock_provider1, mock_provider2],
     ):
         summary = await condense_context(mock_request, chunks, max_tokens=512)
@@ -186,10 +187,10 @@ async def test_parallelism_success(mock_request, mock_provider1, mock_provider2)
 async def test_dynamic_reload(mock_request):
     mock_request.app.state.condensation_config.dynamic_reload = True
     mock_request.app.state.condensation_config.parallel_providers = 1
-    with patch("os.path.getmtime", return_value=100), patch.object(
-        config_manager, "_last_modified", 50
+    with patch("os.path.getmtime", return_value=100), patch(
+        "src.core.config.manager._last_modified", 50
     ), patch(
-        "src.utils.context_condenser.config_manager.load_config",
+        "src.core.config.manager.load_config",
         return_value=Mock(settings=Mock(condensation=Mock(parallel_providers=2))),
     ):
         summary = await condense_context(mock_request, ["test"], max_tokens=512)
@@ -212,7 +213,7 @@ async def test_proactive_truncation(mock_request, mock_provider):
     mock_request.app.state.condensation_config.truncation_threshold = 100
     long_chunks = ["short"] + ["long text " * 50]  # Total > 100
     with patch(
-        "src.utils.context_condenser.get_provider",
+        "src.core.providers.factory.get_provider",
         return_value=AsyncMock(return_value=mock_provider),
     ):
         summary = await condense_context(mock_request, long_chunks, max_tokens=512)
@@ -234,11 +235,11 @@ async def test_background_non_blocking(mock_request):
     long_messages = [{"content": "long" * 50}] * 3  # Total > 100
     req = {"messages": long_messages}
     with patch("uuid.uuid4", return_value="test-request-id"), patch(
-        "src.utils.context_condenser.condense_context",
+        "src.utils.context.condense_context",
         new_callable=AsyncMock(return_value="summary"),
     ), patch.object(BackgroundTasks, "add_task", return_value=None) as mock_add_task:
         # Simulate route call
-        from main import background_condense
+        from src.main import background_condense
 
         background_condense("test-id", mock_request, ["long chunks"])
         mock_add_task.assert_called_once()
@@ -261,7 +262,7 @@ async def test_regex_error_detection(mock_request, mock_provider):
         "choices": [{"message": {"content": "fallback summary"}}]
     }  # Second call after fallback
     with patch(
-        "src.utils.context_condenser.get_provider",
+        "src.core.providers.factory.get_provider",
         return_value=AsyncMock(return_value=mock_provider),
     ):
         with pytest.raises(ValueError):  # Expect fallback but test detection
@@ -273,14 +274,14 @@ async def test_regex_error_detection(mock_request, mock_provider):
 @pytest.mark.asyncio
 async def test_background_offload_simulation(mock_request, mock_provider):
     """Test background offload detection (simulate in test)"""
-    from main import background_condense
+    from src.main import background_condense
 
     mock_request.app.state.summary_cache = {}
     mock_request.app.state.condensation_config.truncation_threshold = 10
     long_chunks = ["a" * 20]
     request_id = "test-bg-id"
     with patch("uuid.uuid4", return_value=request_id), patch(
-        "src.utils.context_condenser.condense_context",
+        "src.utils.context.condense_context",
         new_callable=AsyncMock(return_value="bg summary"),
     ):
         background_condense(request_id, mock_request, long_chunks)
@@ -310,7 +311,7 @@ async def test_multi_provider_retrial(mock_request, mock_provider1, mock_provide
         "choices": [{"message": {"content": "retrial summary"}}]
     }
     with patch(
-        "src.utils.context_condenser.get_provider",
+        "src.core.providers.factory.get_provider",
         side_effect=[mock_provider1, mock_provider2],
     ):
         summary = await condense_context(mock_request, chunks, max_tokens=512)
@@ -333,7 +334,7 @@ async def test_varied_provider_errors(mock_request, mock_provider):
             {"choices": [{"message": {"content": f"handled {pattern}"}}]},
         ]
         with patch(
-            "src.utils.context_condenser.get_provider",
+            "src.core.providers.factory.get_provider",
             return_value=AsyncMock(return_value=mock_provider),
         ):
             summary = await condense_context(mock_request, ["chunk"], max_tokens=512)
@@ -353,7 +354,7 @@ async def test_timeout_error_fallback(mock_request, mock_provider):
         "choices": [{"message": {"content": "fallback summary"}}]
     }  # Second call after fallback
     with patch(
-        "src.utils.context_condenser.get_provider",
+        "src.core.providers.factory.get_provider",
         return_value=AsyncMock(return_value=mock_provider),
     ):
         summary = await condense_context(mock_request, chunks, max_tokens=512)
@@ -377,7 +378,7 @@ async def test_rate_limit_error_fallback(mock_request, mock_provider):
         return_value={"choices": [{"message": {"content": "rate limit fallback"}}]}
     )
     with patch(
-        "src.utils.context_condenser.get_provider",
+        "src.core.providers.factory.get_provider",
         side_effect=[mock_provider, mock_provider2],
     ):
         summary = await condense_context(mock_request, chunks, max_tokens=512)
@@ -401,7 +402,7 @@ async def test_provider_failure_fallback_sequential(mock_request):
     prov2 = AsyncMock(
         return_value={"choices": [{"message": {"content": "sequential fallback"}}]}
     )
-    with patch("src.utils.context_condenser.get_provider", side_effect=[prov1, prov2]):
+    with patch("src.core.providers.factory.get_provider", side_effect=[prov1, prov2]):
         summary = await condense_context(mock_request, chunks, max_tokens=512)
     assert "sequential fallback" == summary
 
@@ -420,7 +421,7 @@ async def test_provider_failure_fallback_parallel(mock_request):
     )
     prov2_fail = AsyncMock(side_effect=Exception("Failed"))
     with patch(
-        "src.utils.context_condenser.get_provider",
+        "src.core.providers.factory.get_provider",
         side_effect=[prov1_success, prov2_fail],
     ):
         summary = await condense_context(mock_request, chunks, max_tokens=512)
@@ -430,13 +431,13 @@ async def test_provider_failure_fallback_parallel(mock_request):
 @pytest.mark.asyncio
 async def test_background_offload_integration(mock_request):
     """Test background offload integration and cache storage"""
-    from main import background_condense
+    from src.main import background_condense
 
     mock_request.app.state.summary_cache = {}
     request_id = "test-bg"
     chunks = ["long context"]
     with patch(
-        "src.utils.context_condenser.condense_context",
+        "src.utils.context.condense_context",
         new_callable=AsyncMock(return_value="bg summary"),
     ):
         await background_condense(request_id, mock_request, chunks)
@@ -448,7 +449,7 @@ async def test_background_offload_integration(mock_request):
 @pytest.mark.asyncio
 async def test_metric_recording_cache_hit(mock_request):
     """Test metric recording for cache hit"""
-    from src.core.metrics import metrics_collector
+    from src.core.metrics.collector import metrics_collector
 
     original_hits = metrics_collector.summarization_metrics.cache_hits
     mock_request.app.state.lru_cache = AsyncLRUCache(maxsize=1)
@@ -462,7 +463,7 @@ async def test_metric_recording_cache_hit(mock_request):
 @pytest.mark.asyncio
 async def test_metric_recording_cache_miss(mock_request, mock_provider):
     """Test metric recording for cache miss with latency"""
-    from src.core.metrics import metrics_collector
+    from src.core.metrics.collector import metrics_collector
 
     original_misses = metrics_collector.summarization_metrics.cache_misses
     original_latency = metrics_collector.summarization_metrics.total_latency
@@ -483,11 +484,11 @@ async def test_exact_threshold_truncation(mock_request, mock_provider):
     mock_request.app.state.condensation_config.truncation_threshold = 50
     chunks = ["a" * 25, "b" * 25]  # Total 50 chars
     with patch(
-        "src.utils.context_condenser.provider_factory.create_provider",
+        "src.core.providers.factory.create_provider",
         return_value=mock_provider,
     ):
         with patch(
-            "src.utils.context_condenser.sorted",
+            "src.utils.context.sorted",
             return_value=[
                 Mock(
                     enabled=True,
@@ -521,11 +522,11 @@ async def test_multiple_truncation_levels(mock_request, mock_provider):
         {"choices": [{"message": {"content": "fallback summary"}}]},
     ]
     with patch(
-        "src.utils.context_condenser.provider_factory.create_provider",
+        "src.core.providers.factory.create_provider",
         return_value=mock_provider,
     ):
         with patch(
-            "src.utils.context_condenser.sorted",
+            "src.utils.context.sorted",
             return_value=[
                 Mock(
                     enabled=True,
@@ -558,7 +559,7 @@ async def test_truncation_with_unicode(mock_request, mock_provider):
         "αβγδε 中文 🚀",
     ]
     with patch(
-        "src.utils.context_condenser.provider_factory.create_provider",
+        "src.core.providers.factory.create_provider",
         return_value=mock_provider,
     ):
         with patch(

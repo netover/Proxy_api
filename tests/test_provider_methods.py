@@ -12,9 +12,9 @@ from unittest.mock import AsyncMock, patch, Mock
 import pytest
 import httpx
 
-from src.core.provider_factory import BaseProvider, ProviderCapability
-from src.core.unified_config import ProviderConfig, ProviderType
-from src.core.exceptions import (
+from src.core.providers.base import BaseProvider, ProviderCapability
+from src.core.config.models import ProviderConfig, ProviderType
+from src.core.routing.exceptions import (
     APIConnectionError,
     AuthenticationError,
     InvalidRequestError,
@@ -99,11 +99,11 @@ class TestProviderMethods:
     def mock_provider(self, mock_config, mock_http_client):
         """Create a mock provider instance."""
         with patch(
-            "src.core.provider_factory.get_advanced_http_client",
+            "src.core.providers.factory.get_advanced_http_client",
             return_value=mock_http_client,
         ):
             with patch(
-                "src.core.provider_factory.config_manager"
+                "src.core.config.manager"
             ) as mock_config_manager:
                 mock_config_manager.load_config.return_value = {
                     "http_client": {
@@ -418,11 +418,11 @@ class TestTextCompletionMethods:
     def mock_provider_text(self, mock_config_text, mock_http_client_text):
         """Create a mock provider instance for text completion."""
         with patch(
-            "src.core.provider_factory.get_advanced_http_client",
+            "src.core.providers.factory.get_advanced_http_client",
             return_value=mock_http_client_text,
         ):
             with patch(
-                "src.core.provider_factory.config_manager"
+                "src.core.config.manager"
             ) as mock_config_manager:
                 mock_config_manager.load_config.return_value = Mock(
                     get=lambda key, default=None: {
@@ -522,11 +522,11 @@ class TestEmbeddingsMethods:
     ):
         """Create a mock provider instance for embeddings."""
         with patch(
-            "src.core.provider_factory.get_advanced_http_client",
+            "src.core.providers.factory.get_advanced_http_client",
             return_value=mock_http_client_embeddings,
         ):
             with patch(
-                "src.core.provider_factory.config_manager"
+                "src.core.config.manager"
             ) as mock_config_manager:
                 mock_config_manager.load_config.return_value = Mock(
                     get=lambda key, default=None: {
@@ -623,11 +623,11 @@ class TestHealthCheckMethods:
     def mock_provider_health(self, mock_config_health, mock_http_client_health):
         """Create a mock provider instance for health checks."""
         with patch(
-            "src.core.provider_factory.get_advanced_http_client",
+            "src.core.providers.factory.get_advanced_http_client",
             return_value=mock_http_client_health,
         ):
             with patch(
-                "src.core.provider_factory.config_manager"
+                "src.core.config.manager"
             ) as mock_config_manager:
                 mock_config_manager.load_config.return_value = {
                     "http_client": {
@@ -726,11 +726,11 @@ class TestModelDiscoveryMethods:
     ):
         """Create a mock provider instance for model discovery."""
         with patch(
-            "src.core.provider_factory.get_advanced_http_client",
+            "src.core.providers.factory.get_advanced_http_client",
             return_value=mock_http_client_discovery,
         ):
             with patch(
-                "src.core.provider_factory.config_manager"
+                "src.core.config.manager"
             ) as mock_config_manager:
                 mock_config_manager.load_config.return_value = {
                     "http_client": {
@@ -778,9 +778,9 @@ class TestProviderCapabilities:
     @pytest.fixture
     def mock_provider_capabilities(self, mock_config_capabilities):
         """Create a mock provider instance for capabilities testing."""
-        with patch("src.core.provider_factory.get_advanced_http_client"):
+        with patch("src.core.providers.factory.get_advanced_http_client"):
             with patch(
-                "src.core.provider_factory.config_manager"
+                "src.core.config.manager"
             ) as mock_config_manager:
                 mock_config_manager.load_config.return_value = {
                     "http_client": {
@@ -840,11 +840,11 @@ class TestErrorScenarios:
     def mock_provider_error(self, mock_config_error, mock_http_client_error):
         """Create a mock provider instance for error scenarios."""
         with patch(
-            "src.core.provider_factory.get_advanced_http_client",
+            "src.core.providers.factory.get_advanced_http_client",
             return_value=mock_http_client_error,
         ):
             with patch(
-                "src.core.provider_factory.config_manager"
+                "src.core.config.manager"
             ) as mock_config_manager:
                 mock_config_manager.load_config.return_value = {
                     "http_client": {

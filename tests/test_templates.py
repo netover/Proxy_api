@@ -5,7 +5,7 @@ Tests for Jinja2 template system and validation.
 import pytest
 from pathlib import Path
 
-from src.core.template_manager import TemplateManager
+from src.core.templates.manager import TemplateManager
 
 
 class TestTemplateManager:
