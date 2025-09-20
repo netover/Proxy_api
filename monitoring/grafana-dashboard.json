@@ -6,6 +6,29 @@
     "timezone": "browser",
     "panels": [
       {
+        "id": 7,
+        "title": "Total HTTP Requests",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(proxy_api_requests_total{job=\\"llm-proxy\\"})",
+            "legendFormat": "Total Requests"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "color": "green", "value": null },
+                { "color": "red", "value": 80 }
+              ]
+            },
+            "mappings": []
+          }
+        }
+      },
+      {
         "id": 1,
         "title": "Service Health Status",
         "type": "stat",
