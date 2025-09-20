@@ -95,8 +95,8 @@ async def chat_completions(request: ChatCompletionRequest, auth_result: bool = D
             )
 
 
-@main_router.post("/embeddings", tags=["embeddings"], dependencies=[Depends(verify_api_key)])
-async def embeddings(request: EmbeddingRequest):
+@main_router.post("/embeddings", tags=["embeddings"])
+async def embeddings(request: EmbeddingRequest, auth_result: bool = Depends(verify_api_key)):
     """Dynamic routing endpoint for embeddings."""
     with logger.span("dynamic_embeddings", attributes={"model": request.model}):
         try:

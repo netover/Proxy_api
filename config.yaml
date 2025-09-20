@@ -78,15 +78,11 @@ rate_limit:
     "/v1/config/invalidate-cache": "50/minute"
 
 # Authentication
-# It is recommended to use the `api_keys_env` variable for production.
-# The value should be the name of the environment variable that contains a
-# comma-separated list of your API keys.
-# Example: export PROXY_API_KEYS="key1,key2,key3"
 auth:
-  api_keys_env: "PROXY_API_KEYS"
-  # The `api_keys` list is still supported for local development or backward compatibility.
   api_keys:
-    - "dev-key-for-local-testing"
+    - "test-key-123"
+    - "prod-key-456"
+    - "admin-key-789"
 
 # Provider Configuration
 providers:

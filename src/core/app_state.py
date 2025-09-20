@@ -84,6 +84,16 @@ class AppState:
                 shutdown_caches(),
                 alert_manager.stop_monitoring(),
             ]
+            # Add shutdown calls for other components
+            if self.http_client and hasattr(self.http_client, "aclose"):
+                shutdown_tasks.append(self.http_client.aclose())
+
+            if hasattr(telemetry, "shutdown"):
+                shutdown_tasks.append(telemetry.shutdown())
+
+            if hasattr(provider_factory, "shutdown"):
+                shutdown_tasks.append(provider_factory.shutdown())
+
             await asyncio.gather(*shutdown_tasks, return_exceptions=True)
             logger.info("AppState: All primary systems shutdown successfully.")
         except Exception as e:

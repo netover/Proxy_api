@@ -15,7 +15,7 @@ from fastapi import Request
 from src.core.logging import ContextualLogger
 from src.core.metrics import metrics_collector
 from src.core.provider_factory import provider_factory
-from src.core.unified_config import config_manager
+from src.core.config.manager import config_manager
 
 # Optional Redis import for distributed caching in high-load environments
 try:

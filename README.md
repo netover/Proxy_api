@@ -177,52 +177,6 @@ python web_ui.py
 
 The UI will be available at `http://localhost:10000`.
 
-## 🧪 Testing
-
-This project uses `pytest` for functional and unit testing. A basic stress test is also included.
-
-### 1. Install Dependencies
-
-First, ensure you have installed all the necessary dependencies from `requirements.txt`:
-
-```bash
-pip install -r requirements.txt
-```
-
-### 2. Install the Project in Editable Mode
-
-To ensure that the test suite can correctly find the application's source code, you must install the project in "editable" mode. This is a critical step for `src`-layout projects.
-
-```bash
-pip install -e .
-```
-
-### 3. Run Tests
-
-You can run the different parts of the test suite separately.
-
-**Functional & Unit Tests (pytest):**
-
-To run the main suite of functional and unit tests, use the following command. This will discover and run all tests under the `tests/` directory.
-
-```bash
-python -m pytest
-```
-
-**Basic Stress Test:**
-
-A simple, Python-based stress test is included to simulate concurrent load.
-
-First, ensure the main API server is running in a separate terminal:
-```bash
-uvicorn main:app --host 0.0.0.0 --port 8000
-```
-
-Then, run the stress test script:
-```bash
-python tests/stress/test_basic_stress.py
-```
-
 ## 📖 Documentation
 
 ### For New Users
