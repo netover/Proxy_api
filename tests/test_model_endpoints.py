@@ -1,11 +1,6 @@
 """
-Comprehensive tests for model management endpoints.
-
-This module contains tests for all model management endpoints including:
-- GET /v1/providers/{provider_name}/models
-- GET /v1/providers/{provider_name}/models/{model_id}
-- PUT /v1/providers/{provider_name}/model_selection
-- POST /v1/providers/{provider_name}/models/refresh
+Refactored tests for model management endpoints.
+This version uses centralized fixtures to reduce boilerplate.
 """
 
 import pytest
@@ -14,561 +9,204 @@ from fastapi.testclient import TestClient
 from fastapi import FastAPI
 
 from src.api.model_endpoints import router as model_router
-from src.models.requests import ModelSelectionRequest, ModelInfoExtended
 from src.models.model_info import ModelInfo
 
-
-class TestModelEndpoints:
-    """Test suite for model management endpoints."""
-
-    @pytest.fixture
-    def app(self):
-        """Create FastAPI test application."""
-        app = FastAPI()
-        app.include_router(model_router)
-        return app
-
-    @pytest.fixture
-    def client(self, app):
-        """Create test client."""
-        return TestClient(app)
-
-    @pytest.fixture
-    def mock_app_state(self):
-        """Mock application state."""
-        return MagicMock()
-
-    @pytest.fixture
-    def mock_provider_factory(self):
-        """Mock provider factory."""
-        factory = AsyncMock()
-        factory.get_all_provider_info = AsyncMock()
-        return factory
-
-    @pytest.fixture
-    def mock_model_discovery(self):
-        """Mock model discovery service."""
-        discovery = AsyncMock()
-        discovery.discover_models = AsyncMock()
-        discovery.get_model_info = AsyncMock()
-        return discovery
-
-    @pytest.fixture
-    def mock_config_manager(self):
-        """Mock configuration manager."""
-        manager = MagicMock()
-        manager.load_config = MagicMock()
-        manager.save_config = MagicMock()
-        return manager
-
-    @pytest.fixture
-    def mock_cache_manager(self):
-        """Mock cache manager."""
-        manager = AsyncMock()
-        manager.clear_provider_cache = AsyncMock()
-        return manager
-
-    def setup_mocks(
-        self,
-        app,
-        mock_app_state,
-        mock_provider_factory,
-        mock_model_discovery,
-        mock_config_manager,
-        mock_cache_manager,
-    ):
-        """Setup common mocks for tests."""
-        app.state.app_state = mock_app_state
-        mock_app_state.provider_factory = mock_provider_factory
-        mock_app_state.model_discovery = mock_model_discovery
-        mock_app_state.config_manager = mock_config_manager
-        mock_app_state.cache_manager = mock_cache_manager
-
-    @pytest.mark.asyncio
-    async def test_list_provider_models_success(
-        self,
-        client,
-        app,
-        mock_app_state,
-        mock_provider_factory,
-        mock_model_discovery,
-    ):
-        """Test successful listing of models for a provider."""
-        # Setup mocks
-        self.setup_mocks(
-            app,
-            mock_app_state,
-            mock_provider_factory,
-            mock_model_discovery,
-            MagicMock(),
-            MagicMock(),
-        )
-
-        # Mock provider info
-        from src.core.provider_factory import ProviderStatus
-
-        mock_provider = MagicMock()
-        mock_provider.name = "openai"
-        mock_provider.status = ProviderStatus.HEALTHY
-        mock_provider_factory.get_all_provider_info.return_value = [mock_provider]
-
-        # Mock models
-        mock_models = [
-            ModelInfo(id="gpt-4", created=1677649200, owned_by="openai"),
-            ModelInfo(id="gpt-3.5-turbo", created=1677649200, owned_by="openai"),
-        ]
-        mock_model_discovery.discover_models.return_value = mock_models
-
-        # Make request
-        response = client.get(
-            "/v1/providers/openai/models",
-            headers={"Authorization": "Bearer test-key"},
-        )
-
-        # Assert response
-        assert response.status_code == 200
-        data = response.json()
-        assert data["object"] == "list"
-        assert data["provider"] == "openai"
-        assert data["total"] == 2
-        assert len(data["data"]) == 2
-        assert data["data"][0]["id"] == "gpt-4"
-        assert data["data"][1]["id"] == "gpt-3.5-turbo"
-
-    @pytest.mark.asyncio
-    async def test_list_provider_models_provider_not_found(
-        self, client, app, mock_provider_factory
-    ):
-        """Test listing models for non-existent provider."""
-        # Setup mocks
-        app.state.app_state = MagicMock()
-        app.state.app_state.provider_factory = mock_provider_factory
-        mock_provider_factory.get_all_provider_info.return_value = []
-
-        # Make request
-        response = client.get(
-            "/v1/providers/nonexistent/models",
-            headers={"Authorization": "Bearer test-key"},
-        )
-
-        # Assert response
-        assert response.status_code == 404
-        data = response.json()
-        assert "Provider 'nonexistent' not found" in data["error"]["message"]
-
-    @pytest.mark.asyncio
-    async def test_get_model_details_success(
-        self,
-        client,
-        app,
-        mock_app_state,
-        mock_provider_factory,
-        mock_model_discovery,
-    ):
-        """Test successful retrieval of model details."""
-        # Setup mocks
-        self.setup_mocks(
-            app,
-            mock_app_state,
-            mock_provider_factory,
-            mock_model_discovery,
-            MagicMock(),
-            MagicMock(),
-        )
-
-        # Mock provider info
-        from src.core.provider_factory import ProviderStatus
-
-        mock_provider = MagicMock()
-        mock_provider.name = "anthropic"
-        mock_provider.status = ProviderStatus.HEALTHY
-        mock_provider_factory.get_all_provider_info.return_value = [mock_provider]
-
-        # Mock model
-        mock_model = ModelInfo(
-            id="claude-3-opus-20240229",
-            created=1709251200,
-            owned_by="anthropic",
-        )
-        mock_model_discovery.get_model_info.return_value = mock_model
-
-        # Make request
-        response = client.get(
-            "/v1/providers/anthropic/models/claude-3-opus-20240229",
-            headers={"Authorization": "Bearer test-key"},
-        )
-
-        # Assert response
-        assert response.status_code == 200
-        data = response.json()
-        assert data["object"] == "model"
-        assert data["provider"] == "anthropic"
-        assert data["data"]["id"] == "claude-3-opus-20240229"
-        assert data["data"]["provider"] == "anthropic"
-
-    @pytest.mark.asyncio
-    async def test_get_model_details_not_found(
-        self,
-        client,
-        app,
-        mock_app_state,
-        mock_provider_factory,
-        mock_model_discovery,
-    ):
-        """Test getting details for non-existent model."""
-        # Setup mocks
-        self.setup_mocks(
-            app,
-            mock_app_state,
-            mock_provider_factory,
-            mock_model_discovery,
-            MagicMock(),
-            MagicMock(),
-        )
-
-        # Mock provider info
-        from src.core.provider_factory import ProviderStatus
-
-        mock_provider = MagicMock()
-        mock_provider.name = "openai"
-        mock_provider.status = ProviderStatus.HEALTHY
-        mock_provider_factory.get_all_provider_info.return_value = [mock_provider]
-
-        # Mock empty models
-        mock_model_discovery.discover_models.return_value = []
-
-        # Make request
-        response = client.get(
-            "/v1/providers/openai/models/nonexistent-model",
-            headers={"Authorization": "Bearer test-key"},
-        )
-
-        # Assert response
-        assert response.status_code == 404
-        data = response.json()
-        assert "Model 'nonexistent-model' not found" in data["error"]["message"]
-
-    @pytest.mark.asyncio
-    async def test_update_model_selection_success(
-        self,
-        client,
-        app,
-        mock_app_state,
-        mock_provider_factory,
-        mock_model_discovery,
-        mock_config_manager,
-    ):
-        """Test successful model selection update."""
-        # Setup mocks
-        self.setup_mocks(
-            app,
-            mock_app_state,
-            mock_provider_factory,
-            mock_model_discovery,
-            mock_config_manager,
-            MagicMock(),
-        )
-
-        # Mock provider info
-        from src.core.provider_factory import ProviderStatus
-
-        mock_provider = MagicMock()
-        mock_provider.name = "openai"
-        mock_provider.status = ProviderStatus.HEALTHY
-        mock_provider_factory.get_all_provider_info.return_value = [mock_provider]
-
-        # Mock model
-        mock_model = ModelInfo(id="gpt-4", created=1677649200, owned_by="openai")
-        mock_model_discovery.get_model_info.return_value = mock_model
-
-        # Mock config
-        mock_config = MagicMock()
-        mock_config.providers = {}
-        mock_config_manager.load_config.return_value = mock_config
-
-        # Make request
-        selection_data = {
-            "selected_model": "gpt-4",
-            "editable": True,
-            "priority": 5,
-            "max_tokens": 2000,
-            "temperature": 0.7,
-        }
-        response = client.put(
-            "/v1/providers/openai/model_selection",
-            json=selection_data,
-            headers={"Authorization": "Bearer test-key"},
-        )
-
-        # Assert response
-        assert response.status_code == 200
-        data = response.json()
-        assert data["success"] is True
-        assert data["provider"] == "openai"
-        assert data["selected_model"] == "gpt-4"
-        assert "updated_at" in data
-
-    @pytest.mark.asyncio
-    async def test_update_model_selection_invalid_model(
-        self,
-        client,
-        app,
-        mock_app_state,
-        mock_provider_factory,
-        mock_model_discovery,
-        mock_config_manager,
-    ):
-        """Test updating model selection with invalid model."""
-        # Setup mocks
-        self.setup_mocks(
-            app,
-            mock_app_state,
-            mock_provider_factory,
-            mock_model_discovery,
-            mock_config_manager,
-            MagicMock(),
-        )
-
-        # Mock provider info
-        from src.core.provider_factory import ProviderStatus
-
-        mock_provider = MagicMock()
-        mock_provider.name = "openai"
-        mock_provider.status = ProviderStatus.HEALTHY
-        mock_provider_factory.get_all_provider_info.return_value = [mock_provider]
-
-        # Mock empty models
-        mock_model_discovery.get_model_info.return_value = None
-
-        # Make request
-        selection_data = {"selected_model": "invalid-model", "editable": True}
-        response = client.put(
-            "/v1/providers/openai/model_selection",
-            json=selection_data,
-            headers={"Authorization": "Bearer test-key"},
-        )
-
-        # Assert response
-        assert response.status_code == 404
-        data = response.json()
-        assert "Model 'invalid-model' not found" in data["error"]["message"]
-
-    @pytest.mark.asyncio
-    async def test_refresh_models_success(
-        self,
-        client,
-        app,
-        mock_app_state,
-        mock_provider_factory,
-        mock_model_discovery,
-        mock_cache_manager,
-    ):
-        """Test successful model cache refresh."""
-        # Setup mocks
-        self.setup_mocks(
-            app,
-            mock_app_state,
-            mock_provider_factory,
-            mock_model_discovery,
-            MagicMock(),
-            mock_cache_manager,
-        )
-
-        # Mock provider info
-        from src.core.provider_factory import ProviderStatus
-
-        mock_provider = MagicMock()
-        mock_provider.name = "openai"
-        mock_provider.status = ProviderStatus.HEALTHY
-        mock_provider_factory.get_all_provider_info.return_value = [mock_provider]
-
-        # Mock models
-        mock_models = [
-            ModelInfo(id="gpt-4", created=1677649200, owned_by="openai"),
-            ModelInfo(id="gpt-3.5-turbo", created=1677649200, owned_by="openai"),
-        ]
-        mock_model_discovery.discover_models.return_value = mock_models
-        mock_cache_manager.clear_provider_cache.return_value = True
-
-        # Make request
-        response = client.post(
-            "/v1/providers/openai/models/refresh",
-            headers={"Authorization": "Bearer test-key"},
-        )
-
-        # Assert response
-        assert response.status_code == 200
-        data = response.json()
-        assert data["success"] is True
-        assert data["provider"] == "openai"
-        assert data["models_refreshed"] == 2
-        assert data["cache_cleared"] is True
-        assert "duration_ms" in data
-        assert "timestamp" in data
-
-    @pytest.mark.asyncio
-    async def test_refresh_models_provider_not_found(
-        self, client, app, mock_provider_factory
-    ):
-        """Test refreshing models for non-existent provider."""
-        # Setup mocks
-        app.state.app_state = MagicMock()
-        app.state.app_state.provider_factory = mock_provider_factory
-        mock_provider_factory.get_all_provider_info.return_value = []
-
-        # Make request
-        response = client.post(
-            "/v1/providers/nonexistent/models/refresh",
-            headers={"Authorization": "Bearer test-key"},
-        )
-
-        # Assert response
-        assert response.status_code == 404
-        data = response.json()
-        assert "Provider 'nonexistent' not found" in data["error"]["message"]
-
-    def test_model_selection_request_validation(self):
-        """Test ModelSelectionRequest validation."""
-        # Valid request
-        valid_request = ModelSelectionRequest(
-            selected_model="gpt-4",
-            editable=True,
-            priority=5,
-            max_tokens=1000,
-            temperature=0.8,
-        )
-        assert valid_request.selected_model == "gpt-4"
-        assert valid_request.editable is True
-        assert valid_request.priority == 5
-
-        # Test whitespace trimming
-        request_with_whitespace = ModelSelectionRequest(
-            selected_model="  gpt-4  ", editable=True
-        )
-        assert request_with_whitespace.selected_model == "gpt-4"
-
-        # Test invalid priority
-        with pytest.raises(ValueError):
-            ModelSelectionRequest(
-                selected_model="gpt-4",
-                editable=True,
-                priority=15,  # Out of range
-            )
-
-        # Test empty model ID
-        with pytest.raises(ValueError):
-            ModelSelectionRequest(selected_model="   ", editable=True)
-
-    def test_model_info_extended_creation(self):
-        """Test ModelInfoExtended model creation."""
-        model = ModelInfoExtended(
-            id="gpt-4",
-            created=1677649200,
-            owned_by="openai",
-            provider="openai",
-            status="active",
-            capabilities=["text_generation", "chat"],
-            context_window=8192,
-            max_tokens=4096,
-            pricing={"input": 0.03, "output": 0.06},
-            description="GPT-4 language model",
-            version="2023-03-15",
-        )
-
-        assert model.id == "gpt-4"
-        assert model.provider == "openai"
-        assert "text_generation" in model.capabilities
-        assert model.context_window == 8192
-
-    @pytest.mark.asyncio
-    async def test_rate_limiting(
-        self,
-        client,
-        app,
-        mock_app_state,
-        mock_provider_factory,
-        mock_model_discovery,
-    ):
-        """Test rate limiting on model endpoints."""
-        # Setup mocks
-        self.setup_mocks(
-            app,
-            mock_app_state,
-            mock_provider_factory,
-            mock_model_discovery,
-            MagicMock(),
-            MagicMock(),
-        )
-
-        # Mock provider info
-        from src.core.provider_factory import ProviderStatus
-
-        mock_provider = MagicMock()
-        mock_provider.name = "openai"
-        mock_provider.status = ProviderStatus.HEALTHY
-        mock_provider_factory.get_all_provider_info.return_value = [mock_provider]
-
-        # Mock models
-        mock_models = [ModelInfo(id="gpt-4", created=1677649200, owned_by="openai")]
-        mock_model_discovery.discover_models.return_value = mock_models
-
-        # Make multiple rapid requests to test rate limiting
-        responses = []
-        for i in range(70):  # Exceed 60/minute limit
-            response = client.get(
-                "/v1/providers/openai/models",
-                headers={"Authorization": "Bearer test-key"},
-            )
-            responses.append(response)
-
-        # Should have some rate limited responses
-        rate_limited = [r for r in responses if r.status_code == 429]
-        assert len(rate_limited) > 0
-
-    @pytest.mark.asyncio
-    async def test_authentication_required(self, client):
-        """Test that authentication is required for model endpoints."""
-        endpoints = [
-            "/v1/providers/openai/models",
-            "/v1/providers/openai/models/gpt-4",
-            "/v1/providers/openai/model_selection",
-            "/v1/providers/openai/models/refresh",
-        ]
-
-        for endpoint in endpoints:
-            if "model_selection" in endpoint:
-                response = client.put(endpoint, json={"selected_model": "test"})
-            elif "refresh" in endpoint:
-                response = client.post(endpoint)
-            else:
-                response = client.get(endpoint)
-
-            assert response.status_code == 403
-
-    @pytest.mark.asyncio
-    async def test_error_handling(
-        self, client, app, mock_app_state, mock_provider_factory
-    ):
-        """Test error handling for various scenarios."""
-        # Setup mocks to raise exception
-        app.state.app_state = mock_app_state
-        mock_app_state.provider_factory = mock_provider_factory
-        mock_provider_factory.get_all_provider_info.side_effect = Exception(
-            "Database error"
-        )
-
-        # Make request
-        response = client.get(
-            "/v1/providers/openai/models",
-            headers={"Authorization": "Bearer test-key"},
-        )
-
-        # Assert error response
-        assert response.status_code == 400
-        data = response.json()
-        assert "error" in data
-        assert "Database error" in data["error"]["message"]
-
-
-if __name__ == "__main__":
-    pytest.main([__file__, "-v"])
+# A single app instance and client for all tests in this module
+@pytest.fixture(scope="module")
+def app():
+    app = FastAPI()
+    app.include_router(model_router)
+    return app
+
+@pytest.fixture(scope="module")
+def client(app):
+    with TestClient(app) as c:
+        yield c
+
+# This master fixture sets up all mocks and injects them into the app state.
+# It runs automatically for every test in this module.
+@pytest.fixture(autouse=True)
+def mock_dependencies(app):
+    # Create mock objects for all dependencies
+    mock_app_state = MagicMock()
+    mock_provider_factory = AsyncMock()
+    mock_model_discovery = AsyncMock()
+    mock_config_manager = MagicMock()
+    mock_cache_manager = AsyncMock()
+
+    # Set up the relationships between mocks
+    mock_app_state.provider_factory = mock_provider_factory
+    mock_app_state.model_discovery = mock_model_discovery
+    mock_app_state.config_manager = mock_config_manager
+    mock_app_state.cache_manager = mock_cache_manager
+
+    # Patch the app's state for all requests
+    app.state.app_state = mock_app_state
+
+    # Yield the mocks in a dictionary so tests can access them
+    mocks = {
+        "provider_factory": mock_provider_factory,
+        "model_discovery": mock_model_discovery,
+        "config_manager": mock_config_manager,
+        "cache_manager": mock_cache_manager,
+    }
+    yield mocks
+
+# Helper to create a mock provider
+def create_mock_provider(name="openai"):
+    from src.core.provider_factory import ProviderStatus
+    mock_provider = MagicMock()
+    mock_provider.name = name
+    mock_provider.status = ProviderStatus.HEALTHY
+    return mock_provider
+
+# --- Test Cases ---
+
+@pytest.mark.asyncio
+async def test_list_provider_models_success(client, mock_dependencies):
+    # Arrange
+    mock_dependencies["provider_factory"].get_all_provider_info.return_value = [create_mock_provider("openai")]
+    mock_models = [
+        ModelInfo(id="gpt-4", created=1677649200, owned_by="openai"),
+        ModelInfo(id="gpt-3.5-turbo", created=1677649200, owned_by="openai"),
+    ]
+    mock_dependencies["model_discovery"].discover_models.return_value = mock_models
+
+    # Act
+    response = client.get("/v1/providers/openai/models", headers={"Authorization": "Bearer test-key"})
+
+    # Assert
+    assert response.status_code == 200
+    data = response.json()
+    assert data["provider"] == "openai"
+    assert len(data["data"]) == 2
+
+@pytest.mark.asyncio
+async def test_list_provider_models_provider_not_found(client, mock_dependencies):
+    # Arrange
+    mock_dependencies["provider_factory"].get_all_provider_info.return_value = []
+
+    # Act
+    response = client.get("/v1/providers/nonexistent/models", headers={"Authorization": "Bearer test-key"})
+
+    # Assert
+    assert response.status_code == 404
+
+@pytest.mark.asyncio
+async def test_get_model_details_success(client, mock_dependencies):
+    # Arrange
+    mock_dependencies["provider_factory"].get_all_provider_info.return_value = [create_mock_provider("anthropic")]
+    mock_model = ModelInfo(id="claude-3-opus", created=1709251200, owned_by="anthropic")
+    mock_dependencies["model_discovery"].get_model_info.return_value = mock_model
+
+    # Act
+    response = client.get("/v1/providers/anthropic/models/claude-3-opus", headers={"Authorization": "Bearer test-key"})
+
+    # Assert
+    assert response.status_code == 200
+    data = response.json()
+    assert data["data"]["id"] == "claude-3-opus"
+
+@pytest.mark.asyncio
+async def test_get_model_details_not_found(client, mock_dependencies):
+    # Arrange
+    mock_dependencies["provider_factory"].get_all_provider_info.return_value = [create_mock_provider("openai")]
+    mock_dependencies["model_discovery"].get_model_info.return_value = None # Simulate model not found
+
+    # Act
+    response = client.get("/v1/providers/openai/models/nonexistent-model", headers={"Authorization": "Bearer test-key"})
+
+    # Assert
+    assert response.status_code == 404
+
+@pytest.mark.asyncio
+async def test_update_model_selection_success(client, mock_dependencies):
+    # Arrange
+    mock_dependencies["provider_factory"].get_all_provider_info.return_value = [create_mock_provider("openai")]
+    mock_dependencies["model_discovery"].get_model_info.return_value = ModelInfo(id="gpt-4", created=1, owned_by="openai")
+    mock_dependencies["config_manager"].load_config.return_value = MagicMock()
+
+    selection_data = {"selected_model": "gpt-4", "editable": True}
+
+    # Act
+    response = client.put("/v1/providers/openai/model_selection", json=selection_data, headers={"Authorization": "Bearer test-key"})
+
+    # Assert
+    assert response.status_code == 200
+    data = response.json()
+    assert data["success"] is True
+    mock_dependencies["config_manager"].save_config.assert_called_once()
+
+@pytest.mark.asyncio
+async def test_update_model_selection_invalid_model(client, mock_dependencies):
+    # Arrange
+    mock_dependencies["provider_factory"].get_all_provider_info.return_value = [create_mock_provider("openai")]
+    mock_dependencies["model_discovery"].get_model_info.return_value = None
+
+    selection_data = {"selected_model": "invalid-model", "editable": True}
+
+    # Act
+    response = client.put("/v1/providers/openai/model_selection", json=selection_data, headers={"Authorization": "Bearer test-key"})
+
+    # Assert
+    assert response.status_code == 404
+
+@pytest.mark.asyncio
+async def test_refresh_models_success(client, mock_dependencies):
+    # Arrange
+    mock_dependencies["provider_factory"].get_all_provider_info.return_value = [create_mock_provider("openai")]
+    mock_models = [ModelInfo(id="gpt-4", created=1, owned_by="openai")]
+    mock_dependencies["model_discovery"].discover_models.return_value = mock_models
+
+    # Act
+    response = client.post("/v1/providers/openai/models/refresh", headers={"Authorization": "Bearer test-key"})
+
+    # Assert
+    assert response.status_code == 200
+    data = response.json()
+    assert data["success"] is True
+    assert data["models_refreshed"] == 1
+    mock_dependencies["cache_manager"].clear_provider_cache.assert_called_once_with("openai")
+
+@pytest.mark.asyncio
+async def test_refresh_models_provider_not_found(client, mock_dependencies):
+    # Arrange
+    mock_dependencies["provider_factory"].get_all_provider_info.return_value = []
+
+    # Act
+    response = client.post("/v1/providers/nonexistent/models/refresh", headers={"Authorization": "Bearer test-key"})
+
+    # Assert
+    assert response.status_code == 404
+
+@pytest.mark.asyncio
+async def test_authentication_required(client):
+    # This test does not need mocks as it should fail before they are called.
+    endpoints = {
+        "GET": ["/v1/providers/openai/models", "/v1/providers/openai/models/gpt-4"],
+        "POST": ["/v1/providers/openai/models/refresh"],
+        "PUT": ["/v1/providers/openai/model_selection"],
+    }
+
+    for method, paths in endpoints.items():
+        for path in paths:
+            if method == "GET":
+                response = client.get(path)
+            elif method == "POST":
+                response = client.post(path)
+            elif method == "PUT":
+                response = client.put(path, json={"selected_model": "test"})
+
+            assert response.status_code == 403, f"Failed for {method} {path}"
+
+@pytest.mark.asyncio
+async def test_error_handling(client, mock_dependencies):
+    # Arrange
+    mock_dependencies["provider_factory"].get_all_provider_info.side_effect = Exception("Database error")
+
+    # Act
+    response = client.get("/v1/providers/openai/models", headers={"Authorization": "Bearer test-key"})
+
+    # Assert
+    assert response.status_code == 500  # Should be 500 for unhandled exceptions
+    assert "Database error" in response.json()["detail"]

@@ -1,13 +1,16 @@
 """
 API Gateway Router - Main entry point for all API endpoints.
 
-This module creates the centralized API router that combines all controllers
-and defines the main API endpoints.
+This module creates the centralized API router that combines all controllers,
+applies middleware, and handles errors consistently across the application.
 """
 
 import time
+
 from fastapi import APIRouter, Request, HTTPException, Depends
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse, JSONResponse
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from .controllers.alerting_controller import router as alerting_router
 from .controllers.analytics_controller import router as analytics_router
@@ -17,6 +20,13 @@ from .controllers.context_controller import router as context_router
 from src.core.rate_limiter import rate_limiter
 from src.models.requests import ChatCompletionRequest
 from src.core.exceptions import ProviderNotFoundError, ProviderUnavailableError
+from .errors.custom_exceptions import APIException
+from .errors.error_handlers import (
+    global_exception_handler,
+    http_exception_handler,
+    validation_exception_handler,
+)
+from .validation.middleware import middleware_pipeline
 from src.core.routing.provider_factory import provider_factory
 from src.core.auth import verify_api_key
 from src.core.breaker.circuit_breaker import get_circuit_breaker
@@ -37,8 +47,10 @@ async def list_models(request: Request):
     return {"object": "list", "data": await provider_factory.list_all_models()}
 
 
-@main_router.post("/chat/completions", tags=["chat"], dependencies=[Depends(verify_api_key)])
-async def chat_completions(request: ChatCompletionRequest):
+from fastapi import Depends
+
+@main_router.post("/chat/completions", tags=["chat"])
+async def chat_completions(request: ChatCompletionRequest, auth_result: bool = Depends(verify_api_key)):
     """
     Main dynamic routing endpoint for chat completions.
     Routes requests to the appropriate provider based on the 'model' field.
@@ -73,10 +85,18 @@ async def chat_completions(request: ChatCompletionRequest):
             raise HTTPException(status_code=404, detail=str(e))
         except ProviderUnavailableError as e:
             raise HTTPException(status_code=503, detail=str(e))
+        except Exception as e:
+            logger.error(
+                "An unexpected error occurred during chat completion",
+                error=str(e),
+            )
+            raise HTTPException(
+                status_code=500, detail="An internal server error occurred."
+            )
 
 
-@main_router.post("/embeddings", tags=["embeddings"], dependencies=[Depends(verify_api_key)])
-async def embeddings(request: Request):
+@main_router.post("/embeddings", tags=["embeddings"])
+async def embeddings(request: Request, auth_result: bool = Depends(verify_api_key)):
     """Dynamic routing endpoint for embeddings."""
     body = await request.json()
     model_name = body.get("model")
@@ -99,6 +119,11 @@ async def embeddings(request: Request):
             raise HTTPException(status_code=404, detail=str(e))
         except ProviderUnavailableError as e:
             raise HTTPException(status_code=503, detail=str(e))
+        except Exception as e:
+            logger.error("An unexpected error occurred during embeddings", error=str(e))
+            raise HTTPException(
+                status_code=500, detail="An internal server error occurred."
+            )
 
 
 # Include other controller routers that are not being replaced
@@ -109,6 +134,42 @@ main_router.include_router(alerting_router, tags=["alerting"])
 main_router.include_router(config_router, prefix="/config", tags=["config"])
 
 # The old chat_router and model_router are now replaced by the dynamic endpoints above.
+
+
+class APIGatewayMiddleware(BaseHTTPMiddleware):
+    """Main API gateway middleware that orchestrates all middleware processing."""
+
+    def __init__(self, app):
+        super().__init__(app)
+
+    async def dispatch(self, request: Request, call_next):
+        """Dispatch request through middleware pipeline."""
+        return await middleware_pipeline.process_request(request, call_next)
+
+
+# Middleware setup functions
+def setup_middleware(app):
+    """Setup all middleware for the FastAPI application."""
+    app.add_middleware(APIGatewayMiddleware)
+
+
+def setup_exception_handlers(app):
+    """Setup global exception handlers for the FastAPI application."""
+
+    # Register exception handlers
+    app.add_exception_handler(Exception, global_exception_handler)
+    app.add_exception_handler(RequestValidationError, validation_exception_handler)
+    app.add_exception_handler(APIException, global_exception_handler)
+
+    # Add additional handlers for common HTTP exceptions
+    from fastapi import HTTPException
+
+    app.add_exception_handler(HTTPException, http_exception_handler)
+
+
+def create_api_router():
+    """Create and return the main API router with all endpoints."""
+    return main_router
 
 
 # Health check endpoint at root level (before /v1 prefix)
@@ -127,12 +188,11 @@ async def root_health_check(request: Request):
 
 
 @root_router.get("/")
-async def root_info(request: Request):
+async def root_info():
     """Basic API information."""
-    app_version = request.app.state.config.app.get("version", "unknown")
     return {
         "name": "Proxy API Gateway",
-        "version": app_version,
+        "version": "1.0.0",
         "description": "Unified API gateway for LLM proxy with intelligent routing",
         "endpoints": {
             "chat": "/v1/chat/completions",
@@ -170,10 +230,9 @@ async def monitoring_dashboard():
 @rate_limiter.limit(route="/v1/status")
 async def api_status(request: Request):
     """Detailed API status information."""
-    app_version = request.app.state.config.app.get("version", "unknown")
     return {
         "status": "operational",
-        "version": app_version,
+        "version": "1.0.0",
         "uptime": "unknown",  # Could be enhanced with actual uptime tracking
         "timestamp": int(time.time()),
         "features": [
@@ -188,4 +247,71 @@ async def api_status(request: Request):
     }
 
 
-# Additional utility endpoints
+# Request/Response logging middleware
+class RequestLoggingMiddleware(BaseHTTPMiddleware):
+    """Middleware for detailed request/response logging."""
+
+    async def dispatch(self, request: Request, call_next):
+        start_time = time.time()
+
+        # Log request
+        print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] {request.method} {request.url}")
+
+        response = await call_next(request)
+
+        # Log response
+        process_time = time.time() - start_time
+        logger.info(
+            "Request processed",
+            method=request.method,
+            url=str(request.url),
+            status_code=response.status_code,
+            process_time=process_time,
+        )
+
+        return response
+
+
+# CORS middleware (if needed)
+class CORSMiddleware(BaseHTTPMiddleware):
+    """CORS middleware for cross-origin requests."""
+
+    def __init__(self, app, allow_origins=None):
+        super().__init__(app)
+        self.allow_origins = allow_origins or ["*"]
+
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+
+        # Add CORS headers
+        response.headers["Access-Control-Allow-Origin"] = ", ".join(self.allow_origins)
+        response.headers["Access-Control-Allow-Methods"] = (
+            "GET, POST, PUT, DELETE, OPTIONS"
+        )
+        response.headers["Access-Control-Allow-Headers"] = (
+            "Authorization, Content-Type, X-API-Key"
+        )
+
+        return response
+
+
+# Initialize additional middleware
+request_logging_middleware = RequestLoggingMiddleware(None)
+cors_middleware = CORSMiddleware(None)
+
+
+def setup_additional_middleware(app):
+    """Setup additional utility middleware."""
+    app.add_middleware(RequestLoggingMiddleware)
+    app.add_middleware(CORSMiddleware)
+
+
+# Export all necessary components
+__all__ = [
+    "main_router",
+    "root_router",
+    "create_api_router",
+    "setup_middleware",
+    "setup_exception_handlers",
+    "setup_additional_middleware",
+]
