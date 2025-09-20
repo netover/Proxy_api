@@ -18,7 +18,7 @@ from .controllers.config_controller import router as config_router
 from .controllers.health_controller import router as health_router
 from .controllers.context_controller import router as context_router
 from src.core.rate_limiter import rate_limiter
-from src.models.requests import ChatCompletionRequest
+from src.models.requests import ChatCompletionRequest, EmbeddingRequest
 from src.core.exceptions import ProviderNotFoundError, ProviderUnavailableError
 from .errors.custom_exceptions import APIException
 from .errors.error_handlers import (
@@ -95,24 +95,20 @@ async def chat_completions(request: ChatCompletionRequest, auth_result: bool = D
             )
 
 
-@main_router.post("/embeddings", tags=["embeddings"])
-async def embeddings(request: Request, auth_result: bool = Depends(verify_api_key)):
+@main_router.post("/embeddings", tags=["embeddings"], dependencies=[Depends(verify_api_key)])
+async def embeddings(request: EmbeddingRequest):
     """Dynamic routing endpoint for embeddings."""
-    body = await request.json()
-    model_name = body.get("model")
-    if not model_name:
-        raise HTTPException(status_code=400, detail="'model' field is required.")
-
-    with logger.span("dynamic_embeddings", attributes={"model": model_name}):
+    with logger.span("dynamic_embeddings", attributes={"model": request.model}):
         try:
-            client, config = await provider_factory.get_provider_client(model_name)
+            client, config = await provider_factory.get_provider_client(request.model)
             breaker = get_circuit_breaker(config.provider)
 
+            # Pass the validated request data to the provider
             response = await breaker.call(
                 client.embeddings,
-                model=model_name,
-                input=body.get("input", []),
-                **{k: v for k, v in body.items() if k not in ["model", "input"]},
+                model=request.model,
+                input=request.input,
+                **request.model_dump(exclude={"model", "input"})
             )
             return response
         except ProviderNotFoundError as e:

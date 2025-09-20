@@ -105,7 +105,7 @@ class ModelDiscoveryService:
     def _generate_model_cache_key(self, provider_config: ProviderConfig) -> str:
         """Generate a unique cache key for provider models"""
         key_string = f"models:{provider_config.name}:{provider_config.base_url}"
-        return hashlib.md5(key_string.encode()).hexdigest()
+        return hashlib.sha256(key_string.encode()).hexdigest()
 
     async def invalidate_model_cache(self, provider_config: ProviderConfig) -> bool:
         """

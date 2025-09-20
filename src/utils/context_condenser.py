@@ -1,5 +1,7 @@
 import asyncio
 import hashlib
+import asyncio
+import hashlib
 import json
 import os
 import re
@@ -7,6 +9,7 @@ import time
 from collections import OrderedDict
 from typing import List, Optional
 
+import aiofiles
 from fastapi import Request
 
 from src.core.logging import ContextualLogger
@@ -68,7 +71,7 @@ class AsyncLRUCache:
     async def load(self):
         """Load cache from file or Redis if persistence enabled"""
         if self.redis_client:
-            # Load from Redis
+            # Load from Redis (already async)
             try:
                 keys = await self.redis_client.keys("cache:*")
                 if keys:
@@ -82,55 +85,51 @@ class AsyncLRUCache:
             except Exception as e:
                 logger.error(f"Failed to load Redis cache: {e}")
         elif self.persist_file:
-            # Load from file
+            # Load from file using aiofiles for non-blocking I/O
             try:
-                with open(
-                    self.persist_file, "r", encoding="utf-8", errors="ignore"
-                ) as f:
-                    data = json.load(f)
+                async with aiofiles.open(self.persist_file, "r", encoding="utf-8", errors="ignore") as f:
+                    content = await f.read()
+                    data = json.loads(content)
                     self.cache = OrderedDict(data)
-                    logger.info(
-                        f"Loaded {len(self.cache)} items from {self.persist_file}"
-                    )
+                    logger.info(f"Loaded {len(self.cache)} items from {self.persist_file}")
             except FileNotFoundError:
                 logger.info(f"No persistent cache file found: {self.persist_file}")
             except json.JSONDecodeError as e:
                 logger.error(f"Failed to parse cache file: {e}")
-                # Handle corrupted cache file
                 try:
-                    os.rename(self.persist_file, f"{self.persist_file}.corrupted")
-                    logger.info(
-                        f"Renamed corrupted cache file to {self.persist_file}.corrupted"
-                    )
+                    # Use aiofiles for async rename if available, otherwise fallback
+                    if hasattr(aiofiles, "os") and hasattr(aiofiles.os, "rename"):
+                        await aiofiles.os.rename(self.persist_file, f"{self.persist_file}.corrupted")
+                    else:
+                         os.rename(self.persist_file, f"{self.persist_file}.corrupted")
+                    logger.info(f"Renamed corrupted cache file to {self.persist_file}.corrupted")
                 except Exception as rename_error:
-                    logger.error(
-                        f"Failed to rename corrupted cache file: {rename_error}"
-                    )
+                    logger.error(f"Failed to rename corrupted cache file: {rename_error}")
             except Exception as e:
                 logger.error(f"Failed to load persistent cache: {e}")
 
     async def save(self):
         """Save cache to file or Redis if persistence enabled"""
         if self.redis_client:
-            # Save to Redis
-            if len(self.cache) == 0:
+            # Save to Redis (already async)
+            if not self.cache:
                 return
             try:
-                for key, value in self.cache.items():
-                    redis_key = f"cache:{key}"
-                    await self.redis_client.set(
-                        redis_key, json.dumps(value, default=str)
-                    )
+                async with self.redis_client.pipeline() as pipe:
+                    for key, value in self.cache.items():
+                        redis_key = f"cache:{key}"
+                        pipe.set(redis_key, json.dumps(value, default=str))
+                    await pipe.execute()
                 logger.debug(f"Saved {len(self.cache)} items to Redis")
             except Exception as e:
                 logger.error(f"Failed to save Redis cache: {e}")
         elif self.persist_file:
-            # Save to file
-            if len(self.cache) == 0:
+            # Save to file using aiofiles for non-blocking I/O
+            if not self.cache:
                 return
             try:
-                with open(self.persist_file, "w", encoding="utf-8") as f:
-                    json.dump(dict(self.cache), f, ensure_ascii=False, default=str)
+                async with aiofiles.open(self.persist_file, "w", encoding="utf-8") as f:
+                    await f.write(json.dumps(dict(self.cache), ensure_ascii=False, default=str))
                 logger.debug(f"Saved {len(self.cache)} items to {self.persist_file}")
             except Exception as e:
                 logger.error(f"Failed to save persistent cache: {e}")
@@ -256,7 +255,7 @@ async def condense_context(
         )  # Respect but cap with adaptive
 
     # Cache key
-    chunk_hash = hashlib.md5("".join(chunks).encode()).hexdigest()
+    chunk_hash = hashlib.sha256("".join(chunks).encode()).hexdigest()
 
     # Check cache
     cached = lru_cache.get(chunk_hash)

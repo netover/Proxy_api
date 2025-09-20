@@ -1,5 +1,6 @@
-from pydantic import BaseModel, Field
-from typing import List, Dict, Any
+import os
+from pydantic import BaseModel, Field, validator
+from typing import List, Dict, Any, Optional
 
 class AppConfig(BaseModel):
     name: str
@@ -22,6 +23,7 @@ class TelemetryConfig(BaseModel):
 
 class AuthConfig(BaseModel):
     api_keys: List[str] = Field(default_factory=list)
+    api_keys_env: Optional[str] = None
 
 class ProviderModel(BaseModel):
     name: str
@@ -62,4 +64,15 @@ class UnifiedConfig(BaseModel):
 
     @property
     def proxy_api_keys(self) -> List[str]:
+        """
+        Provides a unified way to get API keys, prioritizing environment variables
+        over hardcoded keys in the config file.
+        """
+        if self.auth.api_keys_env:
+            keys_from_env = os.getenv(self.auth.api_keys_env)
+            if keys_from_env:
+                # Split comma-separated keys and strip whitespace
+                return [key.strip() for key in keys_from_env.split(',')]
+
+        # Fallback to the list defined directly in the YAML
         return self.auth.api_keys

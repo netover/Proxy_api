@@ -270,7 +270,7 @@ def generate_cache_key(*args, **kwargs) -> str:
         key_parts.append(str(sorted(kwargs.items())))
 
     key_string = "|".join(key_parts)
-    return hashlib.md5(key_string.encode()).hexdigest()
+    return hashlib.sha256(key_string.encode()).hexdigest()
 
 
 async def get_or_set(
