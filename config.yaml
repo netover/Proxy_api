@@ -1,18 +1,29 @@
+# ==============================================================================
 # LLM Proxy API Configuration
-# Updated with OpenTelemetry, Chaos Engineering, and Load Testing features
+# ==============================================================================
+# This file contains the complete configuration for the LLM Proxy API.
+# It is written in YAML format.
 
+# ------------------------------------------------------------------------------
+# Application Metadata
+# ------------------------------------------------------------------------------
 app:
   name: "LLM Proxy API"
   version: "2.0.0"
-  environment: "production"
+  environment: "production" # Can be 'development', 'staging', or 'production'
 
+# ------------------------------------------------------------------------------
+# Server Configuration
+# ------------------------------------------------------------------------------
 server:
-  host: "0.0.0.0"
-  port: 8000
-  debug: false
-  reload: false
+  host: "0.0.0.0"  # Host to bind the server to. "0.0.0.0" makes it accessible externally.
+  port: 8000       # Port to run the server on.
+  debug: false     # Enable debug mode (provides more verbose error pages).
+  reload: false    # Enable auto-reloading when code changes (for development).
 
-# OpenTelemetry Configuration
+# ------------------------------------------------------------------------------
+# OpenTelemetry Configuration for Observability
+# ------------------------------------------------------------------------------
 telemetry:
   enabled: true
   service_name: "llm-proxy"
@@ -24,79 +35,70 @@ telemetry:
     enabled: true
     endpoint: "http://localhost:9411/api/v2/spans"
   sampling:
-    probability: 1.0  # 100% sampling for development, reduce in production
+    probability: 1.0  # 1.0 = 100% sampling. Reduce in production (e.g., 0.1 for 10%).
 
+# ------------------------------------------------------------------------------
 # Jinja2 Template Configuration
+# ------------------------------------------------------------------------------
 templates:
   enabled: true
   directory: "templates"
   cache_size: 1000
   auto_reload: false
 
-# Chaos Engineering Configuration
+# ------------------------------------------------------------------------------
+# Chaos Engineering (for resilience testing)
+# ------------------------------------------------------------------------------
 chaos_engineering:
-  enabled: false  # Enable only for testing
+  enabled: false  # WARNING: Enable only for testing purposes.
   faults:
     - type: "delay"
-      severity: "medium"
       probability: 0.1
       duration_ms: 500
     - type: "error"
-      severity: "low"
       probability: 0.05
       error_code: 503
-      error_message: "Service temporarily unavailable"
-    - type: "rate_limit"
-      severity: "low"
-      probability: 0.03
     - type: "timeout"
-      severity: "medium"
       probability: 0.08
       duration_ms: 5000
-    - type: "network_failure"
-      severity: "high"
-      probability: 0.02
 
+# ------------------------------------------------------------------------------
 # Rate Limiting
+# ------------------------------------------------------------------------------
 rate_limit:
   requests_per_window: 1000
   window_seconds: 60
   burst_limit: 50
+  # Per-route limits (e.g., "100/minute"). These override the global settings.
   routes:
-    "/health": "1000/minute"
     "/v1/chat/completions": "100/minute"
-    "/v1/completions": "100/minute"
     "/v1/embeddings": "200/minute"
-    "/v1/images/generations": "50/minute"
-    "/v1/health": "1000/minute"
-    "/v1/metrics": "500/minute"
-    "/v1/models": "200/minute"
-    "/v1/status": "500/minute"
-    "/v1/providers": "200/minute"
-    "/v1/config/reload": "50/minute"
-    "/v1/config/status": "100/minute"
-    "/v1/config/invalidate-cache": "50/minute"
 
+# ------------------------------------------------------------------------------
 # Authentication
+# ------------------------------------------------------------------------------
+# It is recommended to use `api_keys_env` for production.
+# The value should be the name of an environment variable that contains a
+# comma-separated list of your API keys. Example: export PROXY_API_KEYS="key1,key2"
 auth:
+  api_keys_env: "PROXY_API_KEYS"
+  # The `api_keys` list is still supported for local development or backward compatibility.
   api_keys:
-    - "test-key-123"
-    - "prod-key-456"
-    - "admin-key-789"
+    - "dev-key-for-local-testing"
 
+# ------------------------------------------------------------------------------
 # Provider Configuration
+# ------------------------------------------------------------------------------
+# Define the downstream AI providers the proxy will connect to.
 providers:
   - name: "openai"
     type: "openai"
-    api_key_env: "OPENAI_API_KEY"
+    api_key_env: "OPENAI_API_KEY" # Name of the env var holding the key.
     base_url: "https://api.openai.com/v1"
-    models:
-      - "gpt-3.5-turbo"
-      - "gpt-4"
-      - "gpt-4-turbo"
+    models: ["gpt-3.5-turbo", "gpt-4"]
     enabled: true
-    forced: false
-    priority: 1
+    forced: false # If true, all requests go to this provider regardless of model name.
+    priority: 1   # Lower numbers are higher priority for fallbacks.
     timeout: 30
     max_retries: 3
     max_connections: 50
@@ -110,10 +112,7 @@ providers:
     type: "anthropic"
     api_key_env: "ANTHROPIC_API_KEY"
     base_url: "https://api.anthropic.com"
-    models:
-      - "claude-3-haiku"
-      - "claude-3-sonnet"
-      - "claude-3-opus"
+    models: ["claude-3-haiku", "claude-3-sonnet"]
     enabled: true
     forced: false
     priority: 2
@@ -126,48 +125,33 @@ providers:
     custom_headers:
       "X-Client-Type": "llm-proxy"
 
-  - name: "azure"
-    type: "azure_openai"
-    api_key_env: "AZURE_OPENAI_KEY"
-    base_url: "https://api.openai.azure.com"
-    models:
-      - "gpt-35-turbo"
-      - "gpt-4"
-    enabled: true
-    forced: false
-    priority: 3
-    timeout: 30
-    max_retries: 3
-    max_connections: 50
-    max_keepalive_connections: 20
-    keepalive_expiry: 30.0
-    retry_delay: 1.0
-    custom_headers:
-      "X-Client-Type": "llm-proxy"
-
+# ------------------------------------------------------------------------------
 # Circuit Breaker Configuration
+# ------------------------------------------------------------------------------
 circuit_breaker:
-  failure_threshold: 5
-  recovery_timeout: 60
-  half_open_max_calls: 3
-  expected_exception: "ProviderError"
+  failure_threshold: 5      # Number of failures before the circuit opens.
+  recovery_timeout: 60      # Seconds to wait before moving to HALF-OPEN state.
+  half_open_max_calls: 3    # Number of test requests to allow in HALF-OPEN state.
+  expected_exception: "ProviderError" # Exceptions that count as failures.
 
-# Context Condensation
+# ------------------------------------------------------------------------------
+# Context Condensation (for reducing long contexts)
+# ------------------------------------------------------------------------------
 condensation:
   enabled: true
-  truncation_threshold: 8000
-  summary_max_tokens: 512
-  cache_size: 1000
-  cache_ttl: 3600
+  truncation_threshold: 8000 # Max context length before proactive truncation.
+  summary_max_tokens: 512    # Max tokens for the generated summary.
+  cache_size: 1000           # Number of summaries to keep in the LRU cache.
+  cache_ttl: 3600            # Seconds to keep a summary in the cache.
   cache_persist: true
-  cache_redis_url: "${REDIS_URL}"
+  cache_redis_url: "${REDIS_URL}" # Use env var for Redis URL.
   error_patterns:
     - "context length"
     - "maximum context"
-    - "too long"
-    - "exceeds maximum"
 
-# Smart Caching
+# ------------------------------------------------------------------------------
+# Smart Caching Configuration
+# ------------------------------------------------------------------------------
 caching:
   enabled: true
   response_cache:
@@ -179,14 +163,18 @@ caching:
     ttl: 3600
     compression: true
 
+# ------------------------------------------------------------------------------
 # Memory Management
+# ------------------------------------------------------------------------------
 memory:
-  max_usage_percent: 85
-  gc_threshold_percent: 80
-  monitoring_interval: 30
-  cache_cleanup_interval: 300
+  max_usage_percent: 85      # Max memory usage before triggering warnings/actions.
+  gc_threshold_percent: 80   # Memory usage % to trigger garbage collection.
+  monitoring_interval: 30    # Seconds between memory checks.
+  cache_cleanup_interval: 300 # Seconds between cache cleanup runs.
 
-# HTTP Client Configuration
+# ------------------------------------------------------------------------------
+# Global HTTP Client Configuration
+# ------------------------------------------------------------------------------
 http_client:
   timeout: 30
   connect_timeout: 10
@@ -196,71 +184,13 @@ http_client:
     max_keepalive_connections: 30
     keepalive_timeout: 30
 
-# Logging
+# ------------------------------------------------------------------------------
+# Logging Configuration
+# ------------------------------------------------------------------------------
 logging:
-  level: "INFO"  # Default level, overridden by LOG_LEVEL env var
-  format: "json"
+  level: "INFO"  # Default log level. Can be overridden by LOG_LEVEL env var.
+  format: "json" # 'json' for production, 'console' for development.
   file: "logs/app.log"
   rotation:
     max_size_mb: 100
     max_files: 5
-  # Environment-specific overrides:
-  # Development: Set LOG_LEVEL=DEBUG for detailed logging
-  # Production: Set LOG_LEVEL=WARNING for minimal logging
-  # Default: INFO level
-
-# Health Check Configuration
-health_check:
-  interval: 30
-
-services:
-  context_service_url: "http://localhost:8001"
-  timeout: 5
-  providers: true
-  context_service: true
-  memory: true
-  cache: true
-
-# Load Testing Configuration
-load_testing:
-  tiers:
-    light:
-      users: 30
-      duration: "5m"
-      ramp_up: "30s"
-      expected_rps: 5
-    medium:
-      users: 100
-      duration: "5m"
-      ramp_up: "1m"
-      expected_rps: 20
-    heavy:
-      users: 400
-      duration: "15m"
-      ramp_up: "5m"
-      expected_rps: 80
-    extreme:
-      users: 1000
-      duration: "20m"
-      ramp_up: "10m"
-      expected_rps: 200
-
-# Network Simulation
-network_simulation:
-  profiles:
-    fast:
-      min_delay: 10
-      max_delay: 50
-      jitter: 0.1
-    medium:
-      min_delay: 100
-      max_delay: 300
-      jitter: 0.2
-    slow:
-      min_delay: 500
-      max_delay: 2000
-      jitter: 0.3
-    unreliable:
-      min_delay: 1000
-      max_delay: 5000
-      jitter: 0.5

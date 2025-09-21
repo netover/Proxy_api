@@ -105,15 +105,35 @@ async def perform_parallel_health_checks(request: Request) -> Dict[str, Any]:
 
 @router.get("/health/providers")
 @rate_limiter.limit(route="/health/providers")
-async def provider_health_check(request: Request):
-    """Deep health check of all providers in parallel"""
+async def provider_health_check(request: Request) -> Dict[str, Any]:
+    """
+    Performs a deep health check of all configured providers in parallel.
+
+    This endpoint iterates through all providers defined in the configuration,
+    runs a health check against each one concurrently, and returns a detailed
+    report of their status and response times.
+
+    Returns:
+        A dictionary containing a summary and detailed results of the provider health checks.
+    """
     return await perform_parallel_health_checks(request)
 
 
 @router.get("/health")
 @rate_limiter.limit(route="/v1/health")
-async def health_check(request: Request):
-    """Comprehensive health check with system monitoring"""
+async def health_check(request: Request) -> Dict[str, Any]:
+    """
+    Provides a comprehensive health check of the entire system.
+
+    This endpoint aggregates several key metrics to produce an overall health score:
+    - Status of all configured providers.
+    - System resource usage (CPU, memory, disk).
+    - Number and severity of active alerts.
+
+    Returns:
+        A detailed dictionary containing the overall health status, score, and
+        breakdowns of provider, system, alert, and performance metrics.
+    """
     start_time = time.time()
     logger.info("Health check request started")
 
