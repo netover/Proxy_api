@@ -1,7 +1,5 @@
 import asyncio
 import hashlib
-import asyncio
-import hashlib
 import json
 import os
 import re
@@ -339,17 +337,17 @@ async def condense_context(
         request_body["model"] = top_cfg.models[0]
 
         fallback_attempted = False
+        last_exception = None
         for attempt in range(2):
             try:
                 async with asyncio.timeout(top_cfg.timeout):
                     resp = await provider.create_completion(request_body)
+                last_exception = None # Clear exception on success
                 break
-            except asyncio.TimeoutError as e:
-                error_msg = str(e)
-                logger.error(error_msg)
             except Exception as e:
+                last_exception = e
                 error_msg = str(e)
-                logger.error(f"Condensation failed: {error_msg}")
+                logger.error(f"Condensation attempt failed: {error_msg}")
 
             if not fallback_attempted and condensation_config.error_patterns:
                 if any(
@@ -365,39 +363,31 @@ async def condense_context(
                         request_body["max_tokens"] = use_max_tokens
                         logger.info("Applied truncate fallback")
                         fallback_applied = True
-                    if (
-                        not fallback_applied
-                        and "secondary_provider"
-                        in condensation_config.fallback_strategies
-                    ):
-                        enabled_providers_count = len(
-                            [p for p in sorted_providers if p.enabled]
-                        )
+
+                    if not fallback_applied and "secondary_provider" in condensation_config.fallback_strategies:
+                        enabled_providers_count = len([p for p in sorted_providers if p.enabled])
                         if enabled_providers_count > 1:
                             current_idx = sorted_providers.index(top_cfg)
                             if current_idx + 1 < len(sorted_providers):
-                                # Find next enabled provider
-                                for next_idx in range(
-                                    current_idx + 1, len(sorted_providers)
-                                ):
+                                for next_idx in range(current_idx + 1, len(sorted_providers)):
                                     next_cfg = sorted_providers[next_idx]
                                     if next_cfg.enabled:
                                         top_cfg = next_cfg
-                                        provider = (
-                                            await provider_factory.create_provider(
-                                                top_cfg
-                                            )
-                                        )
+                                        provider = await provider_factory.create_provider(top_cfg)
                                         request_body["model"] = top_cfg.models[0]
-                                        logger.info(
-                                            f"Applied secondary provider fallback: {top_cfg.name}"
-                                        )
+                                        logger.info(f"Applied secondary provider fallback: {top_cfg.name}")
                                         fallback_applied = True
                                         break
+
                     if fallback_applied:
                         fallback_attempted = True
                         continue
-            raise ValueError(error_msg)
+
+            # If we are here, it means an error occurred and no fallback was applied.
+            if last_exception:
+                raise last_exception
+            else:
+                raise ValueError("Condensation failed with an unknown error.")
 
     summary = resp["choices"][0]["message"]["content"]
 
