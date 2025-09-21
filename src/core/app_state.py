@@ -1,13 +1,14 @@
 import asyncio
+import os
 from src.services.logging import ContextualLogger
-from src.core.config.manager import get_config
+# This import is moved inside the initialize method to allow for easier mocking in tests.
+# from src.core.config.manager import get_config
 from src.core.config.models import UnifiedConfig
 from src.core.telemetry.telemetry import telemetry, TracedSpan
 from src.core.http.client_v2 import get_advanced_http_client
 from src.core.cache.smart import get_response_cache, get_summary_cache, shutdown_caches
 from src.core.memory.manager import get_memory_manager, shutdown_memory_manager
 from src.core.security.auth import APIKeyAuth
-from src.core.routing.rate_limiter import rate_limiter
 from src.core.chaos.monkey import chaos_monkey
 from src.core.alerting.manager import alert_manager
 from src.core.providers.factory import provider_factory
@@ -27,6 +28,9 @@ class AppState:
 
     async def initialize(self):
         """Initializes all the application components."""
+        # Import here to allow for easier mocking in tests
+        from src.core.config.manager import get_config
+
         logger.info("AppState: Initializing all application components...")
         self.config = get_config()
 
@@ -36,9 +40,14 @@ class AppState:
 
         # Initialize HTTP client
         with TracedSpan("http_client.initialize"):
-            self.http_client = get_advanced_http_client(**self.config.http_client)
-            await self.http_client.initialize()
-            logger.info("AppState: HTTP client initialized.")
+            if self.config.http_client:
+                http_config_dict = self.config.http_client.model_dump()
+                self.http_client = get_advanced_http_client(**http_config_dict)
+                await self.http_client.initialize()
+                logger.info("AppState: HTTP client initialized.")
+            else:
+                logger.warning("HTTP client configuration not found. Skipping initialization.")
+                self.http_client = None
 
         # Initialize caches
         with TracedSpan("cache.initialize"):
@@ -52,12 +61,10 @@ class AppState:
             logger.info("AppState: Memory manager initialized.")
 
         # Initialize authentication
-        self.api_key_auth = APIKeyAuth(self.config.proxy_api_keys)
-        logger.info(f"AppState: Authentication initialized with {len(self.config.proxy_api_keys)} API key(s).")
-
-        # Configure rate limiter
-        rate_limiter.configure_from_settings(self.config.rate_limit)
-        logger.info("AppState: Per-route rate limiting configured.")
+        api_keys_str = os.getenv("PROXY_API_KEYS", "")
+        api_keys_list = [key.strip() for key in api_keys_str.split(',') if key.strip()]
+        self.api_key_auth = APIKeyAuth(api_keys_list)
+        logger.info(f"AppState: Authentication initialized with {len(api_keys_list)} API key(s) from environment.")
 
         # Configure chaos engineering
         chaos_monkey.configure(self.config.chaos_engineering)

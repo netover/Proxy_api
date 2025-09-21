@@ -30,7 +30,7 @@ ProxyAPI uses API key-based authentication. You can provide your API key in two 
 ### Header Authentication
 
 ```http
-Authorization: Bearer your-api-key
+Authorization: Bearer [YOUR_API_KEY]
 ```
 
 ### Custom Header
@@ -38,7 +38,7 @@ Authorization: Bearer your-api-key
 The API key header can be configured via settings (default: `x-api-key`):
 
 ```http
-X-API-Key: your-api-key
+X-API-Key: [YOUR_API_KEY]
 ```
 
 ### Configuration
@@ -758,7 +758,7 @@ import requests
 
 url = "https://your-proxy-api.com/v1/chat/completions"
 headers = {
-    "Authorization": "Bearer your-api-key",
+    "Authorization": "Bearer [YOUR_API_KEY]",
     "Content-Type": "application/json"
 }
 
@@ -782,7 +782,7 @@ import requests
 
 url = "https://your-proxy-api.com/v1/chat/completions"
 headers = {
-    "Authorization": "Bearer your-api-key",
+    "Authorization": "Bearer [YOUR_API_KEY]",
     "Content-Type": "application/json"
 }
 
@@ -814,7 +814,7 @@ const axios = require('axios');
 
 const url = 'https://your-proxy-api.com/v1/chat/completions';
 const headers = {
-  'Authorization': 'Bearer your-api-key',
+  'Authorization': 'Bearer [YOUR_API_KEY]',
   'Content-Type': 'application/json'
 };
 
@@ -841,7 +841,7 @@ const axios = require('axios');
 
 const url = 'https://your-proxy-api.com/v1/chat/completions';
 const headers = {
-  'Authorization': 'Bearer your-api-key',
+  'Authorization': 'Bearer [YOUR_API_KEY]',
   'Content-Type': 'application/json'
 };
 
@@ -880,7 +880,7 @@ axios.post(url, data, {
 
 ```bash
 curl -X POST "https://your-proxy-api.com/v1/chat/completions" \
-  -H "Authorization: Bearer your-api-key" \
+  -H "Authorization: Bearer [YOUR_API_KEY]" \
   -H "Content-Type: application/json" \
   -d '{
     "model": "gpt-3.5-turbo",
@@ -894,7 +894,7 @@ curl -X POST "https://your-proxy-api.com/v1/chat/completions" \
 
 ```bash
 curl -X POST "https://your-proxy-api.com/v1/chat/completions" \
-  -H "Authorization: Bearer your-api-key" \
+  -H "Authorization: Bearer [YOUR_API_KEY]" \
   -H "Content-Type: application/json" \
   -d '{
     "model": "gpt-3.5-turbo",
@@ -907,7 +907,7 @@ curl -X POST "https://your-proxy-api.com/v1/chat/completions" \
 
 ```bash
 curl -X GET "https://your-proxy-api.com/v1/models" \
-  -H "Authorization: Bearer your-api-key"
+  -H "Authorization: Bearer [YOUR_API_KEY]"
 ```
 
 #### Health Check
@@ -920,7 +920,7 @@ curl -X GET "https://your-proxy-api.com/health"
 
 ```bash
 curl -X GET "https://your-proxy-api.com/v1/metrics" \
-  -H "Authorization: Bearer your-api-key"
+  -H "Authorization: Bearer [YOUR_API_KEY]"
 ```
 
 ## Best Practices
@@ -1013,11 +1013,11 @@ curl -X GET "https://your-api.com/health"
 
 # Detailed health check
 curl -X GET "https://your-api.com/v1/health" \
-  -H "Authorization: Bearer your-api-key"
+  -H "Authorization: Bearer [YOUR_API_KEY]"
 
 # Check provider status
 curl -X GET "https://your-api.com/v1/providers" \
-  -H "Authorization: Bearer your-api-key"
+  -H "Authorization: Bearer [YOUR_API_KEY]"
 ```
 
 ### Performance Monitoring
@@ -1025,15 +1025,15 @@ curl -X GET "https://your-api.com/v1/providers" \
 ```bash
 # Get metrics
 curl -X GET "https://your-api.com/v1/metrics" \
-  -H "Authorization: Bearer your-api-key"
+  -H "Authorization: Bearer [YOUR_API_KEY]"
 
 # Get cache stats
 curl -X GET "https://your-api.com/v1/cache/stats" \
-  -H "Authorization: Bearer your-api-key"
+  -H "Authorization: Bearer [YOUR_API_KEY]"
 
 # Get latency metrics
 curl -X GET "https://your-api.com/analytics/latency" \
-  -H "Authorization: Bearer your-api-key"
+  -H "Authorization: Bearer [YOUR_API_KEY]"
 ```
 
 ### Configuration Issues
@@ -1041,11 +1041,11 @@ curl -X GET "https://your-api.com/analytics/latency" \
 ```bash
 # Check config status
 curl -X GET "https://your-api.com/v1/config/status" \
-  -H "Authorization: Bearer your-api-key"
+  -H "Authorization: Bearer [YOUR_API_KEY]"
 
 # Reload configuration
 curl -X POST "https://your-api.com/v1/config/reload" \
-  -H "Authorization: Bearer your-api-key"
+  -H "Authorization: Bearer [YOUR_API_KEY]"
 ```
 
 ### Logging and Alerting
@@ -1053,15 +1053,15 @@ curl -X POST "https://your-api.com/v1/config/reload" \
 ```bash
 # Get recent logs
 curl -X GET "https://your-api.com/analytics/logs?limit=50" \
-  -H "Authorization: Bearer your-api-key"
+  -H "Authorization: Bearer [YOUR_API_KEY]"
 
 # Get active alerts
 curl -X GET "https://your-api.com/alerts" \
-  -H "Authorization: Bearer your-api-key"
+  -H "Authorization: Bearer [YOUR_API_KEY]"
 
 # Acknowledge alert
 curl -X POST "https://your-api.com/alerts/{alert_id}/acknowledge" \
-  -H "Authorization: Bearer your-api-key" \
+  -H "Authorization: Bearer [YOUR_API_KEY]" \
   -d '{"acknowledged_by": "your_name"}'
 ```
 

@@ -95,7 +95,7 @@ jobs:
         echo "Found $TOTAL_CRITICAL critical/high severity vulnerabilities"
 
     - name: Upload security scan results
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: security-scan-results
         path: |
@@ -168,7 +168,7 @@ jobs:
         pip-audit || true
 
     - name: Upload dependency audit results
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: dependency-audit-results
         path: pip-audit-results.json
@@ -206,7 +206,7 @@ jobs:
         SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
 
     - name: Upload SAST results
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: sast-results
         path: semgrep-results.json
@@ -234,7 +234,7 @@ jobs:
         output-file: container-scan-results.json
 
     - name: Upload container scan results
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: container-scan-results
         path: container-scan-results.json
@@ -296,7 +296,7 @@ jobs:
         cat security-summary.md
 
     - name: Upload security summary
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: security-summary
         path: security-summary.md

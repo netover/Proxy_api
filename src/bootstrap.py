@@ -5,11 +5,9 @@ from src.core.app_state import app_state
 from src.core.logging import setup_logging, ContextualLogger
 from src.api.router import root_router, main_router
 from src.middleware.security_headers import SecurityHeadersMiddleware
+from src.middleware.rate_limiter import RateLimitingMiddleware
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.errors import RateLimitExceeded
-from slowapi.util import get_remote_address
 
 # Initial, basic logging setup before config is loaded
 setup_logging(log_level="INFO")
@@ -28,8 +26,11 @@ async def lifespan(app: FastAPI):
         logger.info("Application state initialized successfully.")
 
         # Re-configure logging based on the loaded configuration
-        log_level = app.state.config.logging.get("level", "INFO").upper()
-        setup_logging(log_level=log_level)
+        if app.state.config and app.state.config.logging:
+            log_level = (app.state.config.logging.level or "INFO").upper()
+            setup_logging(log_level=log_level)
+        else:
+            logger.warning("Logging configuration not found, continuing with default setup.")
 
         logger.info("LLM Proxy API started successfully.")
 
@@ -64,12 +65,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.add_middleware(GZipMiddleware, minimum_size=1000)
+app.add_middleware(RateLimitingMiddleware)
 
 # Include API routers
 app.include_router(root_router)
 app.include_router(main_router)
-
-# Add rate limiting
-limiter = Limiter(key_func=get_remote_address)
-app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)

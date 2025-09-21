@@ -1,155 +1,211 @@
 import pytest
+import os
 from fastapi.testclient import TestClient
-from unittest.mock import patch
+from unittest.mock import MagicMock
 
-from main import app
-from src.core.rate_limiter import TokenBucketRateLimiter, rate_limiter
-from src.core.unified_config import RateLimitSettings
+# The app from bootstrap is already configured, we can use it directly
+from src.bootstrap import app
+from src.core.config.models import UnifiedConfig, RateLimitConfig
+from src.middleware.rate_limiter import RateLimitingMiddleware
+
+@pytest.fixture(scope="function")
+def client_with_rate_limiting(monkeypatch):
+    """
+    Provides a TestClient with a specific rate-limiting configuration
+    and authentication set up for isolated testing.
+    """
+    # Set the API key in the environment before the app starts
+    monkeypatch.setenv("PROXY_API_KEYS", "test-key-for-rate-limit-tests")
+
+    # Create a mock UnifiedConfig object
+    mock_config = UnifiedConfig()
+
+    # Define a specific rate limit configuration for this test
+    mock_config.rate_limit = RateLimitConfig(
+        routes={
+            "/v1/models": "5/minute",
+            "/v1/chat/completions": "2/minute",
+        },
+        default="10/minute"
+    )
+
+    # Before the TestClient starts the app, patch the get_config function
+    # to return our mock config instead of reading from the file.
+    monkeypatch.setattr("src.core.config.manager.get_config", lambda: mock_config)
+
+    # Now, when the TestClient starts the app and the lifespan runs,
+    # it will use our mocked config and the API key from the environment.
+    try:
+        with TestClient(app) as client:
+            yield client
+    finally:
+        # Teardown: find the middleware instance and reset its state
+        # to ensure no state leaks between tests.
+        for middleware in app.user_middleware:
+            if hasattr(middleware.cls, "reset"):
+                # The middleware instance is on middleware.options['app']
+                # No, that's not right. The instance is middleware.cls
+                # Let's check starlette source. The instance is just middleware.cls
+                # No, that's the class. The instance is wrapped.
+                # Let's try to access the instance via the app's middleware stack
+                # The actual instance is not directly exposed in a simple way.
+                # Let's find the actual instance on the app object.
+                # It's app.middleware_stack which is the app itself after wrapping.
+                # This is getting complicated. Let's find a simpler way.
+                # The middleware instance is created when app.add_middleware is called.
+                # The app object is global. So the middleware is also global.
+                # I can find it in app.user_middleware
+
+                # The middleware object in app.user_middleware is a Middleware object
+                # which has a `cls` attribute for the class, and `options`.
+                # The actual instance is not stored there.
+                # This is a problem with how FastAPI/Starlette manages middleware.
+
+                # Let's try another way. The middleware is a global-like instance
+                # because the 'app' is global. I can iterate through app.middleware
+                # and find the one that is my class.
+                # app.middleware is a list of dicts.
+
+                # Let's find the instance on the app object itself.
+                # The app is wrapped by the middleware.
+                # So app.app is the next middleware, and so on.
+
+                # Let's iterate through the middleware stack
+                current_app = app
+                while hasattr(current_app, 'app'):
+                    if isinstance(current_app, RateLimitingMiddleware):
+                        current_app.reset()
+                        break
+                    # This check is needed for the ErrorMiddleware which is the last one.
+                    if not hasattr(current_app.app, 'app'):
+                         break
+                    current_app = current_app.app
+
+# Let's correct the above logic. Starlette's `app.user_middleware` contains
+# `Middleware` objects. The actual instantiated middleware is part of the stack
+# but not easily accessible.
+# The easiest way is to find the instance in the actual stack.
+# The app object is wrapped in middleware layers.
+# app -> GZip -> CORSMiddleware -> SecurityHeaders -> RateLimitingMiddleware -> router
+# So I need to traverse app.app.app.app ...
+# This is fragile.
+
+# A better way: The middleware is added to `app.middleware_stack`.
+# The `app.middleware_stack` is the entry point for requests.
+# It is the result of wrapping the app in all middleware.
+# The instance is `app.middleware_stack`. Let's see its type.
+# It's the GzipMiddleware instance. `app.middleware_stack.app` is the CORSMiddleware.
+# Let's traverse it.
+
+        # Find the middleware and reset it
+        m_app = app.middleware_stack
+        while hasattr(m_app, 'app'):
+            if isinstance(m_app, RateLimitingMiddleware):
+                m_app.reset()
+                break
+            m_app = m_app.app
 
 
 
+class TestRateLimitingMiddleware:
+    """
+    Integration tests for the new RateLimitingMiddleware.
+    """
 
-@pytest.fixture
-def low_rate_limiter():
-    """Rate limiter with low limit for testing"""
-    limiter = TokenBucketRateLimiter(5)  # 5 requests per minute
-    rate_limiter.token_bucket_limiter = limiter
-    return limiter
-
-
-class TestRateLimitingIntegration:
-    """Integration tests for rate limiting on actual endpoints"""
-
-    def test_models_endpoint_under_limit(self, client, low_rate_limiter):
-        """Test GET /models allows requests under rate limit"""
-        response = client.get("/v1/models")
-
+    def test_endpoint_under_limit(self, client_with_rate_limiting):
+        """
+        Tests that a request to a rate-limited endpoint is successful
+        when the client is under the defined limit.
+        """
+        headers = {"X-API-Key": "test-key-for-rate-limit-tests"}
+        response = client_with_rate_limiting.get("/v1/models", headers=headers)
         assert response.status_code == 200
-        assert "data" in response.json()
 
-    def test_models_endpoint_over_limit(self, client, low_rate_limiter):
-        """Test GET /models blocks requests over rate limit"""
-        # Mock client IP to ensure same bucket
-        with patch("fastapi.Request") as mock_request_class:
-            mock_request = mock_request_class.return_value
-            mock_request.client = type("Client", (), {"host": "127.0.0.1"})()
 
-            # Use up all tokens
-            for _ in range(5):
-                low_rate_limiter.is_allowed("127.0.0.1")
+    def test_endpoint_over_limit(self, client_with_rate_limiting):
+        """
+        Tests that requests to a rate-limited endpoint are blocked
+        once the rate limit has been exceeded.
+        """
+        headers = {"X-API-Key": "test-key-for-rate-limit-tests"}
+        # Provide a valid-enough body to pass Pydantic validation
+        valid_body = {"model": "test-model", "messages": [{"role": "user", "content": "hello"}]}
 
-            # Next request should be blocked
-            response = client.get("/v1/models")
-            assert response.status_code == 429
-            assert "Too Many Requests" in response.json()["detail"]["message"]
-            assert "Retry-After" in response.headers
+        # The limit for /v1/chat/completions is 2/minute
+        for _ in range(2):
+            response = client_with_rate_limiting.post("/v1/chat/completions", headers=headers, json=valid_body)
+            # This will now fail at the provider_factory level, which is fine for this test
+            assert response.status_code != 429
 
-    def test_non_rate_limited_endpoints_not_affected(self, client, low_rate_limiter):
-        """Test endpoints without rate limiting are not affected"""
-        # This endpoint doesn't have rate limiting applied in the router
-        response = client.get("/v1/health")
-        assert response.status_code == 200
-
-    def test_different_ips_have_separate_limits(self, client, low_rate_limiter):
-        """Test different IP addresses have separate rate limits"""
-        # This test would require mocking different client IPs
-        # For now, just verify the rate limiter logic works
-        assert low_rate_limiter.is_allowed("192.168.1.1")[0] == True
-        assert low_rate_limiter.is_allowed("192.168.1.2")[0] == True
-
-    def test_retry_after_header_format(self, client, low_rate_limiter):
-        """Test Retry-After header is properly formatted"""
-        # Use up all tokens
-        for _ in range(5):
-            low_rate_limiter.is_allowed("127.0.0.1")
-
-        # Next request should be blocked with Retry-After header
-        response = client.get("/v1/models")
-
+        # The third request should be blocked by the rate limiter
+        response = client_with_rate_limiting.post("/v1/chat/completions", headers=headers, json=valid_body)
         assert response.status_code == 429
-        assert "Retry-After" in response.headers
+        data = response.json()
+        assert "Rate limit exceeded" in data.get("detail")
 
-        # Retry-After should be a number
-        retry_after = response.headers["Retry-After"]
-        assert retry_after.isdigit()
-        assert int(retry_after) > 0
+    def test_non_limited_route_is_not_affected(self, client_with_rate_limiting):
+        """
+        Tests that a route without a specific limit is not affected by the
+        rate limiter, even when other routes are exhausted.
+        """
+        headers = {"X-API-Key": "test-key-for-rate-limit-tests"}
+        valid_body = {"model": "test-model", "messages": [{"role": "user", "content": "hello"}]}
 
-    def test_rate_limit_resets_over_time(self, client, low_rate_limiter):
-        """Test rate limits reset over time (simplified test)"""
-        # Use up all tokens
-        for _ in range(5):
-            assert low_rate_limiter.is_allowed("127.0.0.1")[0] == True
+        # Exhaust the limit for /v1/chat/completions
+        for _ in range(2):
+            client_with_rate_limiting.post("/v1/chat/completions", headers=headers, json=valid_body)
 
-        # Next request should be blocked
-        assert low_rate_limiter.is_allowed("127.0.0.1")[0] == False
+        response = client_with_rate_limiting.post("/v1/chat/completions", headers=headers, json=valid_body)
+        assert response.status_code == 429
 
-        # Simulate time passage
-        bucket = low_rate_limiter.buckets["127.0.0.1"]
-        initial_tokens = bucket.tokens
+        # A request to a non-configured endpoint should still go through
+        response = client_with_rate_limiting.get("/health")
+        assert response.status_code == 200
 
-        # Manually refill some tokens by advancing time
-        bucket.last_refill = bucket.last_refill - 10  # 10 seconds ago
-        bucket._refill()
+    def test_different_clients_have_separate_buckets(self, client_with_rate_limiting, monkeypatch):
+        """
+        Tests that different clients (identified by IP) have separate rate limits.
+        """
+        # Mock the key function to simulate different clients.
+        # We must patch the function where it's *used* (in the middleware module),
+        # not where it's defined (in the slowapi.util module).
+        mock_key_func = MagicMock()
+        monkeypatch.setattr("src.middleware.rate_limiter.get_remote_address", mock_key_func)
 
-        # Should have more tokens now
-        assert bucket.tokens > initial_tokens
+        headers = {"X-API-Key": "test-key-for-rate-limit-tests"}
+        valid_body = {"model": "test-model", "messages": [{"role": "user", "content": "hello"}]}
 
+        # Exhaust the limit for client 1
+        mock_key_func.return_value = "127.0.0.1"
+        for _ in range(2):
+            response = client_with_rate_limiting.post("/v1/chat/completions", headers=headers, json=valid_body)
+            assert response.status_code != 429, "Client 1's requests should be allowed before exhausting the limit"
 
-class TestRateLimiterConfiguration:
-    """Test rate limiter configuration from config"""
+        response = client_with_rate_limiting.post("/v1/chat/completions", headers=headers, json=valid_body)
+        assert response.status_code == 429, "Client 1's third request should be blocked"
 
-    def test_configuration_from_settings(self):
-        """Test rate limiter configures from a RateLimitSettings object."""
-        # Create a mock settings object
-        settings = RateLimitSettings(
-            requests_per_window=120,
-            window_seconds=60,
-            burst_limit=20,
-            routes={
-                "/v1/models": "10/minute",
-                "/v1/providers": "20/minute",
-            },
+        # Make a request from client 2, it should be successful
+        mock_key_func.return_value = "192.168.1.100"
+        response_from_other_client = client_with_rate_limiting.post(
+            "/v1/chat/completions",
+            headers=headers, # No need for X-Forwarded-For since we are mocking the function
+            json=valid_body
         )
+        assert response_from_other_client.status_code != 429, "Client 2's first request should be successful"
 
-        # Configure rate limiter
-        rate_limiter.configure_from_settings(settings)
+    def test_default_rate_limit_is_applied(self, client_with_rate_limiting):
+        """
+        Tests that the default rate limit is applied to routes that
+        do not have a specific limit defined.
+        """
+        headers = {"X-API-Key": "test-key-for-rate-limit-tests"}
 
-        # Check that the token bucket was initialized correctly (120 reqs/60s = 120 rpm)
-        assert rate_limiter.token_bucket_limiter is not None
-        assert rate_limiter.token_bucket_limiter.requests_per_minute == 120
+        # The route /v1/config/status is not in our test config, so it should use default (10/min)
+        for i in range(10):
+            response = client_with_rate_limiting.get("/v1/config/status", headers=headers)
+            assert response.status_code != 429, f"Request {i+1} should have passed"
 
-        # Check that routes were configured
-        assert rate_limiter.get_route_limit("/v1/models") == "10/minute"
-        assert rate_limiter.get_route_limit("/v1/providers") == "20/minute"
-        # Check fallback to default
-        assert rate_limiter.get_route_limit("/v1/unknown") == "120/60s"
-
-
-class TestRateLimitStats:
-    """Test rate limiter statistics"""
-
-    def test_token_bucket_stats(self, low_rate_limiter):
-        """Test token bucket provides useful statistics"""
-        # Make some requests
-        low_rate_limiter.is_allowed("127.0.0.1")
-
-        stats = low_rate_limiter.get_stats()
-
-        assert "total_buckets" in stats
-        assert "capacity" in stats
-        assert "refill_rate" in stats
-        assert stats["capacity"] == 5
-
-    def test_bucket_specific_stats(self, low_rate_limiter):
-        """Test getting stats for specific bucket"""
-        low_rate_limiter.is_allowed("127.0.0.1")
-
-        stats = low_rate_limiter.get_stats("127.0.0.1")
-
-        assert "tokens_remaining" in stats
-        assert "capacity" in stats
-        assert "reset_in_seconds" in stats
-
-
-if __name__ == "__main__":
-    pytest.main([__file__])
+        # The 11th request should be blocked
+        response = client_with_rate_limiting.get("/v1/config/status", headers=headers)
+        assert response.status_code == 429
+        assert "Rate limit exceeded" in response.json().get("detail")

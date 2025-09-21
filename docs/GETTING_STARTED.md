@@ -61,13 +61,13 @@ Edit your `.env` file (or create one) with your API keys:
 
 ```bash
 # OpenAI (optional but recommended for examples)
-OPENAI_API_KEY=sk-your-openai-api-key-here
+OPENAI_API_KEY=[YOUR_OPENAI_API_KEY]
 
 # Anthropic (optional)
-ANTHROPIC_API_KEY=sk-ant-your-anthropic-key-here
+ANTHROPIC_API_KEY=[YOUR_ANTHROPIC_API_KEY]
 
 # Proxy API Key (for authentication)
-API_KEY=your-secure-proxy-api-key
+API_KEY=[YOUR_PROXY_API_KEY]
 
 # Optional: Redis for caching
 REDIS_URL=redis://localhost:6379
@@ -173,7 +173,7 @@ Now for the exciting part - let's make your first AI request:
 ```bash
 curl -X POST http://localhost:8000/v1/chat/completions \
   -H "Content-Type: application/json" \
-  -H "X-API-Key: your-secure-proxy-api-key" \
+  -H "X-API-Key: [YOUR_PROXY_API_KEY]" \
   -d '{
     "model": "gpt-3.5-turbo",
     "messages": [
@@ -226,7 +226,7 @@ import requests
 
 # Configuration
 API_BASE_URL = "http://localhost:8000/v1"
-API_KEY = "your-secure-proxy-api-key"
+API_KEY = "[YOUR_PROXY_API_KEY]"
 
 def chat_completion(model, messages):
     """Make a chat completion request"""

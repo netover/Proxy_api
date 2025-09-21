@@ -27,12 +27,12 @@ from .errors.error_handlers import (
     validation_exception_handler,
 )
 from .validation.middleware import middleware_pipeline
-from src.core.routing.provider_factory import provider_factory
-from src.core.auth import verify_api_key
+from src.core.providers.factory import provider_factory
+from src.core.security.auth import verify_api_key
 from src.core.breaker.circuit_breaker import get_circuit_breaker
-from src.core.logging import StructuredLogger
+from src.core.logging import ContextualLogger
 
-logger = StructuredLogger(__name__)
+logger = ContextualLogger(__name__)
 
 # Create main API router
 main_router = APIRouter(prefix="/v1")
@@ -41,7 +41,6 @@ main_router = APIRouter(prefix="/v1")
 
 
 @main_router.get("/models", tags=["models"], dependencies=[Depends(verify_api_key)])
-@rate_limiter.limit(route="/v1/models")
 async def list_models(request: Request):
     """OpenAI-compatible /v1/models endpoint to list all 100+ models from the registry."""
     return {"object": "list", "data": await provider_factory.list_all_models()}
@@ -173,7 +172,6 @@ root_router = APIRouter()
 
 
 @root_router.get("/health")
-@rate_limiter.limit(route="/health")
 async def root_health_check(request: Request):
     """Basic health check at root level."""
     return {
@@ -223,7 +221,6 @@ async def monitoring_dashboard():
 
 # Additional utility endpoints
 @main_router.get("/status")
-@rate_limiter.limit(route="/v1/status")
 async def api_status(request: Request):
     """Detailed API status information."""
     return {

@@ -36,7 +36,6 @@ class ConfigStatusResponse(BaseModel):
 
 
 @router.post("/reload", response_model=ConfigReloadResponse)
-@rate_limiter.limit(route="/v1/config/reload")
 async def reload_configuration(request: Request) -> ConfigReloadResponse:
     """
     Force reload of configuration from disk
@@ -99,7 +98,6 @@ async def reload_configuration(request: Request) -> ConfigReloadResponse:
 
 
 @router.get("/status", response_model=ConfigStatusResponse)
-@rate_limiter.limit(route="/v1/config/status")
 async def get_config_status(request: Request) -> ConfigStatusResponse:
     """
     Get current configuration status and cache information
@@ -135,7 +133,6 @@ async def get_config_status(request: Request) -> ConfigStatusResponse:
 
 
 @router.post("/invalidate-cache")
-@rate_limiter.limit(route="/v1/config/invalidate-cache")
 async def invalidate_config_cache(request: Request):
     """
     Invalidate configuration cache without reloading

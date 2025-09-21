@@ -77,13 +77,6 @@ rate_limit:
     "/v1/config/status": "100/minute"
     "/v1/config/invalidate-cache": "50/minute"
 
-# Authentication
-auth:
-  api_keys:
-    - "test-key-123"
-    - "prod-key-456"
-    - "admin-key-789"
-
 # Provider Configuration
 providers:
   - name: "openai"

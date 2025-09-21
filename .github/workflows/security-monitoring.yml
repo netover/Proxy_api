@@ -42,7 +42,7 @@ jobs:
           pip-audit || true
 
       - name: Upload dependency audit results
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: dependency-audit-results
           path: |
@@ -82,7 +82,7 @@ jobs:
           SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
 
       - name: Upload SAST results
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: sast-results
           path: semgrep-results.json
@@ -129,7 +129,7 @@ jobs:
           output-file: grype-results.json
 
       - name: Upload Grype results
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: container-security-results
           path: grype-results.json
@@ -182,7 +182,7 @@ jobs:
           "
 
       - name: Upload license report
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: license-report
           path: |
@@ -257,7 +257,7 @@ jobs:
           cat security-monitoring-summary.md
 
       - name: Upload security summary
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: security-monitoring-summary
           path: security-monitoring-summary.md

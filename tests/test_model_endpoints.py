@@ -481,51 +481,6 @@ class TestModelEndpoints:
         assert model.context_window == 8192
 
     @pytest.mark.asyncio
-    async def test_rate_limiting(
-        self,
-        client,
-        app,
-        mock_app_state,
-        mock_provider_factory,
-        mock_model_discovery,
-    ):
-        """Test rate limiting on model endpoints."""
-        # Setup mocks
-        self.setup_mocks(
-            app,
-            mock_app_state,
-            mock_provider_factory,
-            mock_model_discovery,
-            MagicMock(),
-            MagicMock(),
-        )
-
-        # Mock provider info
-        from src.core.provider_factory import ProviderStatus
-
-        mock_provider = MagicMock()
-        mock_provider.name = "openai"
-        mock_provider.status = ProviderStatus.HEALTHY
-        mock_provider_factory.get_all_provider_info.return_value = [mock_provider]
-
-        # Mock models
-        mock_models = [ModelInfo(id="gpt-4", created=1677649200, owned_by="openai")]
-        mock_model_discovery.discover_models.return_value = mock_models
-
-        # Make multiple rapid requests to test rate limiting
-        responses = []
-        for i in range(70):  # Exceed 60/minute limit
-            response = client.get(
-                "/v1/providers/openai/models",
-                headers={"Authorization": "Bearer test-key"},
-            )
-            responses.append(response)
-
-        # Should have some rate limited responses
-        rate_limited = [r for r in responses if r.status_code == 429]
-        assert len(rate_limited) > 0
-
-    @pytest.mark.asyncio
     async def test_authentication_required(self, client):
         """Test that authentication is required for model endpoints."""
         endpoints = [

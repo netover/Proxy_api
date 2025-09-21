@@ -129,6 +129,5 @@ async def shutdown_memory_manager():
     global _memory_manager
     if _memory_manager:
         logger.info("Shutting down memory manager and clearing contexts.")
-        # .clear() is synchronous
-        _memory_manager.clear()
+        await _memory_manager.clear()
         _memory_manager = None

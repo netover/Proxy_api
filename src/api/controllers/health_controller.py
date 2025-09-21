@@ -6,11 +6,10 @@ from fastapi import APIRouter, Request
 from src.core.alerting import alert_manager
 from src.core.logging import ContextualLogger
 from src.core.metrics.metrics import metrics_collector
-from src.core.routing.provider_factory import ProviderStatus
+from src.core.providers.factory import ProviderStatus
 import asyncio
-from src.core.rate_limiter import rate_limiter
-from src.core.unified_config import ProviderConfig
-from src.core.routing.provider_factory import provider_factory
+from src.core.config.models import ProviderConfig
+from src.core.providers.factory import provider_factory
 
 logger = ContextualLogger(__name__)
 
@@ -102,14 +101,12 @@ async def perform_parallel_health_checks(request: Request) -> Dict[str, Any]:
 
 
 @router.get("/health/providers")
-@rate_limiter.limit(route="/health/providers")
 async def provider_health_check(request: Request):
     """Deep health check of all providers in parallel"""
     return await perform_parallel_health_checks(request)
 
 
 @router.get("/health")
-@rate_limiter.limit(route="/v1/health")
 async def health_check(request: Request):
     """Comprehensive health check with system monitoring"""
     start_time = time.time()
