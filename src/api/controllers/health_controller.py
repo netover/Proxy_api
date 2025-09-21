@@ -1,7 +1,5 @@
 import time
-import time
 from typing import Dict, Any
-from collections import Counter
 
 from fastapi import APIRouter, Request
 
@@ -105,35 +103,15 @@ async def perform_parallel_health_checks(request: Request) -> Dict[str, Any]:
 
 @router.get("/health/providers")
 @rate_limiter.limit(route="/health/providers")
-async def provider_health_check(request: Request) -> Dict[str, Any]:
-    """
-    Performs a deep health check of all configured providers in parallel.
-
-    This endpoint iterates through all providers defined in the configuration,
-    runs a health check against each one concurrently, and returns a detailed
-    report of their status and response times.
-
-    Returns:
-        A dictionary containing a summary and detailed results of the provider health checks.
-    """
+async def provider_health_check(request: Request):
+    """Deep health check of all providers in parallel"""
     return await perform_parallel_health_checks(request)
 
 
 @router.get("/health")
 @rate_limiter.limit(route="/v1/health")
-async def health_check(request: Request) -> Dict[str, Any]:
-    """
-    Provides a comprehensive health check of the entire system.
-
-    This endpoint aggregates several key metrics to produce an overall health score:
-    - Status of all configured providers.
-    - System resource usage (CPU, memory, disk).
-    - Number and severity of active alerts.
-
-    Returns:
-        A detailed dictionary containing the overall health status, score, and
-        breakdowns of provider, system, alert, and performance metrics.
-    """
+async def health_check(request: Request):
+    """Comprehensive health check with system monitoring"""
     start_time = time.time()
     logger.info("Health check request started")
 
@@ -151,53 +129,45 @@ async def health_check(request: Request) -> Dict[str, Any]:
 
     # Get active alerts
     active_alerts = alert_manager.get_active_alerts()
-    critical_alerts_count = sum(1 for a in active_alerts if a["severity"] == "critical")
-    warning_alerts_count = sum(1 for a in active_alerts if a["severity"] == "warning")
+    critical_alerts = [a for a in active_alerts if a["severity"] == "critical"]
+    warning_alerts = [a for a in active_alerts if a["severity"] == "warning"]
 
-    # --- Health Score Calculation ---
-    # The health score starts at 100 and penalties are subtracted for issues.
-    health_score = 100.0
-    penalties = {}
+    # Determine overall health based on multiple factors
+    health_score = 100
 
-    # 1. Provider Health Impact (40% weight)
+    # Provider health impact
     if total_count > 0:
         provider_health_ratio = healthy_count / total_count
-        penalties["provider_penalty"] = (1 - provider_health_ratio) * 40
-    else:
-        penalties["provider_penalty"] = 40  # No providers is a significant issue
+        health_score -= (1 - provider_health_ratio) * 40  # 40% weight for providers
 
-    # 2. System Resource Impact (40% weight)
+    # System resource impact
     cpu_percent = system_health.get("cpu_percent", 0)
     memory_percent = system_health.get("memory_percent", 0)
     disk_percent = system_health.get("disk_percent", 0)
-    resource_penalty = 0
-    if cpu_percent > 95:
-        resource_penalty += 20
-    elif cpu_percent > 85:
-        resource_penalty += 10
 
-    if memory_percent > 95:
-        resource_penalty += 15
-    elif memory_percent > 85:
-        resource_penalty += 7.5
+    if cpu_percent > 90:
+        health_score -= 20
+    elif cpu_percent > 75:
+        health_score -= 10
 
-    if disk_percent > 98:
-        resource_penalty += 25
-    elif disk_percent > 90:
-        resource_penalty += 12.5
-    penalties["resource_penalty"] = min(resource_penalty, 40) # Cap penalty at 40
+    if memory_percent > 90:
+        health_score -= 20
+    elif memory_percent > 80:
+        health_score -= 10
 
-    # 3. Alert Impact (20% weight)
-    alert_penalty = 0
-    if critical_alerts_count > 0:
-        alert_penalty += 20
-    elif warning_alerts_count > 0:
-        alert_penalty += 10
-    penalties["alert_penalty"] = alert_penalty
+    if disk_percent > 95:
+        health_score -= 30
+    elif disk_percent > 85:
+        health_score -= 15
 
-    # Calculate final score
-    total_penalty = sum(penalties.values())
-    health_score = max(0, 100 - total_penalty)
+    # Alert impact
+    if critical_alerts:
+        health_score -= 30
+    if warning_alerts:
+        health_score -= 10
+
+    # Ensure health score is within bounds
+    health_score = max(0, min(100, health_score))
 
     # Determine status based on health score
     if health_score >= 80:
@@ -222,7 +192,15 @@ async def health_check(request: Request) -> Dict[str, Any]:
         "providers": {
             "total": total_count,
             "healthy": healthy_count,
-            **Counter(p.status.value for p in provider_info)
+            "degraded": sum(
+                1 for p in provider_info if p.status == ProviderStatus.DEGRADED
+            ),
+            "unhealthy": sum(
+                1 for p in provider_info if p.status == ProviderStatus.UNHEALTHY
+            ),
+            "disabled": sum(
+                1 for p in provider_info if p.status == ProviderStatus.DISABLED
+            ),
         },
         "system": {
             "cpu_percent": round(system_health.get("cpu_percent", 0), 1),
@@ -234,8 +212,8 @@ async def health_check(request: Request) -> Dict[str, Any]:
         },
         "alerts": {
             "active": len(active_alerts),
-            "critical": critical_alerts_count,
-            "warning": warning_alerts_count,
+            "critical": len(critical_alerts),
+            "warning": len(warning_alerts),
             "recent": active_alerts[:5],  # Show last 5 alerts
         },
         "performance": {

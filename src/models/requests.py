@@ -1,11 +1,18 @@
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Literal, Optional, Union
 
 from pydantic import BaseModel, Field, field_validator
 
 
 class ChatMessage(BaseModel):
-    role: str
-    content: str
+    role: Literal["system", "user", "assistant", "tool"]
+    content: str = Field(..., min_length=1)
+
+    @field_validator("content")
+    @classmethod
+    def validate_content(cls, v):
+        if not v.strip():
+            raise ValueError("Content cannot be empty or just whitespace.")
+        return v
 
 class ChatCompletionRequest(BaseModel):
     """Pydantic model for chat completions request"""
@@ -77,12 +84,21 @@ class EmbeddingRequest(BaseModel):
     user: Optional[str] = None
     encoding_format: Optional[str] = "float"
 
+    @field_validator("input")
+    @classmethod
+    def validate_input(cls, v):
+        if isinstance(v, list) and not v:
+            raise ValueError("Input list cannot be empty.")
+        if isinstance(v, str) and not v.strip():
+            raise ValueError("Input string cannot be empty or just whitespace.")
+        return v
+
 
 class ImageGenerationRequest(BaseModel):
     """Pydantic model for image generation request"""
 
     model: str = Field(..., min_length=1)
-    prompt: str = Field(..., min_length=1)
+    prompt: str = Field(..., min_length=1, description="The text prompt for image generation.")
     n: Optional[int] = Field(1, ge=1, le=10)
     size: Optional[str] = Field("1024x1024", pattern=r"^\d+x\d+$")
     quality: Optional[str] = Field("standard", pattern=r"^(standard|hd)$")

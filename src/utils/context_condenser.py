@@ -13,7 +13,7 @@ from fastapi import Request
 from src.core.logging import ContextualLogger
 from src.core.metrics import metrics_collector
 from src.core.provider_factory import provider_factory
-from src.core.config.manager import config_manager
+from src.core.unified_config import config_manager
 
 # Optional Redis import for distributed caching in high-load environments
 try:
@@ -198,6 +198,10 @@ async def condense_context(
     """
     Usa o provider de maior prioridade para resumir mensagens longas.
     """
+    if not chunks:
+        logger.info("Received empty chunks list for condensation, returning empty summary.")
+        return ""
+
     start_time = time.time()
 
     # Get condensation config from app state
@@ -295,13 +299,99 @@ async def condense_context(
 
     resp = None
     if condensation_config.parallel_providers > 1:
-        resp = await _execute_parallel_condensation(
-            sorted_providers, request_body, condensation_config
+        # Parallel execution
+        tasks = []
+        max_parallel = min(
+            condensation_config.parallel_providers, len(sorted_providers)
         )
+        for cfg in sorted_providers[:max_parallel]:
+            prov = await provider_factory.create_provider(cfg)
+            # Copy request_body for each
+            body_copy = request_body.copy()
+            body_copy["model"] = cfg.models[0]
+            task = asyncio.create_task(call_provider_with_timeout(prov, cfg, body_copy))
+            tasks.append((task, cfg))
+        # Wait for first completed
+        done, pending = await asyncio.wait(
+            [t[0] for t in tasks], return_when=asyncio.FIRST_COMPLETED
+        )
+        for task in done:
+            for t, cfg in tasks:
+                if t == task:
+                    if not task.exception():
+                        resp = task.result()
+                        logger.info(f"Parallel success with provider: {cfg.name}")
+                    else:
+                        logger.error(
+                            f"Parallel task failed for {cfg.name}: {task.exception()}"
+                        )
+                    break
+        # Cancel pending
+        for task, _ in tasks:
+            if not task.done():
+                task.cancel()
+        if not resp:
+            raise ValueError("All parallel providers failed")
     else:
-        resp = await _execute_sequential_condensation(
-            sorted_providers, request_body, content, condensation_config
-        )
+        # Sequential with fallback
+        top_cfg = sorted_providers[0]
+        provider = await provider_factory.create_provider(top_cfg)
+
+        # Update request body for sequential execution
+        request_body["model"] = top_cfg.models[0]
+
+        fallback_attempted = False
+        last_exception = None
+        for attempt in range(2):
+            try:
+                async with asyncio.timeout(top_cfg.timeout):
+                    resp = await provider.create_completion(request_body)
+                last_exception = None # Clear exception on success
+                break
+            except Exception as e:
+                last_exception = e
+                error_msg = str(e)
+                logger.error(f"Condensation attempt failed: {error_msg}")
+
+            if not fallback_attempted and condensation_config.error_patterns:
+                if any(
+                    re.search(pattern, error_msg, re.IGNORECASE)
+                    for pattern in condensation_config.error_patterns
+                ):
+                    fallback_applied = False
+                    if "truncate" in condensation_config.fallback_strategies:
+                        half_len = len(content) // 2
+                        content = content[-half_len:]
+                        request_body["messages"][1]["content"] = content
+                        use_max_tokens = min(use_max_tokens, len(content) // 4)
+                        request_body["max_tokens"] = use_max_tokens
+                        logger.info("Applied truncate fallback")
+                        fallback_applied = True
+
+                    if not fallback_applied and "secondary_provider" in condensation_config.fallback_strategies:
+                        enabled_providers_count = len([p for p in sorted_providers if p.enabled])
+                        if enabled_providers_count > 1:
+                            current_idx = sorted_providers.index(top_cfg)
+                            if current_idx + 1 < len(sorted_providers):
+                                for next_idx in range(current_idx + 1, len(sorted_providers)):
+                                    next_cfg = sorted_providers[next_idx]
+                                    if next_cfg.enabled:
+                                        top_cfg = next_cfg
+                                        provider = await provider_factory.create_provider(top_cfg)
+                                        request_body["model"] = top_cfg.models[0]
+                                        logger.info(f"Applied secondary provider fallback: {top_cfg.name}")
+                                        fallback_applied = True
+                                        break
+
+                    if fallback_applied:
+                        fallback_attempted = True
+                        continue
+
+            # If we are here, it means an error occurred and no fallback was applied.
+            if last_exception:
+                raise last_exception
+            else:
+                raise ValueError("Condensation failed with an unknown error.")
 
     # Safely extract the summary from the provider's response
     summary = ""
@@ -325,85 +415,3 @@ async def condense_context(
     logger.debug(f"Cache miss, stored for chunk hash: {chunk_hash}")
 
     return summary
-
-
-async def _execute_parallel_condensation(sorted_providers, request_body, condensation_config):
-    """Helper function to handle parallel provider execution."""
-    tasks = []
-    max_parallel = min(condensation_config.parallel_providers, len(sorted_providers))
-    for cfg in sorted_providers[:max_parallel]:
-        prov = await provider_factory.create_provider(cfg)
-        body_copy = request_body.copy()
-        body_copy["model"] = cfg.models[0]
-        task = asyncio.create_task(call_provider_with_timeout(prov, cfg, body_copy))
-        tasks.append((task, cfg))
-
-    done, pending = await asyncio.wait([t[0] for t in tasks], return_when=asyncio.FIRST_COMPLETED)
-
-    resp = None
-    for task in done:
-        for t, cfg in tasks:
-            if t == task:
-                if not task.exception():
-                    resp = task.result()
-                    logger.info(f"Parallel success with provider: {cfg.name}")
-                else:
-                    logger.error(f"Parallel task failed for {cfg.name}: {task.exception()}")
-                break
-
-    for task, _ in tasks:
-        if not task.done():
-            task.cancel()
-
-    if not resp:
-        raise ValueError("All parallel providers failed")
-
-    return resp
-
-
-async def _execute_sequential_condensation(sorted_providers, request_body, content, condensation_config):
-    """Helper function to handle sequential provider execution with fallbacks."""
-    top_cfg = sorted_providers[0]
-    provider = await provider_factory.create_provider(top_cfg)
-    request_body["model"] = top_cfg.models[0]
-
-    fallback_attempted = False
-    last_exception = None
-    for attempt in range(2):
-        try:
-            async with asyncio.timeout(top_cfg.timeout):
-                return await provider.create_completion(request_body)
-        except Exception as e:
-            last_exception = e
-            error_msg = str(e)
-            logger.error(f"Condensation attempt failed: {error_msg}")
-
-        if not fallback_attempted and any(re.search(p, error_msg, re.IGNORECASE) for p in condensation_config.error_patterns):
-            fallback_applied = False
-            if "truncate" in condensation_config.fallback_strategies:
-                content = content[-len(content) // 2:]
-                request_body["messages"][1]["content"] = content
-                request_body["max_tokens"] = min(request_body["max_tokens"], len(content) // 4)
-                logger.info("Applied truncate fallback")
-                fallback_applied = True
-
-            if not fallback_applied and "secondary_provider" in condensation_config.fallback_strategies and len(sorted_providers) > 1:
-                current_idx = sorted_providers.index(top_cfg)
-                if current_idx + 1 < len(sorted_providers):
-                    for next_cfg in sorted_providers[current_idx + 1:]:
-                        if next_cfg.enabled:
-                            top_cfg = next_cfg
-                            provider = await provider_factory.create_provider(top_cfg)
-                            request_body["model"] = top_cfg.models[0]
-                            logger.info(f"Applied secondary provider fallback: {top_cfg.name}")
-                            fallback_applied = True
-                            break
-
-            if fallback_applied:
-                fallback_attempted = True
-                continue
-
-    if last_exception:
-        raise last_exception
-    else:
-        raise ValueError("Condensation failed with an unknown error.")
