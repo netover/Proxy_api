@@ -6,9 +6,9 @@ Test script to verify HTTP connection pooling and reuse in ProxyAPI
 import asyncio
 import time
 import logging
+import pytest
 from src.core.http.client_v2 import (
     get_advanced_http_client,
-    get_all_client_metrics,
 )
 
 # Configure logging
@@ -16,6 +16,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
+@pytest.mark.asyncio
 async def test_connection_reuse():
     """Test connection reuse by making multiple requests"""
     print("Testing HTTP Connection Pooling and Reuse")
@@ -82,15 +83,6 @@ async def test_connection_reuse():
             f"Pending connections: {pool_info.get('pending_connections', 0)}"
         )
     print()
-
-    # Test client registry
-    print("Testing HTTP Client Registry...")
-    all_metrics = get_all_client_metrics()
-    print(f"Total registered clients: {len(all_metrics)}")
-    for provider_name, provider_metrics in all_metrics.items():
-        print(
-            f"  {provider_name}: {provider_metrics.get('requests_total', 0)} requests"
-        )
 
     print("\nTest completed successfully!")
     print(

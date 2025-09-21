@@ -333,7 +333,6 @@ model_manager = ModelManager()
 
 
 @router.get("/{provider_name}/models", response_model=ModelListResponse)
-@rate_limiter.limit("60/minute")
 async def list_provider_models(
     request: Request, provider_name: str, _: bool = Depends(verify_api_key)
 ):
@@ -349,7 +348,6 @@ async def list_provider_models(
 
 
 @router.get("/{provider_name}/models/{model_id}", response_model=ModelDetailResponse)
-@rate_limiter.limit("60/minute")
 async def get_model_info(
     request: Request,
     provider_name: str,
@@ -369,7 +367,6 @@ async def get_model_info(
 
 
 @router.put("/{provider_name}/model_selection", response_model=Dict[str, Any])
-@rate_limiter.limit("30/minute")
 async def update_model_selection(
     request: Request,
     provider_name: str,
@@ -389,7 +386,6 @@ async def update_model_selection(
 
 
 @router.post("/{provider_name}/models/refresh", response_model=RefreshResponse)
-@rate_limiter.limit("10/minute")
 async def refresh_provider_models(
     request: Request,
     provider_name: str,

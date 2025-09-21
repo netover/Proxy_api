@@ -11,8 +11,9 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 import sys
 import os
+import pytest
 
-from src.core.metrics.collector import MetricsCollector, metrics_collector
+from src.core.metrics.metrics import MetricsCollector, metrics_collector
 from src.core.telemetry.telemetry import telemetry, TracedSpan
 
 
@@ -57,6 +58,7 @@ async def simulate_requests(
                 span.record_error(Exception("Simulated error"))
 
 
+@pytest.mark.asyncio
 async def test_adaptive_sampling():
     """Test adaptive sampling under different load conditions"""
     print("Testing Adaptive Sampling Implementation")

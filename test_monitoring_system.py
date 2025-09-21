@@ -13,13 +13,15 @@ import asyncio
 import json
 import time
 from pathlib import Path
+import pytest
 
 import httpx
 
 from src.core.alerting.manager import alert_manager
-from src.core.metrics.collector import metrics_collector
+from src.core.metrics.metrics import metrics_collector
 
 
+@pytest.mark.asyncio
 async def test_basic_metrics_collection():
     """Test basic metrics collection functionality"""
     print("🧪 Testing basic metrics collection...")
@@ -47,6 +49,7 @@ async def test_basic_metrics_collection():
     return True
 
 
+@pytest.mark.asyncio
 async def test_alert_system():
     """Test the alerting system"""
     print("\n🔔 Testing alerting system...")
@@ -90,6 +93,7 @@ async def test_alert_system():
         return False
 
 
+@pytest.mark.asyncio
 async def test_health_endpoint():
     """Test the health check endpoint"""
     print("\n🏥 Testing health endpoint...")
@@ -114,6 +118,7 @@ async def test_health_endpoint():
         return False
 
 
+@pytest.mark.asyncio
 async def test_metrics_endpoint():
     """Test the metrics endpoint"""
     print("\n📊 Testing metrics endpoint...")
@@ -138,6 +143,7 @@ async def test_metrics_endpoint():
         return False
 
 
+@pytest.mark.asyncio
 async def test_alerting_endpoint():
     """Test the alerting endpoints"""
     print("\n🚨 Testing alerting endpoints...")
@@ -178,6 +184,7 @@ async def test_alerting_endpoint():
         return False
 
 
+@pytest.mark.asyncio
 async def test_monitoring_dashboard():
     """Test the monitoring dashboard"""
     print("\n📈 Testing monitoring dashboard...")
@@ -198,6 +205,7 @@ async def test_monitoring_dashboard():
         return False
 
 
+@pytest.mark.asyncio
 async def test_prometheus_metrics():
     """Test Prometheus metrics endpoint"""
     print("\n📈 Testing Prometheus metrics endpoint...")
@@ -240,6 +248,7 @@ async def test_prometheus_metrics():
         return False
 
 
+@pytest.mark.asyncio
 async def simulate_load_test():
     """Simulate a load test to trigger alerts"""
     print("\n🔥 Running load test simulation...")
