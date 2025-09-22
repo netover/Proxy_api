@@ -9,11 +9,13 @@ import time
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-import redis.asyncio as redis
+import redis  # Import the top-level redis package for exceptions
+import redis.asyncio as aioredis
 from src.core.breaker.circuit_breaker import (
     CircuitBreakerOpenException,
     CircuitState,
     DistributedCircuitBreaker,
+    InMemoryCircuitBreaker,  # Import for the test
     get_circuit_breaker,
     initialize_circuit_breakers,
 )
@@ -25,21 +27,31 @@ pytestmark = pytest.mark.asyncio
 @pytest.fixture
 def mock_redis():
     """Fixture to create a mock of the redis.asyncio.Redis client."""
-    mock = AsyncMock()
-    mock.get = AsyncMock(return_value=None)
-    mock.set = AsyncMock()
-    mock.delete = AsyncMock()
+    mock_redis_client = AsyncMock(spec=aioredis.Redis)
 
-    # Mock the pipeline for transactions
-    pipeline = AsyncMock()
-    pipeline.get = mock.get
-    pipeline.set = mock.set
-    pipeline.multi = MagicMock()
-    pipeline.execute = AsyncMock()
-    pipeline.watch = AsyncMock()
+    # The pipeline object that redis_client.pipeline() will return
+    pipeline_mock = AsyncMock()
 
-    mock.pipeline.return_value = pipeline
-    return mock
+    # When the pipeline is used as a context manager, __aenter__ should return
+    # an object that has the methods we need (get, set, watch, etc.)
+    pipeline_mock.__aenter__.return_value = pipeline_mock
+
+    # Configure the methods on the pipeline object
+    pipeline_mock.get = AsyncMock()
+    pipeline_mock.set = AsyncMock()
+    pipeline_mock.watch = AsyncMock()
+    pipeline_mock.multi = MagicMock()  # multi is not async
+    pipeline_mock.execute = AsyncMock()
+
+    mock_redis_client.pipeline.return_value = pipeline_mock
+
+    # Also mock the top-level methods for non-pipeline operations
+    mock_redis_client.get = AsyncMock(return_value=None)
+    mock_redis_client.set = AsyncMock()
+    mock_redis_client.delete = AsyncMock()
+    mock_redis_client.ping = AsyncMock()  # For initialization test
+
+    return mock_redis_client
 
 
 @pytest.fixture
@@ -262,11 +274,12 @@ class TestDistributedCircuitBreaker:
     async def test_redis_connection_error_fallback(self, mock_redis):
         """Test that the circuit breaker falls back to in-memory state when Redis is down."""
         # Configure the mock to raise ConnectionError
-        mock_redis.get.side_effect = redis.exceptions.ConnectionError
-        mock_redis.set.side_effect = redis.exceptions.ConnectionError
-        mock_redis.delete.side_effect = redis.exceptions.ConnectionError
+        mock_redis.get.side_effect = redis.ConnectionError
+        mock_redis.set.side_effect = redis.ConnectionError
+        mock_redis.delete.side_effect = redis.ConnectionError
         pipeline = mock_redis.pipeline.return_value
-        pipeline.execute.side_effect = redis.exceptions.ConnectionError
+        pipeline.execute.side_effect = redis.ConnectionError
+        pipeline.get.return_value = None # Ensure the pipeline's get returns a valid value
 
         breaker = DistributedCircuitBreaker(
             redis_client=mock_redis,
@@ -293,10 +306,9 @@ class TestDistributedCircuitBreaker:
 
 
 class TestCircuitBreakerFactory:
-    async def test_get_circuit_breaker(self):
+    async def test_get_circuit_breaker(self, mock_redis):
         """Test the get_circuit_breaker factory function."""
-        mock_redis_client = AsyncMock()
-        await initialize_circuit_breakers(mock_redis_client)
+        await initialize_circuit_breakers(mock_redis)
 
         cb1 = get_circuit_breaker("factory_test_1")
         cb2 = get_circuit_breaker("factory_test_2")
@@ -305,15 +317,20 @@ class TestCircuitBreakerFactory:
         assert isinstance(cb1, DistributedCircuitBreaker)
         assert cb1 is cb3
         assert cb1 is not cb2
-        assert cb1.redis is mock_redis_client
+        assert cb1.redis is mock_redis
 
-    async def test_get_breaker_before_init_raises_error(self):
-        """Test that calling get_circuit_breaker before initialization raises an error."""
+    async def test_fallback_to_in_memory_breaker(self):
+        """Test that get_circuit_breaker falls back to InMemoryCircuitBreaker if not initialized."""
         # Reset the global state for this test
         from src.core.breaker import circuit_breaker
 
         circuit_breaker._redis_client = None
         circuit_breaker._circuit_breakers = {}
 
-        with pytest.raises(RuntimeError):
-            get_circuit_breaker("uninitialized_test")
+        # Should not raise an error, but create an in-memory breaker
+        with patch.object(circuit_breaker.logger, "warning") as mock_warning:
+            breaker = get_circuit_breaker("in_memory_test")
+            assert isinstance(breaker, InMemoryCircuitBreaker)
+            mock_warning.assert_called_once_with(
+                "Creating in-memory circuit breaker for 'in_memory_test'."
+            )

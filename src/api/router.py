@@ -17,6 +17,7 @@ from .controllers.analytics_controller import router as analytics_router
 from .controllers.config_controller import router as config_router
 from .controllers.health_controller import router as health_router
 from .controllers.context_controller import router as context_router
+from src.api.model_endpoints import router as model_router
 from src.core.rate_limiter import rate_limiter
 from src.models.requests import ChatCompletionRequest, EmbeddingRequest
 from src.core.exceptions import ProviderNotFoundError, ProviderUnavailableError
@@ -127,6 +128,7 @@ main_router.include_router(context_router, tags=["context"])
 main_router.include_router(analytics_router, tags=["analytics"])
 main_router.include_router(alerting_router, tags=["alerting"])
 main_router.include_router(config_router, prefix="/config", tags=["config"])
+main_router.include_router(model_router)
 
 # The old chat_router and model_router are now replaced by the dynamic endpoints above.
 

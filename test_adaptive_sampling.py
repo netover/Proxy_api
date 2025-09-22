@@ -58,6 +58,7 @@ async def simulate_requests(
                 span.record_error(Exception("Simulated error"))
 
 
+@pytest.mark.skip(reason="Adaptive sampling feature has been removed.")
 @pytest.mark.asyncio
 async def test_adaptive_sampling():
     """Test adaptive sampling under different load conditions"""
@@ -65,7 +66,7 @@ async def test_adaptive_sampling():
     print("=" * 50)
 
     # Reset the global metrics collector for testing
-    metrics_collector.reset_stats()
+    metrics_collector.metrics.clear()
     metrics_collector.enable_adaptive_sampling = True
     metrics_collector.sampling_rate = 0.1
 

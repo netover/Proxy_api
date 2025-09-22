@@ -63,7 +63,7 @@ async def verify_api_key(request: Request, api_key: str = Security(api_key_heade
     A dependency that can be used in FastAPI routes to verify an API key.
     It retrieves the APIKeyAuth instance from the application state.
     """
-    if not hasattr(request.app.state, 'app_state') or not request.app.state.app_state.api_key_auth:
+    if not hasattr(request.app.state, 'api_key_auth') or not request.app.state.api_key_auth:
          raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Authentication system not configured"
@@ -75,7 +75,7 @@ async def verify_api_key(request: Request, api_key: str = Security(api_key_heade
             detail="Not authenticated"
         )
 
-    if not request.app.state.app_state.api_key_auth.verify(api_key):
+    if not request.app.state.api_key_auth.verify(api_key):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid API Key"

@@ -1,0 +1,27 @@
+# Minimal configuration for testing purposes.
+# This file is loaded by the `client` and `authenticated_client` fixtures in conftest.py.
+
+http_client:
+  timeout: 10
+  max_connections: 10
+
+caching:
+  enabled: true
+  type: in-memory
+  ttl: 60
+
+rate_limit:
+  enabled: true
+  strategy: fixed-window
+  limit: "100/minute"
+
+providers:
+  - name: "mock-provider"
+    api_key_env: "MOCK_PROVIDER_API_KEY"
+    enabled: true
+
+logging:
+  level: "DEBUG"
+
+telemetry:
+  enabled: false

@@ -7,6 +7,7 @@ import asyncio
 from unittest.mock import patch
 
 import pytest
+import pytest_asyncio
 
 from src.core.memory.manager import (
     SmartContextManager,
@@ -18,7 +19,7 @@ from src.core.memory.manager import (
 pytestmark = pytest.mark.asyncio
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def manager():
     """Fixture to provide a clean SmartContextManager instance for each test."""
     # Ensure a fresh manager for each test
@@ -130,8 +131,8 @@ async def test_global_instance_management():
     # Ensure we start clean
     await shutdown_memory_manager()
 
-    manager1 = get_memory_manager()
-    manager2 = get_memory_manager()
+    manager1 = await get_memory_manager()
+    manager2 = await get_memory_manager()
 
     assert manager1 is manager2
 
@@ -140,5 +141,5 @@ async def test_global_instance_management():
     await shutdown_memory_manager()
 
     # After shutdown, getting the manager should create a new instance
-    new_manager = get_memory_manager()
+    new_manager = await get_memory_manager()
     assert new_manager is not manager1

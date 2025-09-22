@@ -24,7 +24,7 @@ from src.models.requests import (
 )
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/v1/providers", tags=["model-management"])
+router = APIRouter(prefix="/providers", tags=["model-management"])
 
 
 class ModelManager:

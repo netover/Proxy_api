@@ -11,7 +11,7 @@ from enum import Enum
 from typing import Any, Awaitable, Callable, Dict, Optional, Tuple, Type
 
 import redis
-import redis.asyncio as redis
+import redis.asyncio as aioredis
 from src.core.logging import ContextualLogger
 
 logger = ContextualLogger(__name__)
@@ -96,7 +96,7 @@ class DistributedCircuitBreaker:
 
     def __init__(
         self,
-        redis_client: redis.Redis,
+        redis_client: aioredis.Redis,
         service_name: str,
         failure_threshold: int = 5,
         recovery_timeout: int = 60,
@@ -142,7 +142,7 @@ class DistributedCircuitBreaker:
                     "timestamp": time.time(),
                 }
             state = json.loads(state_data)
-        except (redis.exceptions.ConnectionError, redis.exceptions.TimeoutError) as e:
+        except (redis.ConnectionError, redis.TimeoutError) as e:
             logger.warning(
                 f"Redis connection error in circuit breaker '{self.name}': {e}. "
                 "Falling back to in-memory state."
@@ -182,7 +182,7 @@ class DistributedCircuitBreaker:
             await self.redis.delete(self.key)
             logger.info(f"Circuit breaker '{self.name}' reset to CLOSED after success.")
             self.in_memory_state.clear()  # Clear in-memory state on success
-        except (redis.exceptions.ConnectionError, redis.exceptions.TimeoutError) as e:
+        except (redis.ConnectionError, redis.TimeoutError) as e:
             logger.warning(
                 f"Redis connection error while recording success for '{self.name}': {e}. "
                 "State may be inconsistent."
@@ -194,7 +194,7 @@ class DistributedCircuitBreaker:
         Uses a Redis transaction (WATCH/MULTI/EXEC) to prevent race conditions.
         """
         try:
-            pipeline = await self.redis.pipeline()
+            pipeline = self.redis.pipeline()
             async with pipeline as pipe:
                 while True:
                     try:
@@ -240,7 +240,7 @@ class DistributedCircuitBreaker:
                             f"WatchError on circuit breaker '{self.name}', retrying transaction."
                         )
                         continue
-        except (redis.exceptions.ConnectionError, redis.exceptions.TimeoutError) as e:
+        except (redis.ConnectionError, redis.TimeoutError) as e:
             logger.warning(
                 f"Redis connection error while recording failure for '{self.name}': {e}. "
                 "Falling back to in-memory state."
@@ -287,10 +287,10 @@ class DistributedCircuitBreaker:
 # --- Global Circuit Breaker Management ---
 
 _circuit_breakers: Dict[str, DistributedCircuitBreaker] = {}
-_redis_client: Optional[redis.Redis] = None
+_redis_client: Optional[aioredis.Redis] = None
 
 
-async def initialize_circuit_breakers(redis_client: Optional[redis.Redis]):
+async def initialize_circuit_breakers(redis_client: Optional[aioredis.Redis]):
     """
     Initializes the global Redis client for all circuit breakers.
     If the client is not available or fails to connect, it logs a warning
@@ -307,7 +307,7 @@ async def initialize_circuit_breakers(redis_client: Optional[redis.Redis]):
         await redis_client.ping()
         _redis_client = redis_client
         logger.info("Circuit breaker module initialized with Redis client.")
-    except (redis.exceptions.ConnectionError, redis.exceptions.TimeoutError) as e:
+    except (redis.ConnectionError, redis.TimeoutError) as e:
         logger.error(f"Failed to connect to Redis for circuit breakers: {e}")
         logger.warning("Circuit breakers will be non-persistent.")
         _redis_client = None

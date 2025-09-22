@@ -47,7 +47,7 @@ class RequestRouter:
         """
         Generic request router with comprehensive error handling and fallback
         """
-        app_state = request.app.state.app_state
+        app_state = request.app.state
         request_id = f"{operation}_{int(time.time() * 1000)}"
         logger.set_context(
             request_id=request_id,
@@ -194,7 +194,7 @@ class RequestRouter:
 
                 # Handle context length errors
                 msg = str(e)
-                config = request.app.state.app_state.config
+                config = request.app.state.config
                 if any(
                     re.search(pattern, msg, re.IGNORECASE)
                     for pattern in config.settings.condensation.error_patterns

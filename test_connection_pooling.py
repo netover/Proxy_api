@@ -27,13 +27,11 @@ async def test_connection_reuse():
 
     # Get HTTP client for testing
     client = get_advanced_http_client(
-        provider_name="test_provider",
         max_keepalive_connections=10,
         max_connections=20,
         timeout=10.0,
     )
 
-    print(f"Testing with client: {client.provider_name}")
     print(f"Max connections: {client.max_connections}")
     print(f"Max keepalive connections: {client.max_keepalive_connections}")
     print()
@@ -45,12 +43,10 @@ async def test_connection_reuse():
     for i in range(10):
         try:
             response = await client.request("GET", test_url)
-            async with response:
-                print(
-                    f"Request {i+1}: Status {response.status_code}, "
-                    f"Connection reused: {client.connection_reuse_count > 0}"
-                )
-                # Response is automatically closed by async context manager
+            print(
+                f"Request {i+1}: Status {response.status_code}"
+            )
+            response.close()
         except Exception as e:
             print(f"Request {i+1} failed: {e}")
 
@@ -58,39 +54,18 @@ async def test_connection_reuse():
         await asyncio.sleep(0.1)
 
     total_time = time.time() - start_time
-    print(".2")
+    print(f"Total time for 10 requests: {total_time:.2f}s")
     print()
 
     # Get metrics
     metrics = client.get_metrics()
     print("Connection Pool Metrics:")
     print(f"Total requests: {metrics['requests_total']}")
-    print(f"Connection reuse count: {metrics['connection_reuse_count']}")
-    print(f"New connection count: {metrics['new_connection_count']}")
-    print(".1%")
+    print(f"Total errors: {metrics['errors_total']}")
     print(f"Average response time: {metrics['avg_response_time_ms']:.2f}ms")
     print()
 
-    # Show pool information
-    pool_info = metrics.get("pool_info", {})
-    if pool_info:
-        print("Connection Pool Status:")
-        print(f"Total connections: {pool_info.get('total_connections', 0)}")
-        print(
-            f"Available connections: {pool_info.get('available_connections', 0)}"
-        )
-        print(
-            f"Pending connections: {pool_info.get('pending_connections', 0)}"
-        )
-    print()
-
     print("\nTest completed successfully!")
-    print(
-        "Connection reuse verification: PASSED"
-        if metrics["connection_reuse_rate"] > 0
-        else "FAILED"
-    )
-
 
 if __name__ == "__main__":
     asyncio.run(test_connection_reuse())

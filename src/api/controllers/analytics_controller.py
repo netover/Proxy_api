@@ -18,7 +18,7 @@ async def get_metrics(request: Request, _: bool = Depends(verify_api_key)):
     logger.info("Metrics request started")
 
     app_state = request.app.state.app_state
-    metrics = metrics_collector.get_all_stats()
+    metrics = app_state.metrics_collector.get_metrics()
     provider_info = await app_state.provider_factory.get_all_provider_info()
 
     # Add provider status to metrics
@@ -68,7 +68,7 @@ async def get_prometheus_metrics(request: Request, _: bool = Depends(verify_api_
     start_time = time.time()
     logger.info("Prometheus metrics request started")
 
-    prometheus_data = metrics_collector.get_prometheus_metrics()
+    prometheus_data = request.app.state.app_state.metrics_collector.get_prometheus_metrics()
 
     response_time = time.time() - start_time
     data_size = len(prometheus_data) if prometheus_data else 0

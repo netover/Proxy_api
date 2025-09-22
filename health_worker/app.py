@@ -706,7 +706,7 @@ async def health_check():
             'overall_status': overall_status,
             'client_healthy': client_healthy,
             'scheduler_healthy': scheduler_healthy,
-            'active_checks': active_health_checks._value.get((), 0) if hasattr(active_health_checks, '_value') else 0
+            'active_checks': active_health_checks._value.get() if hasattr(active_health_checks, '_value') else 0
         }
     )
 
@@ -717,7 +717,7 @@ async def health_check():
         "components": {
             "http_client": "healthy" if client_healthy else "unhealthy",
             "scheduler": "healthy" if scheduler_healthy else "unhealthy",
-            "active_health_checks": active_health_checks._value.get((), 0) if hasattr(active_health_checks, '_value') else 0
+            "active_health_checks": active_health_checks._value.get() if hasattr(active_health_checks, '_value') else 0
         },
         "version": "1.0.0"
     }

@@ -121,7 +121,7 @@ async def health_check(request: Request):
     overall_status = "healthy" if healthy_count > 0 else "unhealthy"
 
     # Get system metrics
-    system_metrics = metrics_collector.get_all_stats()
+    system_metrics = app_state.metrics_collector.get_metrics()
     system_health = system_metrics.get("system_health", {})
 
     # Get active alerts
