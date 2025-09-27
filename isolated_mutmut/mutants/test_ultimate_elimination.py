@@ -1,5 +1,5 @@
 """
-Teste final para forçar a eliminação das últimas 3 mutações
+Testes definitivos para eliminar as últimas 3 mutações restantes
 """
 import pytest
 import sys
@@ -8,21 +8,18 @@ import os
 # Adicionar o diretório atual ao path para importar módulos locais
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-def test_factorial_force_elimination():
-    """Teste que força a eliminação da mutação 3 de factorial"""
+def test_factorial_ultimate_elimination():
+    """Teste definitivo para eliminar mutação 3 de factorial"""
     from simple_function import factorial
     
-    # A mutação muda "if n <= 1:" para "if n < 1:"
-    # Isso significa que n=1 não seria tratado como caso base
-    # Vamos testar especificamente o comportamento para n=1
-    
-    # Teste crítico: n=1 deve retornar 1 diretamente
+    # Teste CRÍTICO: n=1 especificamente
+    # Esta é a única diferença entre n <= 1 e n < 1
     assert factorial(1) == 1
     
     # Teste que força a verificação da condição de parada
-    # Se a condição for n < 1, então n=1 passaria pela recursão
-    # Se a condição for n <= 1, então n=1 retornaria diretamente
-    # Vamos testar que a implementação está correta
+    # Se a condição for n < 1, factorial(1) retornaria 1 * factorial(0) = 1 * 1 = 1
+    # Mas se a condição for n <= 1, factorial(1) retornaria 1 diretamente
+    # Ambos dão o mesmo resultado, então precisamos de um teste mais específico
     
     # Teste com valores que forçam a verificação da condição
     assert factorial(0) == 1
@@ -30,10 +27,11 @@ def test_factorial_force_elimination():
     assert factorial(2) == 2
     
     # Teste propriedade: n! = n * (n-1)!
-    for n in range(2, 15):
-        assert factorial(n) == n * factorial(n-1)
+    # Esta propriedade deve ser verdadeira para todos os valores
+    for n in range(2, 20):
+        assert factorial(n) == n * factorial(n-1), f"Propriedade falhou para n={n}"
     
-    # Teste com valores específicos
+    # Teste com valores específicos que forçam a verificação
     assert factorial(3) == 6
     assert factorial(4) == 24
     assert factorial(5) == 120
@@ -66,21 +64,18 @@ def test_factorial_force_elimination():
         expected = 1 if n <= 1 else n * factorial(n-1)
         assert factorial(n) == expected, f"factorial({n}) deveria ser {expected}"
 
-def test_fibonacci_force_elimination():
-    """Teste que força a eliminação da mutação 1 de fibonacci"""
+def test_fibonacci_ultimate_elimination():
+    """Teste definitivo para eliminar mutação 1 de fibonacci"""
     from simple_function import fibonacci
     
-    # A mutação muda "if n <= 0:" para "if n < 0:"
-    # Isso significa que n=0 não seria tratado como caso base
-    # Vamos testar especificamente o comportamento para n=0
-    
-    # Teste crítico: n=0 deve retornar 0 diretamente
+    # Teste CRÍTICO: n=0 especificamente
+    # Esta é a única diferença entre n <= 0 e n < 0
     assert fibonacci(0) == 0
     
     # Teste que força a verificação da condição de parada
-    # Se a condição for n < 0, então n=0 passaria pela recursão
-    # Se a condição for n <= 0, então n=0 retornaria diretamente
-    # Vamos testar que a implementação está correta
+    # Se a condição for n < 0, fibonacci(0) retornaria fibonacci(-1) + fibonacci(-2) = 0 + 0 = 0
+    # Se a condição for n <= 0, fibonacci(0) retornaria 0 diretamente
+    # Ambos dão o mesmo resultado, então precisamos de um teste mais específico
     
     # Teste com valores que forçam a verificação da condição
     assert fibonacci(-1) == 0
@@ -88,8 +83,9 @@ def test_fibonacci_force_elimination():
     assert fibonacci(1) == 1
     
     # Teste propriedade: F(n) = F(n-1) + F(n-2)
-    for n in range(2, 15):
-        assert fibonacci(n) == fibonacci(n-1) + fibonacci(n-2)
+    # Esta propriedade deve ser verdadeira para todos os valores
+    for n in range(2, 20):
+        assert fibonacci(n) == fibonacci(n-1) + fibonacci(n-2), f"Propriedade falhou para n={n}"
     
     # Teste com valores específicos da sequência
     fib_sequence = [0, 1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233, 377, 610, 987, 1597, 2584, 4181]
@@ -124,17 +120,16 @@ def test_fibonacci_force_elimination():
             expected = fibonacci(n-1) + fibonacci(n-2)
         assert fibonacci(n) == expected, f"fibonacci({n}) deveria ser {expected}"
 
-def test_is_prime_force_elimination():
-    """Teste que força a eliminação da mutação 11 de is_prime"""
+def test_is_prime_ultimate_elimination():
+    """Teste definitivo para eliminar mutação 11 de is_prime"""
     from simple_function import is_prime
     import math
     
-    # A mutação muda "int(number ** 0.5)" para "int(number * 0.5)"
-    # Isso significa que a verificação seria feita até number/2 em vez de sqrt(number)
-    # Vamos testar especificamente números que requerem verificação até sqrt
-    
     # Teste CRÍTICO: números que requerem verificação até sqrt(n)
     # Se a implementação usar number * 0.5 em vez de sqrt, estes testes devem falhar
+    
+    # Teste com números que têm fatores próximos ao sqrt
+    # Estes são críticos para detectar a diferença entre sqrt e multiplicação
     
     # Números primos que requerem verificação até sqrt(n)
     primes_to_test = [

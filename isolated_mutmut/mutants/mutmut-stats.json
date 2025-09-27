@@ -19,22 +19,32 @@
             "test_complete_elimination.py::test_is_palindrome"
         ],
         "simple_function.x_count_vowels": [
+            "test_final_elimination_complete.py::test_count_vowels_eliminate_mutations",
             "test_complete_elimination.py::test_count_vowels"
         ],
         "simple_function.x_factorial": [
+            "test_simple_function.py::test_factorial_force_elimination",
+            "test_final_elimination_complete.py::test_factorial_eliminate_mutation",
             "test_final_elimination.py::test_factorial_edge_case_n_equals_1",
-            "test_complete_elimination.py::test_factorial_complete",
-            "test_simple_function.py::test_factorial_complete"
+            "test_final_force_elimination.py::test_factorial_force_elimination",
+            "test_ultimate_elimination.py::test_factorial_ultimate_elimination",
+            "test_complete_elimination.py::test_factorial_complete"
         ],
         "simple_function.x_fibonacci": [
+            "test_ultimate_elimination.py::test_fibonacci_ultimate_elimination",
             "test_final_elimination.py::test_fibonacci_edge_case_n_equals_0",
+            "test_final_force_elimination.py::test_fibonacci_force_elimination",
+            "test_final_elimination_complete.py::test_fibonacci_eliminate_mutation",
             "test_complete_elimination.py::test_fibonacci_complete",
-            "test_simple_function.py::test_fibonacci_complete"
+            "test_simple_function.py::test_fibonacci_force_elimination"
         ],
         "simple_function.x_is_prime": [
+            "test_final_force_elimination.py::test_is_prime_force_elimination",
+            "test_simple_function.py::test_is_prime_force_elimination",
+            "test_final_elimination.py::test_is_prime_sqrt_implementation",
             "test_complete_elimination.py::test_is_prime_complete",
-            "test_simple_function.py::test_is_prime_complete",
-            "test_final_elimination.py::test_is_prime_sqrt_implementation"
+            "test_final_elimination_complete.py::test_is_prime_eliminate_mutation",
+            "test_ultimate_elimination.py::test_is_prime_ultimate_elimination"
         ]
     },
     "duration_by_test": {
@@ -93,7 +103,45 @@
         "test_complete_elimination.py::test_dict_operations": 4.443404031917453e-05,
         "test_complete_elimination.py::test_add_numbers": 4.0814047679305077e-05,
         "test_complete_elimination.py::test_multiply_numbers": 4.1560037061572075e-05,
-        "test_complete_elimination.py::test_is_even": 7.252703653648496e-05
+        "test_complete_elimination.py::test_is_even": 7.252703653648496e-05,
+        "test_final_elimination_complete.py::test_list_operations": 6.547302473336458e-05,
+        "test_simple_function.py::test_count_vowels_eliminate_mutations": 7.609499152749777e-05,
+        "test_final_elimination_complete.py::test_fibonacci_eliminate_mutation": 4.888302646577358e-05,
+        "test_final_elimination_complete.py::test_factorial_eliminate_mutation": 5.2183051593601704e-05,
+        "test_final_elimination_complete.py::test_boolean_operations": 4.0296989027410746e-05,
+        "test_final_elimination_complete.py::test_count_vowels_eliminate_mutations": 5.420000525191426e-05,
+        "test_final_elimination_complete.py::test_string_operations": 3.931799437850714e-05,
+        "test_simple_function.py::test_is_prime_eliminate_mutation": 4.66839992441237e-05,
+        "test_final_elimination_complete.py::test_basic_functionality": 4.574196645990014e-05,
+        "test_simple_function.py::test_fibonacci_eliminate_mutation": 4.29799547418952e-05,
+        "test_simple_function.py::test_factorial_eliminate_mutation": 4.118599463254213e-05,
+        "test_final_elimination_complete.py::test_dict_operations": 5.1014008931815624e-05,
+        "test_final_elimination_complete.py::test_is_prime_eliminate_mutation": 4.490197170525789e-05,
+        "test_final_elimination_complete.py::test_math_operations": 6.443099118769169e-05,
+        "test_simple_function.py::test_is_prime_ultimate_elimination": 6.860302528366446e-05,
+        "test_ultimate_elimination.py::test_fibonacci_ultimate_elimination": 8.579500718042254e-05,
+        "test_ultimate_elimination.py::test_basic_functionality": 5.433795740827918e-05,
+        "test_ultimate_elimination.py::test_dict_operations": 5.8398989494889975e-05,
+        "test_simple_function.py::test_factorial_ultimate_elimination": 6.801402196288109e-05,
+        "test_ultimate_elimination.py::test_boolean_operations": 5.212402902543545e-05,
+        "test_ultimate_elimination.py::test_factorial_ultimate_elimination": 4.762399476021528e-05,
+        "test_simple_function.py::test_fibonacci_ultimate_elimination": 6.413203664124012e-05,
+        "test_ultimate_elimination.py::test_list_operations": 5.353899905458093e-05,
+        "test_ultimate_elimination.py::test_is_prime_ultimate_elimination": 5.9771002270281315e-05,
+        "test_ultimate_elimination.py::test_math_operations": 5.576101830229163e-05,
+        "test_ultimate_elimination.py::test_string_operations": 7.847900269553065e-05,
+        "test_final_force_elimination.py::test_is_prime_force_elimination": 7.127603748813272e-05,
+        "test_simple_function.py::test_is_prime_force_elimination": 6.068201037123799e-05,
+        "test_final_force_elimination.py::test_boolean_operations": 6.267096614465117e-05,
+        "test_final_force_elimination.py::test_basic_functionality": 5.314301233738661e-05,
+        "test_simple_function.py::test_factorial_force_elimination": 5.091400817036629e-05,
+        "test_final_force_elimination.py::test_fibonacci_force_elimination": 7.921201176941395e-05,
+        "test_final_force_elimination.py::test_string_operations": 7.194897625595331e-05,
+        "test_final_force_elimination.py::test_factorial_force_elimination": 4.84500196762383e-05,
+        "test_simple_function.py::test_fibonacci_force_elimination": 6.011500954627991e-05,
+        "test_final_force_elimination.py::test_math_operations": 6.255495827645063e-05,
+        "test_final_force_elimination.py::test_list_operations": 4.9670052248984575e-05,
+        "test_final_force_elimination.py::test_dict_operations": 7.782300235703588e-05
     },
     "stats_time": 0.20946186500000002
 }
