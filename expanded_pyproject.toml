@@ -1,0 +1,74 @@
+[tool.mutmut]
+paths_to_mutate = [
+    "src/core/config.py",
+    "src/core/auth.py", 
+    "src/core/cache_manager.py",
+    "src/core/circuit_breaker.py",
+    "src/core/http_client.py",
+    "src/core/rate_limiter.py",
+    "src/core/retry_strategies.py",
+    "src/core/model_config.py",
+    "src/core/model_discovery.py",
+    "src/core/telemetry.py",
+    "src/core/logging.py",
+    "src/core/metrics.py",
+    "src/api/endpoints.py",
+    "src/api/model_endpoints.py",
+    "src/api/router.py",
+    "src/services/model_config_service.py",
+    "src/services/provider_loader.py",
+    "src/utils/context_condenser.py",
+    "context_service/app.py",
+    "context_service/utils/context_condenser_impl.py",
+    "health_worker/app.py",
+    "main.py",
+    "main_dynamic.py",
+    "production_config.py",
+    "web_ui.py",
+]
+
+exclude_paths = [
+    "tests/",
+    "tests_mutmut/",
+    "test_*.py",
+    "build/",
+    "dist/",
+    "node_modules/",
+    "venv/",
+    "__pycache__/",
+    "*.pyc",
+    "*.pyo", 
+    "*.pyd",
+    ".git/",
+    ".pytest_cache/",
+    "*.egg-info/",
+    "src/components/",
+    "src/providers/",
+    "src/models/",
+    "src/scripts/",
+    "monitoring/",
+    "docs/",
+    "examples/",
+    "static/",
+    "templates/",
+]
+
+pytest_command = "python3 -m pytest tests_mutmut/ -v --tb=short"
+
+[tool.pytest.ini_options]
+testpaths = ["tests_mutmut"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "--verbose",
+    "--tb=short", 
+    "--strict-markers",
+    "--disable-warnings"
+]
+markers = [
+    "unit: Unit tests",
+    "integration: Integration tests", 
+    "slow: Slow running tests",
+    "asyncio"
+]

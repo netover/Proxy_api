@@ -1,0 +1,139 @@
+name: Mutation Testing
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # Executa diariamente às 2:00 UTC
+    - cron: '0 2 * * *'
+
+jobs:
+  mutation-testing:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        python-version: [3.11, 3.12, 3.13]
+        threshold: [90, 95, 98]
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install --break-system-packages -r requirements.txt
+        pip install --break-system-packages mutmut
+    
+    - name: Create test environment
+      run: |
+        mkdir -p tests_mutmut
+        cp tests_mutmut/test_*.py tests_mutmut/ 2>/dev/null || true
+    
+    - name: Run mutation tests with threshold ${{ matrix.threshold }}%
+      run: |
+        python run_mutation_tests.py --threshold ${{ matrix.threshold }} --report mutation_report_${{ matrix.python-version }}_${{ matrix.threshold }}.json
+    
+    - name: Upload mutation test results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: mutation-test-results-${{ matrix.python-version }}-${{ matrix.threshold }}
+        path: |
+          mutation_report_*.json
+          mutation_test_report.json
+    
+    - name: Comment PR with results
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const fs = require('fs');
+          try {
+            const report = JSON.parse(fs.readFileSync('mutation_test_report.json', 'utf8'));
+            const detectionRate = report.results.detection_rate;
+            const threshold = report.threshold;
+            const passed = report.passed;
+            
+            const status = passed ? '✅' : '❌';
+            const message = `${status} **Testes de Mutação** (Python ${{ matrix.python-version }}, Threshold: ${threshold}%)
+            
+            **Resultados:**
+            - 🎉 Mutações mortas: ${report.results.killed}
+            - 🙁 Mutações sobreviventes: ${report.results.survived}
+            - 📈 Taxa de detecção: ${detectionRate.toFixed(1)}%
+            - 🎯 Threshold: ${threshold}%
+            
+            ${passed ? '✅ Threshold atingido!' : '❌ Threshold não atingido!'}`;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: message
+            });
+          } catch (error) {
+            console.log('Erro ao processar relatório:', error);
+          }
+
+  mutation-testing-summary:
+    runs-on: ubuntu-latest
+    needs: mutation-testing
+    if: always()
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Download all artifacts
+      uses: actions/download-artifact@v3
+      with:
+        path: artifacts
+    
+    - name: Generate summary report
+      run: |
+        python -c "
+        import json
+        import os
+        import glob
+        
+        reports = []
+        for file in glob.glob('artifacts/*/mutation_report_*.json'):
+            try:
+                with open(file, 'r') as f:
+                    report = json.load(f)
+                    reports.append(report)
+            except:
+                pass
+        
+        if reports:
+            print('## 📊 Resumo dos Testes de Mutação')
+            print()
+            for report in reports:
+                results = report.get('results', {})
+                threshold = report.get('threshold', 0)
+                detection_rate = results.get('detection_rate', 0)
+                passed = report.get('passed', False)
+                
+                status = '✅' if passed else '❌'
+                print(f'{status} **Threshold {threshold}%**: {detection_rate:.1f}% detecção')
+                print(f'   - Mutações mortas: {results.get(\"killed\", 0)}')
+                print(f'   - Mutações sobreviventes: {results.get(\"survived\", 0)}')
+                print()
+        else:
+            print('❌ Nenhum relatório encontrado')
+        " >> $GITHUB_STEP_SUMMARY
