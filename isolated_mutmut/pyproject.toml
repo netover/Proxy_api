@@ -1,0 +1,48 @@
+[tool.mutmut]
+paths_to_mutate = [
+    "simple_function.py",
+]
+
+exclude_paths = [
+    "tests/",
+    "test_*.py",
+    "build/",
+    "dist/",
+    "node_modules/",
+    "venv/",
+    "__pycache__/",
+    "*.pyc",
+    "*.pyo", 
+    "*.pyd",
+    ".git/",
+    ".pytest_cache/",
+    "*.egg-info/",
+    "src/",
+    "context_service/",
+    "health_worker/",
+    "monitoring/",
+    "main.py",
+    "main_dynamic.py",
+    "production_config.py",
+    "web_ui.py",
+]
+
+pytest_command = "python3 -m pytest test_simple_function.py -v"
+
+[tool.pytest.ini_options]
+testpaths = ["."]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "--verbose",
+    "--tb=short", 
+    "--strict-markers",
+    "--disable-warnings"
+]
+markers = [
+    "unit: Unit tests",
+    "integration: Integration tests", 
+    "slow: Slow running tests",
+    "asyncio"
+]

@@ -1,0 +1,59 @@
+{
+    "tests_by_mangled_function_name": {
+        "simple_function.x_add_numbers": [
+            "test_simple_function.py::test_edge_cases",
+            "test_simple_function.py::test_add_numbers",
+            "test_simple_function.py::test_property_based_tests"
+        ],
+        "simple_function.x_multiply_numbers": [
+            "test_simple_function.py::test_edge_cases",
+            "test_simple_function.py::test_multiply_numbers",
+            "test_simple_function.py::test_property_based_tests"
+        ],
+        "simple_function.x_is_even": [
+            "test_simple_function.py::test_is_even"
+        ],
+        "simple_function.x_get_max": [
+            "test_simple_function.py::test_get_max",
+            "test_simple_function.py::test_edge_cases"
+        ],
+        "simple_function.x_calculate_average": [
+            "test_simple_function.py::test_calculate_average",
+            "test_simple_function.py::test_edge_cases"
+        ],
+        "simple_function.x_is_palindrome": [
+            "test_simple_function.py::test_is_palindrome",
+            "test_simple_function.py::test_edge_cases"
+        ],
+        "simple_function.x_count_vowels": [
+            "test_simple_function.py::test_count_vowels",
+            "test_simple_function.py::test_edge_cases"
+        ],
+        "simple_function.x_factorial": [
+            "test_simple_function.py::test_factorial",
+            "test_simple_function.py::test_property_based_tests"
+        ],
+        "simple_function.x_fibonacci": [
+            "test_simple_function.py::test_fibonacci",
+            "test_simple_function.py::test_property_based_tests"
+        ],
+        "simple_function.x_is_prime": [
+            "test_simple_function.py::test_is_prime"
+        ]
+    },
+    "duration_by_test": {
+        "test_simple_function.py::test_add_numbers": 6.467197090387344e-05,
+        "test_simple_function.py::test_multiply_numbers": 5.1100971177220345e-05,
+        "test_simple_function.py::test_is_even": 4.781101597473025e-05,
+        "test_simple_function.py::test_get_max": 5.3127005230635405e-05,
+        "test_simple_function.py::test_calculate_average": 4.331499803811312e-05,
+        "test_simple_function.py::test_is_palindrome": 5.125999450683594e-05,
+        "test_simple_function.py::test_count_vowels": 4.5806984417140484e-05,
+        "test_simple_function.py::test_factorial": 4.807801451534033e-05,
+        "test_simple_function.py::test_fibonacci": 4.723301390185952e-05,
+        "test_simple_function.py::test_is_prime": 6.392900831997395e-05,
+        "test_simple_function.py::test_property_based_tests": 5.758897168561816e-05,
+        "test_simple_function.py::test_edge_cases": 7.676804671064019e-05
+    },
+    "stats_time": 0.20946186500000002
+}
