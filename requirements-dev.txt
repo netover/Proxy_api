@@ -14,3 +14,4 @@ coverage>=7.0.0
 redis>=4.5.0    # For Redis testing
 docker>=6.0.0   # For container testing
 locust>=2.15.0  # For load testing
+mutmut>=2.4.0   # For mutation testing
