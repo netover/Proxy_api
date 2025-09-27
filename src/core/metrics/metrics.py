@@ -69,5 +69,17 @@ class MetricsCollector:
             self.increment("summary_cache_misses", 1)
         self.histogram("summary_latency", latency)
 
+    def get_all_stats(self) -> Dict[str, Any]:
+        """
+        Returns all stats. Placeholder returns an empty dict.
+        """
+        return {}
+
+    def get_prometheus_metrics(self) -> str:
+        """
+        Returns metrics in Prometheus format. Placeholder returns an empty string.
+        """
+        return ""
+
 # Create a single global instance for the application to use
 metrics_collector = MetricsCollector()

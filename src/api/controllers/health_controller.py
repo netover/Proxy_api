@@ -180,6 +180,7 @@ async def health_check(request: Request):
 
     # Prepare comprehensive health response
     health_response = {
+        "service": "llm-proxy-service",
         "status": overall_status,
         "health_score": round(health_score, 1),
         "timestamp": time.time(),

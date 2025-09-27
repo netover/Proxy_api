@@ -57,9 +57,14 @@ class TestMiddleware:
 
     def test_cors_headers(self, client: TestClient):
         """Test that CORS headers are properly set on OPTIONS preflight."""
-        response = client.options("/v1/chat/completions", headers={"Origin": "http://test.com"})
+        headers = {
+            "Origin": "http://test.com",
+            "Access-Control-Request-Method": "POST",
+        }
+        response = client.options("/v1/chat/completions", headers=headers)
         assert response.status_code == 200
-        assert "access-control-allow-origin" in response.headers
+        assert response.headers["access-control-allow-origin"] == "http://test.com"
+        assert "access-control-allow-credentials" in response.headers
 
     def test_security_headers(self, client: TestClient):
         """Test that security headers are present."""
@@ -87,11 +92,11 @@ class TestErrorHandling:
 class TestValidation:
     """Tests for request validation logic."""
 
-    @patch('src.api.router.route_request', new_callable=AsyncMock)
-    def test_request_validation_integration(self, mock_route_request, authenticated_client: TestClient):
+    @patch('src.api.router.chat_completions', new_callable=AsyncMock)
+    def test_request_validation_integration(self, mock_chat_completions, authenticated_client: TestClient):
         """Test that a valid request passes through the validation middleware."""
         # Mock the final routing function to prevent actual endpoint logic from running
-        mock_route_request.return_value = ("response", None)
+        mock_chat_completions.return_value = ("response", None)
 
         payload = {
             "model": "gpt-4",
@@ -99,5 +104,6 @@ class TestValidation:
         }
         response = authenticated_client.post("/v1/chat/completions", json=payload)
 
-        # We expect the test to fail since the endpoint doesn't exist
-        assert response.status_code == 404
+        # We expect the test to pass, as the middleware should succeed and the
+        # underlying endpoint call is mocked.
+        assert response.status_code == 200

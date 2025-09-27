@@ -1,4 +1,5 @@
 import logging
+import time
 from fastapi import Request
 from fastapi.responses import JSONResponse
 from slowapi import Limiter
@@ -8,8 +9,6 @@ from starlette.status import HTTP_429_TOO_MANY_REQUESTS
 from typing import Callable, Awaitable
 from starlette.responses import Response
 from limits import parse as parse_limit
-
-import logging
 
 # Set up a logger for this middleware
 logger = logging.getLogger(__name__)
@@ -47,19 +46,41 @@ class RateLimitingMiddleware(BaseHTTPMiddleware):
         current_path = request.url.path
         limit_str = self.limiter_mapping.get(current_path, self.default_limit)
 
-        if limit_str and self.limiter:
-            limit_item = parse_limit(limit_str)
-            identifier = self.limiter._key_func(request)
+        if not (limit_str and self.limiter):
+            return await call_next(request)
 
-            if not self.limiter.limiter.hit(limit_item, identifier):
-                logger.warning(f"Rate limit exceeded for {identifier} on path {current_path}. Blocking request.")
-                return JSONResponse(
-                    status_code=HTTP_429_TOO_MANY_REQUESTS,
-                    content={
-                        "detail": f"Rate limit exceeded for {limit_str}",
-                        "error": "Too Many Requests",
-                    },
-                )
+        limit_item = parse_limit(limit_str)
+        identifier = self.limiter._key_func(request)
 
+        if not self.limiter.limiter.test(limit_item, identifier):
+            reset_time, _ = self.limiter.limiter.get_window_stats(limit_item, identifier)
+            retry_after = int(reset_time - time.time())
+
+            headers = {
+                "X-RateLimit-Limit": str(limit_item.amount),
+                "X-RateLimit-Remaining": "0",
+                "X-RateLimit-Reset": str(int(reset_time)),
+                "Retry-After": str(retry_after),
+            }
+
+            logger.warning(f"Rate limit exceeded for {identifier} on path {current_path}. Blocking request.")
+            return JSONResponse(
+                status_code=HTTP_429_TOO_MANY_REQUESTS,
+                content={
+                    "detail": f"Rate limit exceeded for {limit_str}",
+                    "error": "Too Many Requests",
+                },
+                headers=headers,
+            )
+
+        self.limiter.limiter.hit(limit_item, identifier)
+        reset_time, remaining = self.limiter.limiter.get_window_stats(limit_item, identifier)
         response = await call_next(request)
+
+        headers = {
+            "X-RateLimit-Limit": str(limit_item.amount),
+            "X-RateLimit-Remaining": str(remaining),
+            "X-RateLimit-Reset": str(int(reset_time)),
+        }
+        response.headers.update(headers)
         return response

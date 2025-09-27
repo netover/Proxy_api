@@ -7,16 +7,25 @@ http_client:
 
 caching:
   enabled: true
-  type: in-memory
-  ttl: 60
+  response_cache:
+    ttl: 60
+  summary_cache:
+    ttl: 60
 
 rate_limit:
   enabled: true
-  strategy: fixed-window
-  limit: "100/minute"
+  default: "100/minute"
+
+cors:
+  enabled: true
+  allow_origins: ["*"]
+  allow_credentials: true
+  allow_methods: ["*"]
+  allow_headers: ["*"]
 
 providers:
   - name: "mock-provider"
+    type: "mock" # This was the missing required field causing ValidationErrors
     api_key_env: "MOCK_PROVIDER_API_KEY"
     enabled: true
 

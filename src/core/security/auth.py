@@ -12,10 +12,11 @@ class APIKeyAuth:
     def __init__(self, valid_keys: List[str]):
         """
         Initializes the auth manager with a list of valid keys.
+        It automatically trims whitespace from the keys.
         Args:
             valid_keys: A list of strings representing the allowed API keys.
         """
-        self.valid_keys: Set[str] = set(valid_keys)
+        self.valid_keys: Set[str] = {key.strip() for key in valid_keys if key and key.strip()}
 
     def verify(self, api_key: str) -> bool:
         """
@@ -63,21 +64,22 @@ async def verify_api_key(request: Request, api_key: str = Security(api_key_heade
     A dependency that can be used in FastAPI routes to verify an API key.
     It retrieves the APIKeyAuth instance from the application state.
     """
-    if not hasattr(request.app.state, 'api_key_auth') or not request.app.state.api_key_auth:
-         raise HTTPException(
+    auth_manager = request.app.state.app_state.api_key_auth
+    if not auth_manager:
+        raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Authentication system not configured"
+            detail="Authentication system not configured",
         )
 
     if not api_key:
-         raise HTTPException(
+        raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authenticated"
+            detail="Not authenticated",
         )
 
-    if not request.app.state.api_key_auth.verify(api_key):
+    if not auth_manager.verify(api_key):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid API Key"
+            detail="Invalid API Key",
         )
     return api_key

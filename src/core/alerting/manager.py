@@ -25,5 +25,11 @@ class AlertManager:
         logger.info("AlertManager.stop_monitoring() called (placeholder).")
         pass
 
+    def get_active_alerts(self) -> list:
+        """
+        Returns a list of active alerts. Placeholder returns an empty list.
+        """
+        return []
+
 # Create a single global instance
 alert_manager = AlertManager()

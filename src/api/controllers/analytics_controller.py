@@ -53,7 +53,8 @@ async def get_metrics(request: Request, _: bool = Depends(verify_api_key)):
 
     return {
         "timestamp": time.time(),
-        "providers": metrics,
+        "metrics": metrics,
+        "provider_details": provider_info,
         "summary": {
             "total_providers": len(provider_info),
             "total_requests": total_requests,
@@ -62,7 +63,7 @@ async def get_metrics(request: Request, _: bool = Depends(verify_api_key)):
     }
 
 
-@router.get("/metrics/prometheus")
+@router.get("/prometheus")
 async def get_prometheus_metrics(request: Request, _: bool = Depends(verify_api_key)):
     """Prometheus-compatible metrics endpoint"""
     start_time = time.time()

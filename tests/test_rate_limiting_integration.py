@@ -1,39 +1,33 @@
 import pytest
 import time
-import yaml
 from starlette.testclient import TestClient
-from src.core.unified_config import config_manager
-from src.bootstrap import app as fastapi_app
+from src.bootstrap import create_app
 from unittest.mock import patch
+from src.core.config.models import UnifiedConfig
+from src.core.security.auth import APIKeyAuth
 
-# A specific fixture for these tests to set a known rate limit.
+# This fixture builds on the `test_config` fixture from conftest.py.
 @pytest.fixture(scope="function")
-def client_with_rate_limiting(monkeypatch):
+def client_with_rate_limiting(test_config: UnifiedConfig, monkeypatch):
     """
     Provides a client where the rate limit is explicitly configured
-    for testing the rate limiting middleware. This is done by loading the
-    test config, modifying it in memory, and then patching the config loader.
+    for testing. It uses the app factory pattern to create an isolated
+    app instance with a modified and authenticated configuration.
     """
     api_key = "test-key-for-rate-limit-tests"
-    monkeypatch.setenv("PROXY_API_KEYS", api_key)
 
-    config_path = "tests/config.test.yaml"
-    with open(config_path, "r") as f:
-        test_config_data = yaml.safe_load(f)
+    # Modify the configuration object in memory for this specific test suite.
+    test_config.rate_limit.default = "5/minute"
+    test_config.proxy_api_keys = [api_key]
 
-    # Modify the config for the test
-    test_config_data['rate_limit']['limit'] = "5/minute"
+    # Create a new, isolated app instance using the modified config.
+    app = create_app(test_config)
 
-    config_manager.reset()
-
-    # Patch yaml.safe_load to return our modified config
-    with patch('yaml.safe_load', return_value=test_config_data):
-        # Now, load_config will use the patched data
-        config_manager.load_config(config_path) # path is now just a key, not read
-
-        with TestClient(fastapi_app) as c:
-            c.headers = {"X-API-Key": api_key}
-            yield c
+    with TestClient(app) as c:
+        # The API key is now managed by the app's auth system,
+        # so we just need to provide it in the headers.
+        c.headers["X-API-Key"] = api_key
+        yield c
 
 class TestRateLimitingMiddleware:
     """Integration tests for the RateLimitingMiddleware."""
@@ -64,7 +58,7 @@ class TestRateLimitingMiddleware:
         response_denied = client_with_rate_limiting.get("/v1/models")
         assert response_denied.status_code == 429
         assert "Too Many Requests" in response_denied.text
-        assert "X-RateLimit-Retry-After" in response_denied.headers
+        assert "Retry-After" in response_denied.headers
 
     def test_limit_resets_after_window(self, client_with_rate_limiting: TestClient):
         """
@@ -85,7 +79,4 @@ class TestRateLimitingMiddleware:
         Tests that a route not under the rate limiter is not affected
         even if another route is over limit.
         """
-        # We need to modify the config before the client is created for this test
-        # This test needs a more specific fixture, or we need to modify the fixture logic.
-        # For now, we will skip this test as it requires a more complex setup.
         pytest.skip("Requires a more complex fixture setup to modify routes.")

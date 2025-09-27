@@ -125,7 +125,7 @@ async def embeddings(request: EmbeddingRequest, auth_result: bool = Depends(veri
 # Include other controller routers that are not being replaced
 main_router.include_router(health_router, tags=["health"])
 main_router.include_router(context_router, tags=["context"])
-main_router.include_router(analytics_router, tags=["analytics"])
+main_router.include_router(analytics_router, prefix="/analytics", tags=["analytics"], dependencies=[Depends(verify_api_key)])
 main_router.include_router(alerting_router, tags=["alerting"])
 main_router.include_router(config_router, prefix="/config", tags=["config"])
 main_router.include_router(model_router)
@@ -242,63 +242,7 @@ async def api_status(request: Request):
     }
 
 
-# Request/Response logging middleware
-class RequestLoggingMiddleware(BaseHTTPMiddleware):
-    """Middleware for detailed request/response logging."""
-
-    async def dispatch(self, request: Request, call_next):
-        start_time = time.time()
-
-        # Log request
-        print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] {request.method} {request.url}")
-
-        response = await call_next(request)
-
-        # Log response
-        process_time = time.time() - start_time
-        logger.info(
-            "Request processed",
-            method=request.method,
-            url=str(request.url),
-            status_code=response.status_code,
-            process_time=process_time,
-        )
-
-        return response
-
-
-# CORS middleware (if needed)
-class CORSMiddleware(BaseHTTPMiddleware):
-    """CORS middleware for cross-origin requests."""
-
-    def __init__(self, app, allow_origins=None):
-        super().__init__(app)
-        self.allow_origins = allow_origins or ["*"]
-
-    async def dispatch(self, request: Request, call_next):
-        response = await call_next(request)
-
-        # Add CORS headers
-        response.headers["Access-Control-Allow-Origin"] = ", ".join(self.allow_origins)
-        response.headers["Access-Control-Allow-Methods"] = (
-            "GET, POST, PUT, DELETE, OPTIONS"
-        )
-        response.headers["Access-Control-Allow-Headers"] = (
-            "Authorization, Content-Type, X-API-Key"
-        )
-
-        return response
-
-
-# Initialize additional middleware
-request_logging_middleware = RequestLoggingMiddleware(None)
-cors_middleware = CORSMiddleware(None)
-
-
-def setup_additional_middleware(app):
-    """Setup additional utility middleware."""
-    app.add_middleware(RequestLoggingMiddleware)
-    app.add_middleware(CORSMiddleware)
+# Middleware setup functions are now in bootstrap
 
 
 # Export all necessary components
