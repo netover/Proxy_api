@@ -1,44 +1,40 @@
 {
     "tests_by_mangled_function_name": {
         "simple_function.x_add_numbers": [
-            "test_simple_function.py::test_edge_cases",
-            "test_simple_function.py::test_add_numbers",
-            "test_simple_function.py::test_property_based_tests"
+            "test_complete_elimination.py::test_add_numbers"
         ],
         "simple_function.x_multiply_numbers": [
-            "test_simple_function.py::test_edge_cases",
-            "test_simple_function.py::test_multiply_numbers",
-            "test_simple_function.py::test_property_based_tests"
+            "test_complete_elimination.py::test_multiply_numbers"
         ],
         "simple_function.x_is_even": [
-            "test_simple_function.py::test_is_even"
+            "test_complete_elimination.py::test_is_even"
         ],
         "simple_function.x_get_max": [
-            "test_simple_function.py::test_get_max",
-            "test_simple_function.py::test_edge_cases"
+            "test_complete_elimination.py::test_get_max"
         ],
         "simple_function.x_calculate_average": [
-            "test_simple_function.py::test_calculate_average",
-            "test_simple_function.py::test_edge_cases"
+            "test_complete_elimination.py::test_calculate_average"
         ],
         "simple_function.x_is_palindrome": [
-            "test_simple_function.py::test_is_palindrome",
-            "test_simple_function.py::test_edge_cases"
+            "test_complete_elimination.py::test_is_palindrome"
         ],
         "simple_function.x_count_vowels": [
-            "test_simple_function.py::test_count_vowels",
-            "test_simple_function.py::test_edge_cases"
+            "test_complete_elimination.py::test_count_vowels"
         ],
         "simple_function.x_factorial": [
-            "test_simple_function.py::test_factorial",
-            "test_simple_function.py::test_property_based_tests"
+            "test_final_elimination.py::test_factorial_edge_case_n_equals_1",
+            "test_complete_elimination.py::test_factorial_complete",
+            "test_simple_function.py::test_factorial_complete"
         ],
         "simple_function.x_fibonacci": [
-            "test_simple_function.py::test_fibonacci",
-            "test_simple_function.py::test_property_based_tests"
+            "test_final_elimination.py::test_fibonacci_edge_case_n_equals_0",
+            "test_complete_elimination.py::test_fibonacci_complete",
+            "test_simple_function.py::test_fibonacci_complete"
         ],
         "simple_function.x_is_prime": [
-            "test_simple_function.py::test_is_prime"
+            "test_complete_elimination.py::test_is_prime_complete",
+            "test_simple_function.py::test_is_prime_complete",
+            "test_final_elimination.py::test_is_prime_sqrt_implementation"
         ]
     },
     "duration_by_test": {
@@ -53,7 +49,51 @@
         "test_simple_function.py::test_fibonacci": 4.723301390185952e-05,
         "test_simple_function.py::test_is_prime": 6.392900831997395e-05,
         "test_simple_function.py::test_property_based_tests": 5.758897168561816e-05,
-        "test_simple_function.py::test_edge_cases": 7.676804671064019e-05
+        "test_simple_function.py::test_edge_cases": 7.676804671064019e-05,
+        "test_simple_function.py::test_edge_cases_rigorous": 7.505598478019238e-05,
+        "test_simple_function.py::test_factorial_implementation_specific": 5.021097604185343e-05,
+        "test_simple_function.py::test_is_prime_implementation_specific": 4.463602090254426e-05,
+        "test_simple_function.py::test_count_vowels_implementation_specific": 4.80070011690259e-05,
+        "test_simple_function.py::test_fibonacci_implementation_specific": 5.813600728288293e-05,
+        "test_simple_function.py::test_implementation_details": 4.9569993279874325e-05,
+        "test_simple_function.py::test_property_based_rigorous": 7.301499135792255e-05,
+        "test_final_elimination.py::test_list_operations": 6.652297452092171e-05,
+        "test_final_elimination.py::test_string_operations": 5.4400996305048466e-05,
+        "test_final_elimination.py::test_factorial_edge_case_n_equals_1": 6.265798583626747e-05,
+        "test_simple_function.py::test_math_operations": 4.7384004574269056e-05,
+        "test_simple_function.py::test_dict_operations": 4.4973043259233236e-05,
+        "test_simple_function.py::test_basic_functionality": 4.382198676466942e-05,
+        "test_final_elimination.py::test_is_prime_sqrt_implementation": 4.826701479032636e-05,
+        "test_final_elimination.py::test_basic_functionality": 4.454201553016901e-05,
+        "test_simple_function.py::test_list_operations": 5.024496931582689e-05,
+        "test_simple_function.py::test_boolean_operations": 3.912299871444702e-05,
+        "test_simple_function.py::test_factorial_edge_case_n_equals_1": 4.067999543622136e-05,
+        "test_simple_function.py::test_fibonacci_edge_case_n_equals_0": 5.006999708712101e-05,
+        "test_simple_function.py::test_string_operations": 4.913698649033904e-05,
+        "test_final_elimination.py::test_boolean_operations": 4.4455984607338905e-05,
+        "test_final_elimination.py::test_math_operations": 4.0292972698807716e-05,
+        "test_final_elimination.py::test_fibonacci_edge_case_n_equals_0": 4.5688997488468885e-05,
+        "test_simple_function.py::test_is_prime_sqrt_implementation": 4.464999074116349e-05,
+        "test_final_elimination.py::test_dict_operations": 6.331602344289422e-05,
+        "test_complete_elimination.py::test_list_operations": 5.822302773594856e-05,
+        "test_complete_elimination.py::test_get_max": 6.011402001604438e-05,
+        "test_complete_elimination.py::test_count_vowels": 4.648900358006358e-05,
+        "test_complete_elimination.py::test_calculate_average": 4.447699757292867e-05,
+        "test_simple_function.py::test_fibonacci_complete": 4.807102959603071e-05,
+        "test_complete_elimination.py::test_is_palindrome": 4.236004315316677e-05,
+        "test_complete_elimination.py::test_factorial_complete": 4.516594344750047e-05,
+        "test_complete_elimination.py::test_string_operations": 4.573300248011947e-05,
+        "test_complete_elimination.py::test_boolean_operations": 4.173198249191046e-05,
+        "test_simple_function.py::test_is_prime_complete": 4.426599480211735e-05,
+        "test_complete_elimination.py::test_math_operations": 4.065700341016054e-05,
+        "test_complete_elimination.py::test_basic_functionality": 4.391197580844164e-05,
+        "test_simple_function.py::test_factorial_complete": 4.356802674010396e-05,
+        "test_complete_elimination.py::test_fibonacci_complete": 4.1503983084112406e-05,
+        "test_complete_elimination.py::test_is_prime_complete": 4.2046012822538614e-05,
+        "test_complete_elimination.py::test_dict_operations": 4.443404031917453e-05,
+        "test_complete_elimination.py::test_add_numbers": 4.0814047679305077e-05,
+        "test_complete_elimination.py::test_multiply_numbers": 4.1560037061572075e-05,
+        "test_complete_elimination.py::test_is_even": 7.252703653648496e-05
     },
     "stats_time": 0.20946186500000002
 }

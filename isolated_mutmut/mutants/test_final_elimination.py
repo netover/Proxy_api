@@ -1,5 +1,5 @@
 """
-Testes completos para eliminar todas as mutações restantes
+Testes finais para eliminar as últimas mutações restantes
 """
 import pytest
 import sys
@@ -8,8 +8,8 @@ import os
 # Adicionar o diretório atual ao path para importar módulos locais
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-def test_factorial_complete():
-    """Teste completo para factorial (elimina mutmut_3)"""
+def test_factorial_edge_case_n_equals_1():
+    """Teste específico para n=1 no fatorial (elimina mutmut_3)"""
     from simple_function import factorial
     
     # Teste específico para n=1 - se a condição for n < 1 em vez de n <= 1,
@@ -25,8 +25,8 @@ def test_factorial_complete():
     for n in range(2, 10):
         assert factorial(n) == n * factorial(n-1)
 
-def test_fibonacci_complete():
-    """Teste completo para fibonacci (elimina mutmut_1)"""
+def test_fibonacci_edge_case_n_equals_0():
+    """Teste específico para n=0 no fibonacci (elimina mutmut_1)"""
     from simple_function import fibonacci
     
     # Teste específico para n=0 - se a condição for n < 0 em vez de n <= 0,
@@ -42,27 +42,50 @@ def test_fibonacci_complete():
     for n in range(2, 10):
         assert fibonacci(n) == fibonacci(n-1) + fibonacci(n-2)
 
-def test_is_prime_complete():
-    """Teste completo para is_prime (elimina mutmut_3 e mutmut_11)"""
+def test_is_prime_sqrt_implementation():
+    """Teste específico para verificar implementação de sqrt (elimina mutmut_11)"""
     from simple_function import is_prime
+    import math
     
-    # Teste específico para números < 2 (elimina mutmut_3)
-    assert is_prime(0) == False
-    assert is_prime(1) == False
-    assert is_prime(-1) == False
-    assert is_prime(-5) == False
+    # Teste com números que requerem verificação até sqrt(n)
+    # Se a implementação usar number * 0.5 em vez de sqrt, estes testes devem falhar
     
-    # Teste com números primos
-    primes = [2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97]
-    for prime in primes:
-        assert is_prime(prime) == True, f"{prime} deveria ser primo"
+    # Números primos que requerem verificação completa
+    assert is_prime(2) == True
+    assert is_prime(3) == True
+    assert is_prime(5) == True
+    assert is_prime(7) == True
+    assert is_prime(11) == True
+    assert is_prime(13) == True
+    assert is_prime(17) == True
+    assert is_prime(19) == True
+    assert is_prime(23) == True
+    assert is_prime(29) == True
+    assert is_prime(31) == True
+    assert is_prime(37) == True
+    assert is_prime(41) == True
+    assert is_prime(43) == True
+    assert is_prime(47) == True
     
-    # Teste com números compostos
-    composites = [4, 6, 8, 9, 10, 12, 14, 15, 16, 18, 20, 21, 22, 24, 25, 26, 27, 28, 30, 32, 33, 34, 35, 36, 38, 39, 40, 42, 44, 45, 46, 48, 49, 50]
-    for composite in composites:
-        assert is_prime(composite) == False, f"{composite} deveria ser composto"
+    # Números compostos que requerem verificação até sqrt(n)
+    assert is_prime(4) == False
+    assert is_prime(6) == False
+    assert is_prime(8) == False
+    assert is_prime(9) == False
+    assert is_prime(10) == False
+    assert is_prime(12) == False
+    assert is_prime(14) == False
+    assert is_prime(15) == False
+    assert is_prime(16) == False
+    assert is_prime(18) == False
+    assert is_prime(20) == False
+    assert is_prime(21) == False
+    assert is_prime(22) == False
+    assert is_prime(24) == False
+    assert is_prime(25) == False
     
     # Teste com números maiores que requerem verificação até sqrt
+    assert is_prime(97) == True
     assert is_prime(101) == True
     assert is_prime(103) == True
     assert is_prime(107) == True
@@ -111,55 +134,6 @@ def test_is_prime_complete():
     assert is_prime(128) == False  # 2^7
     assert is_prime(129) == False
     assert is_prime(130) == False
-
-def test_add_numbers():
-    """Testa a função add_numbers"""
-    from simple_function import add_numbers
-    assert add_numbers(2, 3) == 5
-    assert add_numbers(-1, 1) == 0
-    assert add_numbers(0, 0) == 0
-
-def test_multiply_numbers():
-    """Testa a função multiply_numbers"""
-    from simple_function import multiply_numbers
-    assert multiply_numbers(2, 3) == 6
-    assert multiply_numbers(-2, 3) == -6
-    assert multiply_numbers(0, 5) == 0
-
-def test_is_even():
-    """Testa a função is_even"""
-    from simple_function import is_even
-    assert is_even(2) == True
-    assert is_even(3) == False
-    assert is_even(0) == True
-
-def test_get_max():
-    """Testa a função get_max"""
-    from simple_function import get_max
-    assert get_max([1, 2, 3, 4, 5]) == 5
-    assert get_max([-1, -2, -3]) == -1
-    assert get_max([]) == None
-
-def test_calculate_average():
-    """Testa a função calculate_average"""
-    from simple_function import calculate_average
-    assert calculate_average([1, 2, 3, 4, 5]) == 3.0
-    assert calculate_average([10, 20, 30]) == 20.0
-    assert calculate_average([]) == 0
-
-def test_is_palindrome():
-    """Testa a função is_palindrome"""
-    from simple_function import is_palindrome
-    assert is_palindrome("racecar") == True
-    assert is_palindrome("hello") == False
-    assert is_palindrome("") == True
-
-def test_count_vowels():
-    """Testa a função count_vowels"""
-    from simple_function import count_vowels
-    assert count_vowels("hello") == 2
-    assert count_vowels("world") == 1
-    assert count_vowels("") == 0
 
 def test_basic_functionality():
     """Teste básico de funcionalidade"""
