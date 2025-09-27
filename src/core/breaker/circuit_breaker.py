@@ -17,7 +17,7 @@ from src.core.logging import ContextualLogger
 logger = ContextualLogger(__name__)
 
 
-class CircuitState(Enum):
+class CircuitBreakerState(Enum):
     """Enumeration for circuit breaker states."""
 
     CLOSED = "CLOSED"
@@ -51,41 +51,52 @@ class InMemoryCircuitBreaker:
         self.failure_threshold = failure_threshold
         self.recovery_timeout = recovery_timeout
         self.expected_exceptions = expected_exceptions
-        self.state = CircuitState.CLOSED
+        self.state = CircuitBreakerState.CLOSED
         self.failures = 0
+        self.success_count = 0
+        self.failure_count = 0
+        self.total_calls = 0
         self.last_failure_time = 0
 
     async def _get_state(self) -> str:
         if (
-            self.state == CircuitState.OPEN
+            self.state == CircuitBreakerState.OPEN
             and (time.time() - self.last_failure_time) > self.recovery_timeout
         ):
-            self.state = CircuitState.HALF_OPEN
+            self.state = CircuitBreakerState.HALF_OPEN
         return self.state
 
     async def _record_success(self):
         self.failures = 0
-        self.state = CircuitState.CLOSED
+        self.state = CircuitBreakerState.CLOSED
 
     async def _record_failure(self):
         self.failures += 1
+        self.failure_count += 1
+        self.total_calls += 1
         if self.failures >= self.failure_threshold:
-            self.state = CircuitState.OPEN
+            self.state = CircuitBreakerState.OPEN
             self.last_failure_time = time.time()
 
     async def call(self, func: Callable[..., Awaitable[Any]], *args, **kwargs) -> Any:
         state = await self._get_state()
-        if state == CircuitState.OPEN:
+        if state == CircuitBreakerState.OPEN:
             raise CircuitBreakerOpenException(self.name)
 
         try:
             result = await func(*args, **kwargs)
-            if state == CircuitState.HALF_OPEN:
+            self.success_count += 1
+            self.total_calls += 1
+            if state == CircuitBreakerState.HALF_OPEN:
                 await self._record_success()
             return result
         except self.expected_exceptions:
             await self._record_failure()
             raise
+
+    async def execute(self, func: Callable[..., Awaitable[Any]], *args, **kwargs) -> Any:
+        """Execute function with circuit breaker protection (alias for call)."""
+        return await self.call(func, *args, **kwargs)
 
 
 class DistributedCircuitBreaker:
@@ -137,7 +148,7 @@ class DistributedCircuitBreaker:
             if not state_data:
                 # No state in Redis, return default closed state
                 return {
-                    "state": CircuitState.CLOSED.value,
+                    "state": CircuitBreakerState.CLOSED.value,
                     "failures": 0,
                     "timestamp": time.time(),
                 }
@@ -150,7 +161,7 @@ class DistributedCircuitBreaker:
             # Use in-memory state as a fallback
             if not self.in_memory_state:
                 self.in_memory_state = {
-                    "state": CircuitState.CLOSED.value,
+                    "state": CircuitBreakerState.CLOSED.value,
                     "failures": 0,
                     "timestamp": time.time(),
                 }
@@ -162,11 +173,11 @@ class DistributedCircuitBreaker:
         # Add jitter to recovery timeout to prevent thundering herd
         jitter = self.recovery_timeout * 0.1 * random.random()
         if (
-            state["state"] == CircuitState.OPEN.value
+            state["state"] == CircuitBreakerState.OPEN.value
             and (time.time() - state["timestamp"]) > (self.recovery_timeout + jitter)
         ):
             new_state = {
-                "state": CircuitState.HALF_OPEN.value,
+                "state": CircuitBreakerState.HALF_OPEN.value,
                 "failures": 0,
                 "timestamp": time.time(),
             }
@@ -202,7 +213,7 @@ class DistributedCircuitBreaker:
                         state_data = await pipe.get(self.key)
 
                         state = {
-                            "state": CircuitState.CLOSED.value,
+                            "state": CircuitBreakerState.CLOSED.value,
                             "failures": 0,
                             "timestamp": time.time(),
                         }
@@ -213,11 +224,11 @@ class DistributedCircuitBreaker:
 
                         pipe.multi()
                         if (
-                            state["state"] == CircuitState.HALF_OPEN.value
+                            state["state"] == CircuitBreakerState.HALF_OPEN.value
                             or failures >= self.failure_threshold
                         ):
                             new_state = {
-                                "state": CircuitState.OPEN.value,
+                                "state": CircuitBreakerState.OPEN.value,
                                 "failures": failures,
                                 "timestamp": time.time(),
                             }
@@ -227,7 +238,7 @@ class DistributedCircuitBreaker:
                             )
                         else:
                             new_state = {
-                                "state": CircuitState.CLOSED.value,
+                                "state": CircuitBreakerState.CLOSED.value,
                                 "failures": failures,
                                 "timestamp": time.time(),
                             }
@@ -266,22 +277,26 @@ class DistributedCircuitBreaker:
         """
         state = await self._get_state()
 
-        if state["state"] == CircuitState.OPEN.value:
+        if state["state"] == CircuitBreakerState.OPEN.value:
             raise CircuitBreakerOpenException(self.name, self.recovery_timeout)
 
-        if state["state"] == CircuitState.HALF_OPEN.value:
+        if state["state"] == CircuitBreakerState.HALF_OPEN.value:
             logger.info(
                 f"Circuit breaker '{self.name}' is HALF-OPEN, testing with one request."
             )
 
         try:
             result = await func(*args, **kwargs)
-            if state["state"] == CircuitState.HALF_OPEN.value:
+            if state["state"] == CircuitBreakerState.HALF_OPEN.value:
                 await self._record_success()
             return result
         except self.expected_exceptions:
             await self._record_failure()
             raise
+
+    async def execute(self, func: Callable[..., Awaitable[Any]], *args, **kwargs) -> Any:
+        """Execute function with circuit breaker protection (alias for call)."""
+        return await self.call(func, *args, **kwargs)
 
 
 # --- Global Circuit Breaker Management ---
@@ -351,3 +366,71 @@ async def get_all_breaker_states() -> Dict[str, Dict]:
     for name, breaker in _circuit_breakers.items():
         states[name] = await breaker._get_state()
     return states
+
+
+class CircuitBreaker:
+    """Main circuit breaker class that wraps the in-memory implementation."""
+
+    def __init__(
+        self,
+        name: str,
+        failure_threshold: int = 5,
+        recovery_timeout: int = 60,
+        half_open_max_calls: int = 3,
+        expected_exception: Optional[str] = None
+    ):
+        self.name = name
+        self.failure_threshold = failure_threshold
+        self.recovery_timeout = recovery_timeout
+        self.half_open_max_calls = half_open_max_calls
+        self.expected_exception = expected_exception
+
+        # Use in-memory circuit breaker as the implementation
+        self._impl = InMemoryCircuitBreaker(
+            service_name=name,
+            failure_threshold=failure_threshold,
+            recovery_timeout=recovery_timeout,
+            expected_exceptions=(Exception,) if expected_exception is None else (Exception,)
+        )
+
+    @property
+    def state(self) -> CircuitBreakerState:
+        """Get current circuit breaker state."""
+        return self._impl.state
+
+    @property
+    def success_count(self) -> int:
+        """Get success count."""
+        return self._impl.success_count
+
+    @property
+    def failure_count(self) -> int:
+        """Get failure count."""
+        return self._impl.failure_count
+
+    @property
+    def total_calls(self) -> int:
+        """Get total calls."""
+        return self._impl.total_calls
+
+    async def call(self, func: Callable[[], Awaitable[Any]]) -> Any:
+        """Execute function with circuit breaker protection."""
+        return await self._impl.call(func)
+
+    async def execute(self, func: Callable[[], Awaitable[Any]]) -> Any:
+        """Execute function with circuit breaker protection (alias for call)."""
+        return await self.call(func)
+
+    async def _get_state(self) -> Dict[str, Any]:
+        """Get circuit breaker state for monitoring."""
+        return {
+            "name": self.name,
+            "state": self.state.value,
+            "success_count": self.success_count,
+            "failure_count": self.failure_count,
+            "total_calls": self.total_calls,
+            "failure_threshold": self.failure_threshold,
+            "recovery_timeout": self.recovery_timeout
+        }
+
+

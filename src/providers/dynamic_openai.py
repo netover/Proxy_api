@@ -9,17 +9,80 @@ class DynamicOpenAIProvider(DynamicProvider):
     """Dynamic OpenAI provider implementation"""
 
     async def _perform_health_check(self) -> Dict[str, Any]:
-        """Check OpenAI health"""
+        """Check OpenAI health with comprehensive validation"""
+        start_time = time.time()
         try:
+            # Test basic connectivity
             response = await self.make_request(
                 "GET",
                 f"{self.base_url}/models",
                 headers={"Authorization": f"Bearer {self.api_key}"},
+                timeout=10.0  # Faster timeout for health checks
             )
-            return response.json()
+
+            if response.status_code != 200:
+                return {
+                    "healthy": False,
+                    "error": f"API returned status {response.status_code}",
+                    "response_time": time.time() - start_time
+                }
+
+            data = response.json()
+
+            # Validate response structure
+            if not isinstance(data, dict) or "data" not in data:
+                return {
+                    "healthy": False,
+                    "error": "Invalid response structure from API",
+                    "response_time": time.time() - start_time
+                }
+
+            models = data.get("data", [])
+            if not isinstance(models, list):
+                return {
+                    "healthy": False,
+                    "error": "Models data is not a list",
+                    "response_time": time.time() - start_time
+                }
+
+            # Check if we have at least one model
+            if len(models) == 0:
+                return {
+                    "healthy": False,
+                    "error": "No models available",
+                    "response_time": time.time() - start_time
+                }
+
+            # Check API key validity by examining first model
+            first_model = models[0]
+            if not isinstance(first_model, dict) or "id" not in first_model:
+                return {
+                    "healthy": False,
+                    "error": "Invalid model structure",
+                    "response_time": time.time() - start_time
+                }
+
+            return {
+                "healthy": True,
+                "models_count": len(models),
+                "first_model": first_model.get("id"),
+                "api_version": data.get("object", "unknown"),
+                "response_time": time.time() - start_time,
+                "details": {
+                    "total_models": len(models),
+                    "models_sample": [m.get("id") for m in models[:5]]  # First 5 models
+                }
+            }
+
         except Exception as e:
+            response_time = time.time() - start_time
             self.logger.error(f"Health check failed: {e}")
-            raise
+            return {
+                "healthy": False,
+                "error": str(e),
+                "error_type": type(e).__name__,
+                "response_time": response_time
+            }
 
     async def _make_request(
         self, endpoint: str, request: Dict[str, Any], request_type: str

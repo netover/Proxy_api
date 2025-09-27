@@ -1,0 +1,16 @@
+# Development and testing dependencies
+pytest>=7.0.0
+pytest-asyncio>=0.21.0
+pytest-cov>=4.0.0
+pytest-mock>=3.10.0
+httpx>=0.24.0  # For async HTTP testing
+faker>=15.0.0   # For test data generation
+black>=23.0.0   # Code formatting
+flake8>=6.0.0   # Linting
+isort>=5.12.0   # Import sorting
+mypy>=1.0.0     # Type checking
+pre-commit>=3.0.0
+coverage>=7.0.0
+redis>=4.5.0    # For Redis testing
+docker>=6.0.0   # For container testing
+locust>=2.15.0  # For load testing

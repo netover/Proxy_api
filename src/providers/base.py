@@ -1,6 +1,6 @@
-from src.core.provider_factory import BaseProvider as CoreBaseProvider
-from src.core.provider_factory import provider_factory
-from src.core.unified_config import ProviderConfig
+from src.core.providers.factory import BaseProvider as CoreBaseProvider
+from src.core.providers.factory import provider_factory
+from src.core.config.models import ProviderConfig
 
 
 # Legacy base for backward compatibility - individual providers should inherit from core.BaseProvider

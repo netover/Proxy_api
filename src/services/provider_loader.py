@@ -1,7 +1,7 @@
 import asyncio
 from typing import Dict, List
 
-from src.core.provider_factory import provider_factory
+from src.core.providers.factory import provider_factory
 from src.core.unified_config import config_manager
 
 

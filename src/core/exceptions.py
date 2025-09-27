@@ -6,7 +6,7 @@ class ProviderError(Exception):
 
     def __init__(self, message: str, provider: str = "", code: str = "provider_error"):
         self.message = message
-        self.provider = provider
+        self.provider_name = provider  # Changed to provider_name to match test expectations
         self.code = code
         super().__init__(self.message)
 
@@ -95,6 +95,34 @@ class NotFoundError(ProviderError):
 
     def __init__(self, message: str, code: str = "not_found_error"):
         super().__init__(message, code=code)
+
+
+class APIException(Exception):
+    """Base exception for API-related errors"""
+
+    def __init__(
+        self,
+        message: str,
+        status_code: int = 500,
+        error_code: str = "internal_error",
+        details: Optional[dict] = None
+    ):
+        self.message = message
+        self.status_code = status_code
+        self.error_code = error_code
+        self.details = details or {}
+        super().__init__(self.message)
+
+    def to_dict(self) -> dict:
+        """Convert exception to dictionary for API response."""
+        return {
+            "error": {
+                "message": self.message,
+                "type": self.error_code,
+                "code": self.error_code,
+                **self.details
+            }
+        }
 
 
 class ValidationError(Exception):

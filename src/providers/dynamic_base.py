@@ -2,8 +2,8 @@ from abc import abstractmethod
 from typing import Any, Dict
 
 from src.core.logging import ContextualLogger
-from src.core.provider_factory import BaseProvider
-from src.core.unified_config import ProviderConfig
+from src.core.providers.factory import BaseProvider
+from src.core.config.models import ProviderConfig
 
 
 class DynamicProvider(BaseProvider):

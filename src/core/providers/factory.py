@@ -10,22 +10,10 @@ import time
 import httpx
 import random
 
-# Imports to be fixed in subsequent steps
 from src.core.config.models import ProviderConfig
-# from .metrics import metrics_collector  # Placeholder needed
-# from .logging import ContextualLogger # Placeholder needed
-# from .models import ModelInfo # This needs to be created or moved.
-
-# Dummy placeholders to allow the file to be created
-class ModelInfo: pass
-class ContextualLogger:
-    def __init__(self, name): pass
-    def info(self, *args, **kwargs): pass
-    def error(self, *args, **kwargs): pass
-    def warning(self, *args, **kwargs): pass
-class MetricsCollector:
-    def record_request(self, *args, **kwargs): pass
-metrics_collector = MetricsCollector()
+from src.core.logging import ContextualLogger
+from src.core.metrics import metrics_collector
+from src.models.model_info import ModelInfo
 
 
 class ProviderType(Enum):
@@ -70,6 +58,9 @@ class BaseProvider(ABC):
         self.models = config.models
         self.priority = config.priority
         self.logger = ContextualLogger(f"provider.{config.name}")
+
+        # Base URL used by provider implementations for request construction
+        self.base_url = getattr(config, "base_url", None)
 
         # Status tracking
         self._status = ProviderStatus.HEALTHY
@@ -326,11 +317,12 @@ class ProviderFactory:
 
     # Mapping of provider types to their implementation modules/classes
     PROVIDER_MAPPING = {
-        ProviderType.OPENAI: ("src.providers.dynamic_openai", "OpenAIProvider"),
-        ProviderType.ANTHROPIC: ("src.providers.dynamic_anthropic", "AnthropicProvider"),
-        ProviderType.PERPLEXITY: ("src.providers.dynamic_perplexity", "PerplexityProvider"),
-        ProviderType.BLACKBOX: ("src.providers.dynamic_blackbox", "BlackboxProvider"),
-        ProviderType.OPENROUTER: ("src.providers.dynamic_openrouter", "OpenRouterProvider"),
+        ProviderType.OPENAI: ("src.providers.dynamic_openai", "DynamicOpenAIProvider"),
+        ProviderType.ANTHROPIC: ("src.providers.dynamic_anthropic", "DynamicAnthropicProvider"),
+        ProviderType.PERPLEXITY: ("src.providers.dynamic_perplexity", "DynamicPerplexityProvider"),
+        ProviderType.BLACKBOX: ("src.providers.dynamic_blackbox", "DynamicBlackboxProvider"),
+        ProviderType.OPENROUTER: ("src.providers.dynamic_openrouter", "DynamicOpenRouterProvider"),
+        ProviderType.AZURE_OPENAI: ("src.providers.dynamic_azure_openai", "DynamicAzureOpenAIProvider"),
     }
 
     def __init__(self):
@@ -384,6 +376,11 @@ class ProviderFactory:
 
             # Perform initial health check
             health_result = await provider.health_check()
+
+            # Only create provider if health check passes
+            if not health_result.get("healthy", False):
+                await provider.close()
+                raise ValueError(f"Provider {config.name} failed health check: {health_result.get('error', 'Unknown error')}")
 
             self.logger.info(
                 f"Created provider: {config.name}",

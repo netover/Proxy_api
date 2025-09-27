@@ -1,1 +1,5 @@
-# This file makes this a Python package.
+"""Metrics package exports."""
+
+from .metrics import metrics_collector, MetricsCollector
+
+__all__ = ["metrics_collector", "MetricsCollector"]

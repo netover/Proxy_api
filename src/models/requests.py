@@ -14,6 +14,18 @@ class ChatMessage(BaseModel):
             raise ValueError("Content cannot be empty or just whitespace.")
         return v
 
+    def __getitem__(self, key):
+        """Make ChatMessage subscriptable for testing."""
+        if key == "role":
+            return self.role
+        elif key == "content":
+            return self.content
+        raise KeyError(key)
+
+    def __contains__(self, key):
+        """Make ChatMessage checkable for testing."""
+        return key in ["role", "content"]
+
 class ChatCompletionRequest(BaseModel):
     """Pydantic model for chat completions request"""
 

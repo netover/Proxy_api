@@ -5,25 +5,26 @@ from src.core.metrics import metrics_collector
 from src.providers.dynamic_base import DynamicProvider
 
 
-class DynamicPerplexityProvider(DynamicProvider):
-    """Dynamic Perplexity provider implementation"""
+class DynamicAzureOpenAIProvider(DynamicProvider):
+    """Dynamic Azure OpenAI provider implementation"""
 
     async def _perform_health_check(self) -> Dict[str, Any]:
-        """Check Perplexity health with comprehensive validation"""
+        """Check Azure OpenAI health with comprehensive validation"""
         start_time = time.time()
         try:
-            # Test basic connectivity with a simple request
+            # Azure OpenAI uses a different endpoint structure
+            # We'll test with a simple chat completion
             test_request = {
-                "model": self.models[0] if self.models else "llama-3-sonar-small-32k-online",
-                "messages": [{"role": "user", "content": "Hello, are you working?"}],
+                "model": self.models[0] if self.models else "gpt-35-turbo",  # Use first available model
+                "messages": [{"role": "user", "content": "Hello"}],
                 "max_tokens": 10
             }
 
             response = await self.make_request(
                 "POST",
-                f"{self.base_url}/chat/completions",
+                f"{self.base_url}/openai/deployments/{test_request['model']}/chat/completions",
                 headers={
-                    "Authorization": f"Bearer {self.api_key}",
+                    "api-key": self.api_key,
                     "Content-Type": "application/json",
                 },
                 json=test_request,
@@ -77,8 +78,9 @@ class DynamicPerplexityProvider(DynamicProvider):
                 "tokens_used": usage.get("total_tokens", 0),
                 "response_time": time.time() - start_time,
                 "details": {
-                    "provider": "perplexity",
-                    "model_family": data.get("model", "").split("-")[0] if data.get("model") else "unknown"
+                    "deployment": test_request["model"],
+                    "api_version": "2023-05-15",  # Azure OpenAI API version
+                    "provider": "azure_openai"
                 }
             }
 
@@ -93,16 +95,19 @@ class DynamicPerplexityProvider(DynamicProvider):
             }
 
     async def _make_request(
-        self, request: Dict[str, Any], request_type: str
+        self, endpoint: str, request: Dict[str, Any], request_type: str
     ) -> Dict[str, Any]:
-        """Helper to make requests to Perplexity's API and handle metrics."""
+        """Helper to make requests to Azure OpenAI API and handle metrics"""
         start_time = time.time()
         try:
+            # Azure OpenAI requires the model to be in the deployment path
+            model = request.get("model", self.models[0] if self.models else "gpt-35-turbo")
+
             response = await self.make_request(
                 "POST",
-                f"{self.base_url}/chat/completions",
+                f"{self.base_url}/openai/deployments/{model}/{endpoint}",
                 headers={
-                    "Authorization": f"Bearer {self.api_key}",
+                    "api-key": self.api_key,
                     "Content-Type": "application/json",
                 },
                 json=request,
@@ -134,21 +139,16 @@ class DynamicPerplexityProvider(DynamicProvider):
             raise
 
     async def create_completion(self, request: Dict[str, Any]) -> Dict[str, Any]:
-        """Create a chat completion using Perplexity's API."""
-        return await self._make_request(request, "Chat completion")
+        """Create a chat completion using Azure OpenAI's API"""
+        return await self._make_request("chat/completions", request, "Chat completion")
 
     async def create_text_completion(self, request: Dict[str, Any]) -> Dict[str, Any]:
-        """Create a text completion using Perplexity's API by adapting the request."""
-        # Adapt the text completion request to a chat completion format
-        chat_request = {
-            "model": request.get("model"),
-            "messages": [{"role": "user", "content": request.get("prompt", "")}],
-            "max_tokens": request.get("max_tokens", 1024),
-            "temperature": request.get("temperature", 0.7),
-        }
-        # Perplexity API is OpenAI-compatible, so the response is also compatible
+        """Create a text completion using Azure OpenAI's API"""
+        # Map text completion to chat completion format
+        messages = [{"role": "user", "content": request.get("prompt", "")}]
+        chat_request = {**request, "messages": messages}
         return await self.create_completion(chat_request)
 
     async def create_embeddings(self, request: Dict[str, Any]) -> Dict[str, Any]:
-        """Create embeddings using Perplexity's API (not supported)."""
-        raise NotImplementedError("Perplexity provider does not support embeddings")
+        """Create embeddings using Azure OpenAI's API"""
+        return await self._make_request("embeddings", request, "Embeddings creation")

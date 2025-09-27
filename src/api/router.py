@@ -14,6 +14,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from .controllers.alerting_controller import router as alerting_router
 from .controllers.analytics_controller import router as analytics_router
+from .controllers.chaos_controller import router as chaos_router
 from .controllers.config_controller import router as config_router
 from .controllers.health_controller import router as health_router
 from .controllers.context_controller import router as context_router
@@ -126,6 +127,7 @@ async def embeddings(request: EmbeddingRequest, auth_result: bool = Depends(veri
 main_router.include_router(health_router, tags=["health"])
 main_router.include_router(context_router, tags=["context"])
 main_router.include_router(analytics_router, prefix="/analytics", tags=["analytics"], dependencies=[Depends(verify_api_key)])
+main_router.include_router(chaos_router, prefix="/chaos", tags=["chaos"], dependencies=[Depends(verify_api_key)])
 main_router.include_router(alerting_router, tags=["alerting"])
 main_router.include_router(config_router, prefix="/config", tags=["config"])
 main_router.include_router(model_router)

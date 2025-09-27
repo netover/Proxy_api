@@ -81,6 +81,16 @@ repos:
       - id: markdownlint
         args: [--config=.markdownlint.json]
 
+  # Testing
+  - repo: local
+    hooks:
+      - id: pytest-quick
+        name: pytest-quick
+        entry: python -m pytest --tb=short -x -q tests/test_unit/
+        language: system
+        pass_filenames: false
+        files: ^tests/test_unit/.*\.py$
+
 ci:
   autofix_commit_msg: |
     [pre-commit.ci] auto fixes from {hook_id}

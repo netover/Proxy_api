@@ -75,6 +75,32 @@ class MetricsCollector:
         """
         return {}
 
+    def record_request(self, provider_name: str, success: bool, response_time: float, **kwargs) -> None:
+        """
+        Record a request metric.
+
+        Args:
+            provider_name: Name of the provider
+            success: Whether the request was successful
+            response_time: Response time in milliseconds
+            **kwargs: Additional metrics (tokens, error_type, etc.)
+        """
+        metric_name = f"request_{provider_name}"
+
+        if success:
+            self.increment(f"{metric_name}_success", 1)
+        else:
+            self.increment(f"{metric_name}_failure", 1)
+
+        self.histogram(f"{metric_name}_response_time", response_time)
+
+        # Record additional metrics if provided
+        if "tokens" in kwargs:
+            self.gauge(f"{metric_name}_tokens", kwargs["tokens"])
+
+        if "error_type" in kwargs:
+            self.increment(f"{metric_name}_error_{kwargs['error_type']}", 1)
+
     def get_prometheus_metrics(self) -> str:
         """
         Returns metrics in Prometheus format. Placeholder returns an empty string.

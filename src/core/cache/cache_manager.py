@@ -25,6 +25,7 @@ from .model_discovery import ModelDiscoveryService, ProviderConfig
 # Unified cache system imports
 from .unified_cache import UnifiedCache
 from .unified_config import config_manager
+from .redis_cache import get_response_cache, get_summary_cache, DistributedCacheManager
 
 logger = logging.getLogger(__name__)
 
@@ -99,7 +100,22 @@ class CacheManager:
         self.use_unified_cache = use_unified_cache
         self.enable_monitoring = enable_monitoring
 
-        # Initialize unified cache (primary)
+        # Initialize caches (Redis first, then unified cache as fallback)
+        self.redis_cache = None
+        self.distributed_cache_manager = None
+
+        # Try to initialize Redis cache first
+        try:
+            if hasattr(self.config, 'caching') and self.config.caching.enabled:
+                self.distributed_cache_manager = DistributedCacheManager()
+                await self.distributed_cache_manager.initialize(self.config.caching)
+                logger.info("Redis distributed cache initialized")
+            else:
+                logger.info("Redis caching disabled in config")
+        except Exception as e:
+            logger.warning(f"Redis cache initialization failed, falling back to in-memory: {e}")
+
+        # Initialize unified cache (primary fallback)
         if self.use_unified_cache:
             if cache is None:
                 cache_config = getattr(self.config.settings, "cache", None)
@@ -119,8 +135,26 @@ class CacheManager:
             else:
                 self.unified_cache = cache
 
-            # Set cache reference for backward compatibility
-            self.cache = self.unified_cache
+        # Set cache reference for backward compatibility
+        self.cache = self.unified_cache
+
+    def get_cache_for_type(self, cache_type: str = "response"):
+        """
+        Get the appropriate cache instance based on type.
+
+        Args:
+            cache_type: Type of cache ('response', 'summary', etc.)
+
+        Returns:
+            Cache instance (Redis cache if available, otherwise unified cache)
+        """
+        if self.distributed_cache_manager:
+            redis_cache = self.distributed_cache_manager.get_cache(cache_type)
+            if redis_cache:
+                return redis_cache
+
+        # Fallback to unified cache
+        return self.unified_cache
         else:
             # Fallback to legacy ModelCache
             cache_config = self.config.settings.cache

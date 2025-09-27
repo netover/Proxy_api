@@ -69,6 +69,9 @@ class RateLimitConfig(BaseModel):
     burst_limit: int = 120
     routes: Dict[str, str] = Field(default_factory=dict)
     default: str = "100/minute"
+    redis_url: str = "redis://localhost:6379"
+    strategy: str = "sliding_window"  # sliding_window, token_bucket
+    enabled: bool = True
 
 class ProviderConfig(BaseModel):
     name: str

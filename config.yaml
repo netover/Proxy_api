@@ -37,31 +37,37 @@ templates:
 chaos_engineering:
   enabled: false  # Enable only for testing
   faults:
-    - type: "delay"
+    - type: "latency"
       severity: "medium"
       probability: 0.1
       duration_ms: 500
-    - type: "error"
+      target_services: ["openai", "anthropic"]
+    - type: "network_failure"
       severity: "low"
       probability: 0.05
-      error_code: 503
-      error_message: "Service temporarily unavailable"
-    - type: "rate_limit"
+      duration_ms: 1000
+      target_services: ["openai"]
+    - type: "cpu_exhaustion"
       severity: "low"
-      probability: 0.03
-    - type: "timeout"
-      severity: "medium"
-      probability: 0.08
-      duration_ms: 5000
-    - type: "network_failure"
-      severity: "high"
       probability: 0.02
+      duration_ms: 2000
+    - type: "memory_exhaustion"
+      severity: "medium"
+      probability: 0.01
+      duration_ms: 3000
+    - type: "service_unavailable"
+      severity: "high"
+      probability: 0.03
+      duration_ms: 1500
 
 # Rate Limiting
 rate_limit:
   requests_per_window: 1000
   window_seconds: 60
   burst_limit: 50
+  redis_url: "redis://localhost:6379"
+  strategy: "sliding_window"
+  enabled: true
   routes:
     "/health": "1000/minute"
     "/v1/chat/completions": "100/minute"
@@ -163,6 +169,7 @@ condensation:
 # Smart Caching
 caching:
   enabled: true
+  redis_url: "redis://localhost:6379"
   response_cache:
     max_size_mb: 100
     ttl: 1800
