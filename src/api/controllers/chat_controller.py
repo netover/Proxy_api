@@ -7,6 +7,7 @@ from src.core.auth import verify_api_key
 from src.core.logging import ContextualLogger
 from src.core.rate_limiter import rate_limiter
 from src.models.requests import ChatCompletionRequest, TextCompletionRequest
+from src.core.config import settings
 
 from .common import request_router  # Import shared router
 
@@ -15,7 +16,7 @@ logger = ContextualLogger(__name__)
 router = APIRouter()
 
 @router.post("/v1/chat/completions")
-@rate_limiter.limit("100/minute")
+@rate_limiter.limit(lambda: f"{settings.rate_limit_requests}/{settings.rate_limit_window}second")
 async def chat_completions(
     request: Request,
     completion_request: ChatCompletionRequest,
@@ -50,7 +51,7 @@ async def chat_completions(
     return result
 
 @router.post("/v1/completions")
-@rate_limiter.limit("100/minute")
+@rate_limiter.limit(lambda: f"{settings.rate_limit_requests}/{settings.rate_limit_window}second")
 async def text_completions(
     request: Request,
     completion_request: TextCompletionRequest,
